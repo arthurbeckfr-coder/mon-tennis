@@ -216,23 +216,36 @@ export function profilForm() {
           </select>
         </label>
       </div>
+      <label>Mon classement
+        <select name="echelon">${opts(ECHELONS, p.echelon)}</select>
+      </label>
+      <p class="tiny muted">Le bilan n'est plus à saisir : il se calcule depuis tes matchs,
+        exactement comme le fait la fédération. Les deux réglages ci-dessous sont les seuls
+        qu'on ne peut pas déduire — ils se lisent sur Ten'Up, onglet
+        « Bilan classement ».</p>
+
       <div class="duo">
-        <label>Mon classement
-          <select name="echelon">${opts(ECHELONS, p.echelon)}</select>
+        <label>Bonus de victoires
+          <input type="number" name="bonusVictoires" min="0" max="7" step="1"
+                 value="${p.bonusVictoires ?? 0}">
         </label>
-        <label>Mon bilan
-          <input type="number" name="bilan" value="${h(p.bilan)}" min="0" step="1">
+        <label>Bonus de points
+          <input type="number" name="bonusPoints" min="0" step="1"
+                 value="${p.bonusPoints ?? 0}">
         </label>
       </div>
-      <p class="tiny muted">Le bilan est le nombre de points affiché sur Ten'Up, dans ta fiche
-        de classement. C'est de lui que part tout le simulateur : sans lui, on ne peut
-        que deviner. La fédération le recalcule à chaque traitement informatique.</p>
-      <label>Matchs déjà joués cette saison
-        <input type="number" name="victoiresJouees" min="0" step="1"
-               value="${p.victoiresJouees ?? ''}" placeholder="laisser vide pour compter depuis mes matchs">
+      <p class="tiny muted">Le <strong>bonus de victoires</strong>, c'est le « +2 » de
+        « victoires comptabilisées : 9+2 » — des victoires supplémentaires accordées à ton
+        ratio. Sa formule n'est pas publiée, d'où la saisie ; à zéro, le calcul est
+        seulement pessimiste. Le <strong>bonus de points</strong> est celui du double, qui
+        s'ajoute au bilan.</p>
+
+      <label>Bilan officiel Ten'Up (facultatif)
+        <input type="number" name="bilanOfficiel" min="0" step="1"
+               value="${p.bilanOfficiel ?? ''}" placeholder="pour vérifier le calcul">
       </label>
-      <p class="tiny muted">Monter demande aussi un nombre minimum de matchs joués, pas
-        seulement des points. Si tu laisses vide, on compte les matchs saisis ici.</p>
+      <p class="tiny muted">Sert uniquement de contrôle. Si le calcul ne tombe pas dessus,
+        c'est qu'il manque des matchs à l'historique — le site te le dira.</p>
     </form>`,
     footer: `<button class="btn btn-primary" data-ok>Enregistrer</button>`,
     onMount: () => {
@@ -245,8 +258,9 @@ export function profilForm() {
             prenom: d.prenom,
             sexe: d.sexe,
             echelon: d.echelon,
-            bilan: Number(d.bilan) || 0,
-            victoiresJouees: d.victoiresJouees === '' ? null : Number(d.victoiresJouees),
+            bonusVictoires: Number(d.bonusVictoires) || 0,
+            bonusPoints: Number(d.bonusPoints) || 0,
+            bilanOfficiel: d.bilanOfficiel === '' ? null : Number(d.bilanOfficiel),
           };
         }), 'Classement enregistré.');
       };

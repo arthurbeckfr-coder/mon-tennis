@@ -130,13 +130,10 @@ if (!etat.ok) {
   toast('Données locales illisibles — on repart d\'un carnet vide.');
 }
 
-/* Le classement conditionne tout le simulateur et le calcul des points.
-   Tant qu'il n'est pas renseigné, on le demande — une seule fois, sans
-   bloquer l'accès au reste. */
+/* Le classement conditionne tout le calcul des points. Sur un carnet
+   vierge, on le demande une fois — sans bloquer l'accès au reste. */
 if (etat.neuf) {
-  setTimeout(() => {
-    if (!store.profil.bilan && !store.matchs.length) profilForm();
-  }, 400);
+  setTimeout(() => { if (!store.matchs.length) profilForm(); }, 400);
 }
 
 afficher();

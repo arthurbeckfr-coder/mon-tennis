@@ -1,29 +1,36 @@
-/* Le classement FFT : échelons, barème des victoires, seuils, simulateur.
+/* Le classement FFT : échelons, barème, seuils, bilan et simulateur.
 
    Tout ce qui touche aux règles de la fédération est rassemblé ici, et
-   nulle part ailleurs. La raison est simple : ces règles changent (la 5e
-   série est née le 1er juillet 2025), et le jour où elles bougeront il
-   faudra pouvoir corriger un seul fichier sans relire l'application.
+   nulle part ailleurs : ces règles bougent — la 5ᵉ série est née le
+   1ᵉʳ juillet 2025 — et il faut pouvoir corriger un seul fichier.
 
-   Ce qui est vérifié et ce qui ne l'est pas — à lire avant de faire
-   confiance à un chiffre :
+   ─── Ce modèle a été vérifié contre les chiffres officiels ───────────
 
-   • Le barème des victoires (120/90/60/30/20/15) est recoupé par deux
-     sources indépendantes. Une seule divergence : la victoire contre un
-     adversaire 3 échelons plus bas vaut 15 points selon Wikipédia et 10
-     selon tennis-classement.fr. On retient 15, et le barème est réglable
-     dans l'application — si le prof ou Ten'Up dit autre chose, on corrige
-     sans toucher au code.
+   Il ne repose pas sur des sources de seconde main. Il a été confronté à
+   la page « Bilan de classement » de Ten'Up d'un joueur réel classé 15,
+   sur ses 28 matchs de la période, et il reproduit **les trois bilans
+   officiels au point près** :
 
-   • Les seuils de bilan minimum viennent de tennis-classement.fr. Deux
-     valeurs identiques se suivent chez les hommes (5/6 et 4/6 à 435) : ça
-     ressemble à une coquille de la source, mais on recopie plutôt que
-     d'inventer une correction.
+       bilan à 15  → 120+120+60+60+60+30+30+30+30+30+20 = 590 (+20) = 610 ✓
+       bilan à 5/6 → 90+90+30+30+30+20+20+20+20+20      = 370 (+20) = 390 ✓
+       bilan à 4/6 → 60+60+20+20+20+15+15+15+15         = 240 (+20) = 260 ✓
 
-   • Le capital de départ, lui, n'est publié par aucune source fiable.
-     C'est pourquoi le simulateur ne recalcule jamais un bilan à partir de
-     zéro : il part du bilan que Ten'Up affiche déjà, et raisonne sur
-     l'écart qui reste à combler. Moins ambitieux, mais juste. */
+   Trois enseignements en découlent, dont deux contredisent ce qu'on lit
+   partout ailleurs :
+
+   • **Il n'y a pas de « capital de départ ».** Le bilan est la somme des
+     meilleures victoires, plus les bonus. Rien d'autre. On peut donc le
+     calculer entièrement depuis l'historique, sans rien demander.
+
+   • **Le bilan se calcule échelon par échelon.** Les points d'une victoire
+     dépendent de l'échelon *visé*, pas de celui qu'on a. Battre un 4/6
+     vaut 120 quand on se juge à 15, mais seulement 60 quand on se juge à
+     4/6. C'est là toute la difficulté de monter, et c'est ce que les
+     simulateurs naïfs ratent.
+
+   • **La victoire à trois échelons d'écart vaut 15 points**, pas 10 :
+     observé directement (une victoire sur 15/1 comptée 15 points au bilan
+     à 4/6). Les deux sources publiques se contredisaient sur ce point. */
 
 /* Du plus faible au plus fort. L'ordre est la seule chose qui compte :
    tout le barème se calcule sur des écarts de position dans cette liste. */
@@ -44,10 +51,8 @@ export function echelonSuivant(e) {
   return i >= 0 && i < ECHELONS.length - 1 ? ECHELONS[i + 1] : null;
 }
 
-/* Barème par défaut, indexé par l'écart « adversaire − moi » exprimé en
-   échelons. Battre plus fort que soi rapporte gros, battre trois crans en
-   dessous rapporte des miettes, et au-delà plus rien : la fédération ne
-   veut pas qu'on monte en accumulant des victoires faciles. */
+/* Barème, indexé par l'écart « adversaire − échelon visé ». Les six
+   valeurs ont été vérifiées une à une sur des bilans officiels. */
 export const BAREME_DEFAUT = {
   '2': 120,   // adversaire 2 échelons au-dessus ou plus
   '1': 90,
@@ -55,22 +60,25 @@ export const BAREME_DEFAUT = {
   '-1': 30,
   '-2': 20,
   '-3': 15,
-  '-4': 0,    // 4 échelons en dessous ou plus
+  '-4': 0,    // 4 échelons en dessous ou plus : rien
 };
 
-/** Points rapportés par une victoire, selon le barème en vigueur.
- *  Les écarts extrêmes sont ramenés aux bornes du barème : battre un
- *  joueur 5 échelons au-dessus rapporte autant qu'à 2 échelons. */
-export function pointsVictoire(monEchelon, echelonAdverse, bareme = BAREME_DEFAUT) {
-  const diff = rang(echelonAdverse) - rang(monEchelon);
-  if (!estValide(monEchelon) || !estValide(echelonAdverse)) return 0;
-  const borne = Math.max(-4, Math.min(2, diff));
-  return bareme[String(borne)] ?? 0;
+/**
+ * Points d'une victoire, **relativement à l'échelon que l'on cherche à
+ * valider** — et non à celui que l'on porte aujourd'hui. C'est le point
+ * de bascule du calcul : le même match ne vaut pas la même chose selon
+ * l'échelon auquel on se juge.
+ */
+export function pointsVictoire(echelonVise, echelonAdverse, bareme = BAREME_DEFAUT) {
+  if (!estValide(echelonVise) || !estValide(echelonAdverse)) return 0;
+  const diff = rang(echelonAdverse) - rang(echelonVise);
+  return bareme[String(Math.max(-4, Math.min(2, diff)))] ?? 0;
 }
 
-/* Bilan minimum et nombre de victoires exigés pour être classé à chaque
-   échelon. Monter demande les deux à la fois : les points ne suffisent
-   pas si l'on n'a pas joué assez de matchs. */
+/* Bilan minimum et nombre de victoires exigés pour valider chaque
+   échelon. Les trois valeurs recoupées avec Ten'Up (15 → 420, 5/6 → 435,
+   4/6 → 435) sont exactes : le doublon 435/435, qui ressemblait à une
+   coquille de la source, n'en est pas une. */
 export const SEUILS = {
   '40':   { h: null, hv: 6,  f: null, fv: 6 },
   '30/5': { h: 6,    hv: 6,  f: 6,    fv: 6 },
@@ -84,9 +92,9 @@ export const SEUILS = {
   '15/3': { h: 325,  hv: 8,  f: 305,  fv: 8 },
   '15/2': { h: 335,  hv: 8,  f: 325,  fv: 8 },
   '15/1': { h: 360,  hv: 8,  f: 345,  fv: 8 },
-  '15':   { h: 420,  hv: 9,  f: 385,  fv: 9 },
-  '5/6':  { h: 435,  hv: 9,  f: 395,  fv: 9 },
-  '4/6':  { h: 435,  hv: 9,  f: 430,  fv: 9 },
+  '15':   { h: 420,  hv: 9,  f: 385,  fv: 9 },   // vérifié
+  '5/6':  { h: 435,  hv: 9,  f: 395,  fv: 9 },   // vérifié
+  '4/6':  { h: 435,  hv: 9,  f: 430,  fv: 9 },   // vérifié
   '3/6':  { h: 475,  hv: 10, f: 500,  fv: 10 },
   '2/6':  { h: 505,  hv: 10, f: 560,  fv: 11 },
   '1/6':  { h: 550,  hv: 11, f: 610,  fv: 12 },
@@ -96,8 +104,8 @@ export const SEUILS = {
   '-15':  { h: 930,  hv: 19, f: 780,  fv: 17 },
 };
 
-/** Ce qu'il faut atteindre pour être classé à cet échelon.
- *  `null` en points signifie que la source ne publie pas de seuil. */
+/** Ce qu'il faut atteindre pour valider cet échelon.
+ *  `points: null` signifie qu'aucun seuil n'est publié. */
 export function seuil(echelon, sexe = 'h') {
   const s = SEUILS[echelon];
   if (!s) return null;
@@ -106,44 +114,124 @@ export function seuil(echelon, sexe = 'h') {
     : { points: s.h, victoires: s.hv };
 }
 
-// =====================================================================
-//  Le bilan et son évolution
-// =====================================================================
-/* Seules les meilleures victoires comptent, et en nombre limité. Une fois
-   le quota atteint, une victoire de plus ne s'ajoute pas : elle remplace
-   la moins bonne, et ne rapporte que la différence. C'est le point que
-   tout le monde oublie, et qui explique pourquoi une victoire facile ne
-   fait parfois rien bouger du tout. */
+/* ─── Le bonus de victoires, et pourquoi il reste saisi à la main ─────
 
-/** Somme des `quota` meilleures valeurs d'une liste de points. */
-function meilleures(points, quota) {
-  return [...points].sort((a, b) => b - a).slice(0, quota).reduce((s, p) => s + p, 0);
+   Le nombre de victoires retenues n'est pas fixe : la fédération en
+   ajoute ou en retire selon un paramètre nommé V-E-2I-5G, qui mesure la
+   qualité d'ensemble du palmarès. Le document officiel en publie les
+   seuils, reproduits ici pour mémoire (2ᵉ série positive, celle qui va
+   de 15 à 0) :
+
+       de -20 à -0,1 →  0        de 15 à 22,9 → +3
+       de   0 à  7,9 → +1        de 23 à 29,9 → +4
+       de   8 à 14,9 → +2        de 30 à 39,9 → +5
+                                 40 et plus   → +6
+
+   Ce qui n'est pas publié, c'est la définition exacte des termes : la
+   pondération des défaites par le coefficient du match, et le traitement
+   des W.O. Les décimales des seuils trahissent d'ailleurs des poids
+   fractionnaires. Sur le cas mesuré, une lecture naïve retombe bien sur
+   le +2 observé à l'échelon 15, mais pas sur le +1 observé à 5/6.
+
+   Reconstituer la formule à partir de deux points d'observation
+   produirait un chiffre faux avec l'assurance d'un chiffre juste. Le
+   bonus reste donc saisi — il se lit sur Ten'Up — et vaut zéro par
+   défaut, ce qui rend le calcul pessimiste plutôt que trompeur. */
+
+/**
+ * La limitation de montée : « pour pouvoir prétendre monter à un échelon
+ * (sauf pour l'échelon 40), il est impératif d'avoir battu un joueur déjà
+ * classé à cet échelon (hors WO). »
+ *
+ * Règle officielle, et souvent la vraie raison d'un blocage : on a les
+ * points, mais pas le scalp. Un simulateur qui l'ignore annonce des
+ * montées qui n'arriveront pas.
+ */
+export function monteeAutorisee(matchs, cible, finISO = null) {
+  if (cible === '40') return { requise: false, satisfaite: true };
+  const preuve = matchs.find(m =>
+    m.issue === 'V' && !m.wo && m.echelonAdverse === cible && dansLaFenetre(m.date, finISO));
+  return { requise: true, satisfaite: !!preuve, preuve: preuve || null };
 }
 
-/** Ce que rapportent vraiment `nouvelles` victoires, une fois le jeu des
- *  remplacements appliqué. Sans historique connu, on ne peut pas jouer ce
- *  jeu : on additionne alors bêtement, en le disant à l'appelant. */
-export function gainReel(nouvelles, acquises, quota) {
-  if (!acquises || !acquises.length) {
-    return { gain: nouvelles.reduce((s, p) => s + p, 0), estime: true };
-  }
-  const avant = meilleures(acquises, quota);
-  const apres = meilleures([...acquises, ...nouvelles], quota);
-  return { gain: apres - avant, estime: false };
+// =====================================================================
+//  La fenêtre de calcul
+// =====================================================================
+/* La fédération calcule sur les douze mois qui précèdent le traitement.
+   Sur le cas vérifié, la fenêtre annoncée allait du 04/08/2025 au
+   02/08/2026 : douze mois glissants, à quelques jours près. On retient
+   douze mois pleins, ce qui donne le même compte de matchs. */
+export function dansLaFenetre(dateISO, finISO = null) {
+  if (!dateISO) return false;
+  const fin = finISO ? new Date(finISO + 'T12:00:00') : new Date();
+  const debut = new Date(fin);
+  debut.setFullYear(debut.getFullYear() - 1);
+  const d = new Date(dateISO + 'T12:00:00');
+  return !isNaN(d) && d >= debut && d <= fin;
+}
+
+// =====================================================================
+//  Le bilan
+// =====================================================================
+/**
+ * Le bilan à un échelon donné, calculé exactement comme la fédération :
+ * on note chaque victoire selon l'échelon visé, on garde les meilleures
+ * dans la limite du quota, on ajoute les bonus.
+ *
+ * @param {object} p
+ * @param {Array}  p.matchs         l'historique complet
+ * @param {string} p.cible          l'échelon que l'on cherche à valider
+ * @param {string} [p.sexe]
+ * @param {object} [p.bareme]
+ * @param {number} [p.bonusVictoires] le « +2 » de « 9+2 » sur Ten'Up :
+ *        victoires supplémentaires accordées au ratio victoires/défaites.
+ *        Il varie selon l'échelon visé et sa formule n'est pas publiée —
+ *        d'où la saisie manuelle, à 0 par défaut (donc pessimiste).
+ * @param {number} [p.bonusPoints]  bonus en points (double, etc.).
+ */
+export function bilanA({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAUT,
+                         bonusVictoires = 0, bonusPoints = 0, finISO = null }) {
+  const s = seuil(cible, sexe);
+  const quota = (s?.victoires ?? 8) + bonusVictoires;
+
+  const fenetre = matchs.filter(m => dansLaFenetre(m.date, finISO));
+  const victoires = fenetre.filter(m => m.issue === 'V');
+  const defaites = fenetre.filter(m => m.issue === 'D');
+
+  const notees = victoires
+    .map(m => ({ match: m, points: pointsVictoire(cible, m.echelonAdverse, bareme) }))
+    .sort((a, b) => b.points - a.points);
+
+  const retenues = notees.slice(0, quota);
+  const points = retenues.reduce((t, x) => t + x.points, 0);
+
+  return {
+    cible,
+    bilan: points + bonusPoints,
+    points,
+    bonusPoints,
+    quota,
+    retenues,
+    ecartees: notees.slice(quota),
+    nbMatchs: fenetre.length,
+    nbVictoires: victoires.length,
+    nbDefaites: defaites.length,
+    seuil: s,
+  };
 }
 
 // =====================================================================
 //  Le simulateur
 // =====================================================================
-/* La question qu'on se pose vraiment n'est pas « quel est mon bilan »
-   mais « qu'est-ce qu'il me reste à faire ». On répond donc en scénarios
-   concrets — une victoire à 15, ou deux à 15/1 — et non en points. */
+/* La question n'est pas « quel est mon bilan » mais « qu'est-ce qu'il me
+   reste à faire ». On répond en scénarios — une victoire à 15, ou deux à
+   15/1 — et non en points. */
 
-/** Les adversaires qu'il est réaliste de rencontrer : trois échelons en
- *  dessous, deux au-dessus. Au-delà vers le bas ça ne rapporte rien, au-delà
- *  vers le haut le barème plafonne de toute façon. */
-function adversairesPlausibles(monEchelon) {
-  const i = rang(monEchelon);
+/** Les adversaires qu'il est réaliste de rencontrer, exprimés autour de
+ *  l'échelon visé : au-delà de trois crans en dessous, une victoire ne
+ *  rapporte plus rien, et au-dessus le barème plafonne. */
+function adversairesPlausibles(cible) {
+  const i = rang(cible);
   const out = [];
   for (let d = 2; d >= -3; d--) {
     const e = ECHELONS[i + d];
@@ -152,105 +240,87 @@ function adversairesPlausibles(monEchelon) {
   return out;
 }
 
-/** Combien de victoires à cet échelon-là pour combler l'écart ?
- *  Rend null si le compte n'y arrive jamais — typiquement une victoire à
- *  zéro point, ou un plafond atteint par les remplacements. */
-function combienPour(manque, echelonAdverse, ctx, max = 8) {
-  const p = pointsVictoire(ctx.echelon, echelonAdverse, ctx.bareme);
-  if (p <= 0) return null;
-  for (let n = 1; n <= max; n++) {
-    const { gain } = gainReel(Array(n).fill(p), ctx.acquises, ctx.quota);
-    if (gain >= manque) return { n, points: p, gain };
-  }
-  return null;
+/** Ce que rapporte vraiment l'ajout de victoires, une fois le jeu des
+ *  remplacements appliqué : au-delà du quota, une victoire de plus ne
+ *  s'ajoute pas, elle remplace la moins bonne. */
+function gainDe(nouvellesPoints, base) {
+  const avant = base.retenues.reduce((t, x) => t + x.points, 0);
+  const toutes = [...base.retenues.map(x => x.points),
+                  ...base.ecartees.map(x => x.points),
+                  ...nouvellesPoints].sort((a, b) => b - a);
+  const apres = toutes.slice(0, base.quota).reduce((t, p) => t + p, 0);
+  return apres - avant;
 }
 
-/* Une victoire contre plus fort que soi est plus dure à aller chercher
-   qu'une victoire contre plus faible. Deux scénarios qui demandent le même
-   nombre de matchs ne se valent donc pas, et c'est ce coût qui les
-   départage à l'affichage. */
-function difficulte(monEchelon, echelonAdverse) {
-  const d = rang(echelonAdverse) - rang(monEchelon);
+/* Une victoire contre plus fort que soi se va chercher plus difficilement.
+   Deux scénarios de même longueur ne se valent donc pas. */
+function difficulte(cible, adversaire) {
+  const d = rang(adversaire) - rang(cible);
   return d >= 2 ? 5 : d === 1 ? 3 : d === 0 ? 2 : 1;
 }
 
 /**
  * Les chemins possibles vers l'échelon visé.
- *
- * @param {object} p
- * @param {string} p.echelon    classement actuel
- * @param {number} p.bilan      bilan actuel, celui que Ten'Up affiche
- * @param {string} [p.cible]    échelon visé (par défaut le suivant)
- * @param {string} [p.sexe]     'h' ou 'f', les seuils diffèrent
- * @param {number[]} [p.acquises] points des victoires déjà comptées
- * @param {number} [p.victoires]  nombre de victoires déjà jouées
- * @param {object} [p.bareme]
+ * @returns {{cible, bilan, manque, matchsManquants, atteint, scenarios}}
  */
-export function simuler({ echelon, bilan, cible, sexe = 'h', acquises = [], victoires = 0, bareme = BAREME_DEFAUT }) {
+export function simuler({ matchs = [], echelon, cible, sexe = 'h',
+                          bareme = BAREME_DEFAUT, bonusVictoires = 0, bonusPoints = 0 }) {
   const visee = cible || echelonSuivant(echelon);
   if (!visee) return { erreur: 'Pas d\'échelon au-dessus.' };
 
-  const s = seuil(visee, sexe);
-  if (!s || s.points == null) {
+  const base = bilanA({ matchs, cible: visee, sexe, bareme, bonusVictoires, bonusPoints });
+  if (!base.seuil || base.seuil.points == null) {
     return { erreur: `Aucun seuil publié pour ${visee}.`, cible: visee };
   }
 
-  const manque = Math.max(0, s.points - bilan);
-  const quota = s.victoires;
-  const ctx = { echelon, bareme, acquises, quota };
+  const manque = Math.max(0, base.seuil.points - base.bilan);
+  const matchsManquants = Math.max(0, base.seuil.victoires - base.nbVictoires);
+  const montee = monteeAutorisee(matchs, visee);
 
-  const matchsManquants = Math.max(0, quota - victoires);
-
-  /* Le cas où les points sont déjà là. On ne dit pas « c'est bon » pour
-     autant : il peut manquer des matchs joués, et c'est une condition à
-     part entière. */
   if (manque === 0) {
     return {
-      cible: visee, seuil: s, manque: 0, matchsManquants,
-      atteint: matchsManquants === 0,
+      ...base, manque: 0, matchsManquants, montee,
+      atteint: matchsManquants === 0 && montee.satisfaite,
       scenarios: [],
     };
   }
 
   const scenarios = [];
+  const advs = adversairesPlausibles(visee);
 
-  // D'abord les chemins purs : n victoires contre le même niveau.
-  for (const adv of adversairesPlausibles(echelon)) {
-    const r = combienPour(manque, adv, ctx);
-    if (r) {
-      scenarios.push({
-        parts: [{ echelon: adv, n: r.n, points: r.points }],
-        matchs: r.n,
-        gain: r.gain,
-        cout: r.n * difficulte(echelon, adv),
-      });
+  // Les chemins purs : n victoires contre le même niveau.
+  for (const adv of advs) {
+    const p = pointsVictoire(visee, adv, bareme);
+    if (p <= 0) continue;
+    for (let n = 1; n <= 8; n++) {
+      const gain = gainDe(Array(n).fill(p), base);
+      if (gain >= manque) {
+        scenarios.push({
+          parts: [{ echelon: adv, n, points: p }],
+          matchs: n, gain, cout: n * difficulte(visee, adv),
+        });
+        break;
+      }
     }
   }
 
-  /* Puis les chemins mixtes : une victoire de prestige complétée par des
-     victoires plus accessibles. C'est souvent le scénario le plus réaliste
-     — et celui auquel on ne pense pas tout seul. */
-  const advs = adversairesPlausibles(echelon);
+  /* Les chemins mixtes : une victoire de prestige complétée par des
+     victoires plus accessibles. Souvent le scénario le plus réaliste, et
+     celui auquel on ne pense pas seul. */
   for (const fort of advs) {
-    const pf = pointsVictoire(echelon, fort, bareme);
-    if (pf <= 0) continue;
-    const { gain: g1 } = gainReel([pf], acquises, quota);
-    if (g1 >= manque) continue;            // déjà couvert par un chemin pur
+    const pf = pointsVictoire(visee, fort, bareme);
+    if (pf <= 0 || gainDe([pf], base) >= manque) continue;
     for (const appoint of advs) {
-      if (appoint === fort) continue;
-      const pa = pointsVictoire(echelon, appoint, bareme);
-      if (pa <= 0 || pa >= pf) continue;   // l'appoint doit être plus accessible
+      const pa = pointsVictoire(visee, appoint, bareme);
+      if (appoint === fort || pa <= 0 || pa >= pf) continue;
       for (let n = 1; n <= 4; n++) {
-        const { gain } = gainReel([pf, ...Array(n).fill(pa)], acquises, quota);
+        const gain = gainDe([pf, ...Array(n).fill(pa)], base);
         if (gain >= manque) {
           scenarios.push({
-            parts: [
-              { echelon: fort, n: 1, points: pf },
-              { echelon: appoint, n, points: pa },
-            ],
-            matchs: 1 + n,
-            gain,
-            cout: difficulte(echelon, fort) + n * difficulte(echelon, appoint),
+            parts: [{ echelon: fort, n: 1, points: pf },
+                    { echelon: appoint, n, points: pa }],
+            matchs: 1 + n, gain,
+            cout: difficulte(visee, fort) + n * difficulte(visee, appoint),
           });
           break;
         }
@@ -258,26 +328,24 @@ export function simuler({ echelon, bilan, cible, sexe = 'h', acquises = [], vict
     }
   }
 
-  /* On classe par effort ressenti — d'abord le moins de matchs, puis le
-     moins difficile — et on écarte les doublons de forme identique. */
-  scenarios.sort((a, b) => a.matchs - b.matchs || a.cout - b.cout);
+  /* Tant que la limitation de montée n'est pas levée, un scénario qui ne
+     passe pas par une victoire contre un joueur de l'échelon visé ne mène
+     nulle part, quels que soient les points. On les écarte plutôt que de
+     faire miroiter une montée impossible. */
+  const valables = montee.satisfaite
+    ? scenarios
+    : scenarios.filter(s => s.parts.some(p => p.echelon === visee));
+
+  valables.sort((a, b) => a.matchs - b.matchs || a.cout - b.cout);
   const vus = new Set();
-  const retenus = scenarios.filter(s => {
+  const retenus = valables.filter(s => {
     const cle = s.parts.map(p => `${p.n}×${p.echelon}`).join('+');
     if (vus.has(cle)) return false;
     vus.add(cle);
     return true;
   }).slice(0, 8);
 
-  return {
-    cible: visee,
-    seuil: s,
-    manque,
-    matchsManquants,
-    atteint: false,
-    estime: !acquises.length,
-    scenarios: retenus,
-  };
+  return { ...base, manque, matchsManquants, montee, atteint: false, scenarios: retenus };
 }
 
 /** Formule un scénario en français : « 2 victoires à 15/1 ». */

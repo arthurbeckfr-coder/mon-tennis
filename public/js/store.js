@@ -11,7 +11,7 @@
    entre les deux appareils. */
 
 import { uid, dansLesDouzeMois } from './util.js';
-import { pointsVictoire, BAREME_DEFAUT, seuil } from './classement.js';
+import { BAREME_DEFAUT } from './classement.js';
 
 const CLE = 'tennis-donnees';
 const VERSION = 1;
@@ -75,7 +75,13 @@ export const nomCategorie = c => CATEGORIES.find(x => x.cle === c)?.nom || c;
 function vide() {
   return {
     version: VERSION,
-    profil: { prenom: '', sexe: 'h', echelon: '30/2', bilan: 0, victoiresJouees: null },
+    /* Le bilan ne se saisit plus : il se calcule depuis l'historique.
+       `bilanOfficiel` ne sert qu'à comparer avec le chiffre de Ten'Up —
+       un écart signale des matchs manquants, pas une erreur de calcul. */
+    profil: {
+      prenom: '', sexe: 'h', echelon: '15',
+      bilanOfficiel: null, bonusVictoires: 0, bonusPoints: 0,
+    },
     bareme: { ...BAREME_DEFAUT },
     matchs: [],
     conseils: [],
@@ -147,28 +153,33 @@ export const supprimerSource = id => maj(s => { s.sources = s.sources.filter(x =
 // =====================================================================
 //  Lectures calculées
 // =====================================================================
-/** Les points des victoires qui comptent pour le classement : sur les
- *  douze derniers mois, hors abandons adverses non joués. */
-export function victoiresComptees() {
-  const { echelon } = store.profil;
-  return store.matchs
-    .filter(m => m.issue === 'V' && !m.wo && dansLesDouzeMois(m.date))
-    .map(m => pointsVictoire(echelon, m.echelonAdverse, store.bareme))
-    .filter(p => p > 0)
-    .sort((a, b) => b - a);
-}
-
-/** Nombre de matchs joués sur douze mois — le quota de victoires exigé
- *  par la fédération se compte là-dessus. */
+/** Les matchs de la fenêtre de calcul du classement. */
 export function matchsDouzeMois() {
   return store.matchs.filter(m => dansLesDouzeMois(m.date));
 }
 
-export function bilanEstime() {
-  const s = seuil(store.profil.echelon, store.profil.sexe);
-  const quota = s?.victoires ?? 8;
-  const pts = victoiresComptees().slice(0, quota).reduce((a, b) => a + b, 0);
-  return { pointsVictoires: pts, quota };
+/** Les réglages du calcul, tels que `classement.js` les attend.
+ *
+ *  Le bonus de victoires est délibérément absent d'ici : il ne vaut que
+ *  pour l'échelon auquel il a été relevé. La fédération en accorde un
+ *  différent à chaque échelon visé — sur un cas mesuré, +2 à 15, +1 à 5/6
+ *  et +0 à 4/6 — et sa formule n'est pas publiée. L'appliquer partout
+ *  ferait annoncer des échelons déjà acquis qui ne le sont pas. C'est donc
+ *  à l'appelant de décider, échelon par échelon. */
+export function reglagesCalcul() {
+  return {
+    matchs: store.matchs,
+    sexe: store.profil.sexe,
+    bareme: store.bareme,
+    bonusPoints: Number(store.profil.bonusPoints) || 0,
+  };
+}
+
+/** Le bonus de victoires ne s'applique qu'à l'échelon où il a été lu.
+ *  Ailleurs on retient zéro : mieux vaut annoncer un objectif un peu plus
+ *  loin qu'il ne l'est que l'inverse. */
+export function bonusVictoiresPour(cible) {
+  return cible === store.profil.echelon ? (Number(store.profil.bonusVictoires) || 0) : 0;
 }
 
 /** Statistiques d'ensemble, telles qu'on aime les lire après coup. */
