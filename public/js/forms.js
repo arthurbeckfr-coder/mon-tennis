@@ -355,6 +355,30 @@ export function sourceForm() {
 // =====================================================================
 //  Import depuis la fédération
 // =====================================================================
+/** Reconnaît une sauvegarde du carnet collée dans l'écran d'import.
+ *  La confusion est facile — les deux écrans demandent de coller du texte —
+ *  et ses conséquences sont sournoises : l'analyseur ne refuse pas le JSON,
+ *  il y trouve des dates et en tire des matchs qui ont l'air corrects. */
+function reconnaitreSauvegarde(texte) {
+  const t = texte.trim();
+  if (!t.startsWith('{') && !t.startsWith('[')) return null;
+
+  try {
+    const lu = JSON.parse(t);
+    if (lu && typeof lu === 'object' && (Array.isArray(lu.matchs) || Array.isArray(lu.conseils))) {
+      return { matchs: (lu.matchs || []).length, conseils: (lu.conseils || []).length };
+    }
+    return null;
+  } catch {
+    /* Un copier-coller partiel ne se parse pas, mais ses clés le trahissent
+       — et c'est justement le cas où l'utilisateur a le plus besoin qu'on
+       lui dise ce qui se passe. */
+    return /"echelonAdverse"|"profil"\s*:|"version"\s*:\s*1/.test(t)
+      ? { matchs: null, conseils: null }
+      : null;
+  }
+}
+
 export function importFFTForm() {
   openModal({
     title: 'Importer mes matchs depuis Ten\'Up',
@@ -385,6 +409,33 @@ export function importFFTForm() {
       let lignes = [];
 
       const relire = () => {
+        /* Une sauvegarde du carnet collée ici par erreur : chaque fiche
+           contient une date, l'analyseur y trouve donc des centaines de
+           « matchs » et fabrique du plausible-mais-faux — des noms de clubs
+           dans la colonne adversaire. Mieux vaut le reconnaître et proposer
+           le bon geste que de laisser produire ce charabia. */
+        const sauvegarde = reconnaitreSauvegarde(zone.value);
+        if (sauvegarde) {
+          lignes = [];
+          btnOk.disabled = true;
+          apercu.innerHTML = `<div class="avis">
+            <strong>Ce n'est pas un palmarès Ten'Up : c'est une sauvegarde du carnet.</strong>
+            <p class="tiny">${sauvegarde.matchs != null
+              ? `Elle contient ${sauvegarde.matchs} match(s) et ${sauvegarde.conseils} conseil(s).`
+              : 'Le texte collé semble tronqué, mais il s\'agit bien d\'une sauvegarde.'}
+              Ce fichier se charge par le bouton 💾, pas par cet écran-ci —
+              mais autant le faire d'ici.</p>
+            <label class="case case-seule">
+              <input type="checkbox" id="sauv-remplacer" checked>
+              <span>Remplacer tout ce qui est déjà enregistré</span>
+            </label>
+            <p class="tiny muted">À laisser coché pour repartir propre : sinon la sauvegarde
+              s'ajoute à ce qui est déjà là, doublons compris.</p>
+            <button class="btn btn-primary" data-sauvegarde>Charger cette sauvegarde</button>
+          </div>`;
+          return;
+        }
+
         const { resultats, ignores } = analyser(zone.value);
         lignes = resultats;
         btnOk.disabled = !lignes.length;
@@ -405,7 +456,7 @@ export function importFFTForm() {
           <div class="tableau-defile">
           <table class="tableau-import">
             <thead><tr><th></th><th>Date</th><th>Issue</th><th>Adversaire</th>
-                       <th>Class.</th><th>Score</th></tr></thead>
+                       <th>Class.</th><th>Score</th><th>Épreuve</th><th>Né en</th></tr></thead>
             <tbody>
               ${lignes.map((l, i) => `<tr class="${l.confiance === 'verifier' ? 'douteux' : ''}">
                 <td><input type="checkbox" data-prendre="${i}" checked></td>
@@ -419,17 +470,37 @@ export function importFFTForm() {
                       <option value="">?</option>${opts(ECHELONS, l.echelonAdverse)}
                     </select></td>
                 <td><input data-champ="score" data-i="${i}" value="${h(l.score)}" size="10"></td>
+                <td><input data-champ="tournoi" data-i="${i}" value="${h(l.tournoi || '')}"></td>
+                <td><input data-champ="annee" data-i="${i}" value="${h(l.annee || '')}" size="4"></td>
               </tr>`).join('')}
             </tbody>
           </table></div>
-          <p class="tiny muted">Les lignes surlignées sont celles où l'issue ou le classement
-             n'ont pas été trouvés : corrige-les avant d'importer.</p>`;
-
-        apercu.addEventListener('input', e => {
-          const champ = e.target.dataset.champ;
-          if (champ) lignes[+e.target.dataset.i][champ] = e.target.value;
-        });
+          <p class="tiny muted">Les lignes surlignées sont celles où quelque chose manque :
+             corrige-les avant d'importer. La colonne <strong>Épreuve</strong> est le meilleur
+             contrôle — si un nom de club s'y trouve aussi bien qu'en adversaire, c'est que la
+             lecture a dérapé.</p>`;
       };
+
+      /* Un seul écouteur, posé une fois : le remettre à chaque relecture
+         les empilerait, et une frappe serait enregistrée autant de fois
+         qu'on a analysé. */
+      apercu.addEventListener('input', e => {
+        const champ = e.target.dataset.champ;
+        if (champ && lignes[+e.target.dataset.i]) {
+          lignes[+e.target.dataset.i][champ] = e.target.value;
+        }
+      });
+
+      apercu.addEventListener('click', e => {
+        if (!e.target.closest('[data-sauvegarde]')) return;
+        const remplacer = racine.querySelector('#sauv-remplacer')?.checked;
+        const r = importerJSON(zone.value, remplacer ? 'remplacement' : 'fusion');
+        if (!r.ok) { toast(r.erreur); return; }
+        closeModal();
+        toast(remplacer
+          ? `Sauvegarde chargée : ${r.matchs} match(s), ${r.conseils} conseil(s).`
+          : `Ajouté : ${r.matchs} match(s), ${r.conseils} conseil(s).`);
+      });
 
       racine.querySelector('[data-lire]').onclick = relire;
       zone.addEventListener('paste', () => setTimeout(relire, 50));
@@ -447,7 +518,7 @@ export function importFFTForm() {
             s.matchs.push({
               id: uid(), date: l.date, issue: l.issue, adversaire: l.adversaire,
               echelonAdverse: l.echelonAdverse, score: l.score, tournoi: l.tournoi,
-              wo: l.wo, notes: '', surface: '',
+              annee: l.annee || '', wo: l.wo, notes: '', surface: '',
             });
           }
           s.matchs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
