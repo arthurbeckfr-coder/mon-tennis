@@ -180,6 +180,47 @@ saison, ou par extraction directe depuis un navigateur connecté.
 
 ---
 
+## Le terrain cliquable
+
+[`public/js/terrain.js`](public/js/terrain.js) dessine un court vu du dessus,
+en SVG, dont chaque zone se touche du pouce. Le même dessin sert des deux
+côtés : à **étiqueter** un conseil quand on le note, à le **retrouver** en
+match. Ce qui a servi à ranger sert à chercher.
+
+Pourquoi un dessin plutôt qu'une liste de cases : un conseil de tennis parle
+presque toujours d'un endroit. « Avance d'un mètre », « joue croisé long »,
+« monte derrière ton coup droit » — la liste oblige à traduire, le terrain
+non. Et un tracé, contrairement à une photo de court, reste net à toutes les
+tailles, fonctionne hors ligne et se colore avec le thème.
+
+Douze coups, de trois natures, parce qu'un coup n'est pas toujours un
+endroit :
+
+| Nature | Coups |
+|---|---|
+| **Zones** cliquables sur le court | Service, Coup droit, Revers, Montée, Volée, Son coup droit, Son revers |
+| **Flèches** de direction | Croisé, Long de ligne |
+| **Pastilles** à côté | Lob, Smash, Amortie |
+
+L'orientation est celle de la caméra derrière le joueur : mon côté en bas,
+l'adversaire en haut. Pour un droitier le coup droit tombe à droite de
+l'image, comme sur le court — tout s'inverse pour un gaucher, et c'est le
+seul réglage dont le dessin a besoin (Classement → Régler → Ma main).
+
+Chaque zone porte le **nombre de conseils** qu'elle contient, recalculé
+d'après les autres filtres actifs : la pastille montre ce qu'il y a vraiment
+à lire, pas un total qui ne correspondrait à rien.
+
+Les flèches portent un double tracé — un large invisible pour attraper le
+pouce, un fin visible pour l'œil. Viser un trait de deux pixels de large sur
+un téléphone serait un jeu d'adresse.
+
+Enfin, le mode court ne montre **qu'un seul sélecteur à la fois** (le coup,
+l'adversaire, ou le moment). Un écran qu'il faut faire défiler pour trouver
+son conseil a déjà perdu la partie.
+
+---
+
 ## Réseaux sociaux des clubs : ce qui n'est pas faisable
 
 L'écran **Clubs** range les comptes et les ouvre d'un geste. Il n'affiche pas
@@ -210,6 +251,7 @@ public/
     classement.js       barème, seuils, bilan, simulateur (règles FFT)
     import-fft.js       relecture du copier-coller Ten'Up
     forms.js            tous les formulaires
+    terrain.js          le court cliquable, en SVG
     theme.js            clair / sombre / comme l'appareil
     util.js             échappement, fenêtres, dates, messages
     views/              un fichier par écran

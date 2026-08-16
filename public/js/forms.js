@@ -16,6 +16,7 @@ import {
   PROFILS, MOMENTS, CATEGORIES, PLATEFORMES, SURFACES,
 } from './store.js';
 import { analyser, EXEMPLE } from './import-fft.js';
+import { blocTerrain, brancherTerrain } from './terrain.js';
 
 const opts = (liste, choisi) => liste
   .map(v => `<option value="${h(v)}" ${v === choisi ? 'selected' : ''}>${h(v)}</option>`).join('');
@@ -152,6 +153,13 @@ export function conseilForm(existant = null) {
       </div>
 
       <fieldset>
+        <legend>De quel coup ça parle ?</legend>
+        <p class="tiny muted">Touche l'endroit du terrain concerné — la zone, la direction,
+           ou une pastille. C'est ce qui te permettra de le retrouver d'un pouce en match.</p>
+        <div id="terrain-conseil"></div>
+      </fieldset>
+
+      <fieldset>
         <legend>Face à quel joueur ?</legend>
         <p class="tiny muted">Ce sont ces cases qui feront ressortir le conseil au bon moment,
            quand tu chercheras quoi faire contre l'adversaire en face.</p>
@@ -177,11 +185,25 @@ export function conseilForm(existant = null) {
       const racine = document.getElementById('modal-root');
       const form = racine.querySelector('#f-conseil');
 
+      /* Le terrain se redessine à chaque choix : c'est un dessin, pas un
+         formulaire, donc la sélection vit ici et non dans des champs. */
+      let coups = [...(c.coups || [])];
+      const zoneTerrain = form.querySelector('#terrain-conseil');
+      const redessiner = () => {
+        zoneTerrain.innerHTML = blocTerrain({ selection: coups, gaucher: !!store.profil.gaucher });
+      };
+      redessiner();
+      brancherTerrain(zoneTerrain, cle => {
+        coups = coups.includes(cle) ? coups.filter(x => x !== cle) : [...coups, cle];
+        redessiner();
+      });
+
       racine.querySelector('[data-ok]').onclick = () => {
         if (!form.reportValidity()) return;
         const d = Object.fromEntries(new FormData(form));
         d.profils = valeurs(form, 'profils');
         d.moments = valeurs(form, 'moments');
+        d.coups = coups;
         d.favori = form.favori.checked;
         conclure(
           existant ? modifierConseil(existant.id, d) : ajouterConseil(d),
@@ -216,9 +238,19 @@ export function profilForm() {
           </select>
         </label>
       </div>
-      <label>Mon classement
-        <select name="echelon">${opts(ECHELONS, p.echelon)}</select>
-      </label>
+      <div class="duo">
+        <label>Mon classement
+          <select name="echelon">${opts(ECHELONS, p.echelon)}</select>
+        </label>
+        <label>Ma main
+          <select name="gaucher">
+            <option value="" ${!p.gaucher ? 'selected' : ''}>Droitier</option>
+            <option value="1" ${p.gaucher ? 'selected' : ''}>Gaucher</option>
+          </select>
+        </label>
+      </div>
+      <p class="tiny muted">La main décide de quel côté du terrain se trouve ton coup droit,
+        sur le schéma des conseils.</p>
       <p class="tiny muted">Le bilan n'est plus à saisir : il se calcule depuis tes matchs,
         exactement comme le fait la fédération. Les deux réglages ci-dessous sont les seuls
         qu'on ne peut pas déduire — ils se lisent sur Ten'Up, onglet
@@ -258,6 +290,7 @@ export function profilForm() {
             prenom: d.prenom,
             sexe: d.sexe,
             echelon: d.echelon,
+            gaucher: d.gaucher === '1',
             bonusVictoires: Number(d.bonusVictoires) || 0,
             bonusPoints: Number(d.bonusPoints) || 0,
             bilanOfficiel: d.bilanOfficiel === '' ? null : Number(d.bilanOfficiel),

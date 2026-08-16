@@ -79,7 +79,7 @@ function vide() {
        `bilanOfficiel` ne sert qu'à comparer avec le chiffre de Ten'Up —
        un écart signale des matchs manquants, pas une erreur de calcul. */
     profil: {
-      prenom: '', sexe: 'h', echelon: '15',
+      prenom: '', sexe: 'h', echelon: '15', gaucher: false,
       bilanOfficiel: null, bonusVictoires: 0, bonusPoints: 0,
     },
     bareme: { ...BAREME_DEFAUT },

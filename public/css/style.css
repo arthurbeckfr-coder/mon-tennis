@@ -491,6 +491,7 @@ body.mode-court .fab { display: none; }
 .puce-fort   { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .puce-faible { opacity: .8; }
 .puce-vert   { background: var(--accent); border-color: var(--accent); color: var(--accent-txt); font-weight: 600; }
+.puce-coup   { background: var(--accent-doux); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .puce-profil { border-color: var(--accent); color: var(--accent); }
 .puce-moment { font-style: italic; }
 
@@ -647,6 +648,119 @@ body.mode-court .view { padding-top: 6px; }
 .court-carte h2 { font-size: 1.32rem; line-height: 1.3; margin-bottom: 8px; }
 .court-carte p { font-size: 1.08rem; line-height: 1.55; margin: 0; }
 .court-bas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; font-size: .78rem; }
+
+/* ===================================================================
+   Le terrain cliquable
+   =================================================================== */
+/* Le tracé prend les couleurs du thème comme le reste : c'est l'avantage
+   d'un dessin sur une photo de court. */
+:root {
+  --terrain-sol:   #a9c5a2;
+  --terrain-ligne: #ffffff;
+  --terrain-texte: #17251a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --terrain-sol:   #2c4430;
+    --terrain-ligne: #cfe3cb;
+    --terrain-texte: #e8efe9;
+  }
+}
+:root[data-theme="dark"] {
+  --terrain-sol:   #2c4430;
+  --terrain-ligne: #cfe3cb;
+  --terrain-texte: #e8efe9;
+}
+
+/* Un court est deux fois plus long que large : à pleine largeur d'écran il
+   mangerait toute la hauteur et la liste des conseils passerait sous le pli.
+   On le bride donc, quitte à laisser de la marge sur les côtés. */
+.terrain {
+  display: block;
+  width: 100%;
+  max-width: 246px;
+  height: auto;
+  margin: 0 auto;
+  touch-action: manipulation;
+}
+
+.t-surface { fill: var(--terrain-sol); }
+.t-lignes { pointer-events: none; }
+.t-cadre  { fill: none; stroke: var(--terrain-ligne); stroke-width: 2; }
+.t-ligne  { stroke: var(--terrain-ligne); stroke-width: 1.4; }
+.t-filet  { stroke: var(--terrain-ligne); stroke-width: 3.4; stroke-dasharray: 3 2.2; }
+
+.t-zone { cursor: pointer; }
+.t-zone rect {
+  fill: rgba(255, 255, 255, .07);
+  stroke: rgba(255, 255, 255, .34);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  transition: fill .12s;
+}
+.t-zone text {
+  fill: var(--terrain-texte);
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.t-zone:hover rect { fill: rgba(255, 255, 255, .22); }
+.t-zone.actif rect {
+  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-dasharray: none;
+}
+.t-zone.actif text { fill: var(--accent-txt); }
+.t-zone:focus-visible rect { outline: 2px solid var(--accent); }
+
+/* La flèche porte un double tracé : un large invisible pour attraper le
+   pouce, un fin visible pour l'œil. Viser un trait de deux pixels de large
+   sur un téléphone serait un jeu d'adresse. */
+.t-fleche { cursor: pointer; }
+.t-fleche-cible { fill: none; stroke: transparent; stroke-width: 24; }
+.t-fleche-trait {
+  fill: none;
+  stroke: var(--terrain-texte);
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+  opacity: .55;
+}
+.t-fleche text {
+  fill: var(--terrain-texte);
+  font-size: 10px;
+  font-weight: 600;
+  text-anchor: middle;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: var(--terrain-sol);
+  stroke-width: 3.5;
+  opacity: .8;
+}
+.t-fleche:hover .t-fleche-trait { opacity: .9; }
+.t-fleche.actif .t-fleche-trait {
+  stroke: var(--accent);
+  stroke-width: 3.4;
+  stroke-dasharray: none;
+  opacity: 1;
+}
+.t-fleche.actif text { fill: var(--accent); opacity: 1; }
+.t-pointe { fill: var(--terrain-texte); }
+.t-fleche.actif .t-pointe { fill: var(--accent); }
+
+.t-compte { fill: var(--accent); }
+.t-compte-txt {
+  fill: var(--accent-txt);
+  font-size: 10px;
+  font-weight: 700;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.t-zone.actif .t-compte { fill: var(--carte); }
+.t-zone.actif .t-compte-txt { fill: var(--accent); }
+
+.terrain-bloc { margin: 10px 0 14px; }
+.terrain-aide { text-align: center; margin-top: 8px; }
 
 /* ===================================================================
    Clubs

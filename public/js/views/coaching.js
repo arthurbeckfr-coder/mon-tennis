@@ -7,31 +7,35 @@
 
    Le mode court sert entre deux jeux, quatre-vingt-dix secondes, une main
    sur la serviette et l'autre sur le téléphone. Là, tout ce qui n'est pas
-   immédiatement lisible est nuisible : on choisit le profil de l'adversaire
-   d'un pouce, et on ne voit plus que les conseils qui s'y rapportent, en
-   gros caractères. Rien à chercher, rien à taper.
+   immédiatement lisible est nuisible. D'où le terrain : viser une zone du
+   pouce va plus vite que lire douze libellés, et un conseil de tennis
+   parle presque toujours d'un endroit.
 
-   Le carnet est volontairement vide au premier lancement. Ces conseils
-   sont ceux de tes profs, pas des miens : les pré-remplir de généralités
-   les diluerait dans du bruit. En revanche les situations que tu as citées
-   sont proposées d'emblée, pour n'avoir qu'à les remplir. */
+   Les trois façons de chercher — le coup, l'adversaire, le moment — ne
+   s'empilent pas à l'écran : on en choisit une, et les autres attendent.
+   Un écran qu'il faut faire défiler pour trouver son conseil a déjà perdu
+   la partie.
+
+   Le carnet reste volontairement vide au premier lancement : ces conseils
+   sont ceux de tes profs, pas des miens. */
 
 import { h, hMulti, dateCourte, puce } from '../util.js';
 import {
   store, basculerFavori, PROFILS, MOMENTS, CATEGORIES,
   nomProfil, nomMoment,
 } from '../store.js';
+import { blocTerrain, nomCoup, COUPS } from '../terrain.js';
 import { conseilForm } from '../forms.js';
 
-let filtre = { profil: '', moment: '', categorie: '', texte: '', favoris: false };
-let profilCourt = '';
-let momentCourt = '';
+let filtre = { profil: '', moment: '', categorie: '', coup: '', texte: '', favoris: false };
+let court = { profil: '', moment: '', coup: '', onglet: 'terrain' };
 
-function trouver(f = filtre) {
+function trouver(f) {
   return store.conseils.filter(c => {
     if (f.favoris && !c.favori) return false;
     if (f.profil && !(c.profils || []).includes(f.profil)) return false;
     if (f.moment && !(c.moments || []).includes(f.moment)) return false;
+    if (f.coup && !(c.coups || []).includes(f.coup)) return false;
     if (f.categorie && c.categorie !== f.categorie) return false;
     if (f.texte) {
       const t = f.texte.toLowerCase();
@@ -39,6 +43,16 @@ function trouver(f = filtre) {
     }
     return true;
   });
+}
+
+/** Combien de conseils par coup, une fois les autres filtres appliqués.
+ *  Les pastilles du terrain montrent ainsi ce qu'il y a *vraiment* à
+ *  lire, et non un total qui ne correspond à rien. */
+function compterParCoup(f) {
+  const base = trouver({ ...f, coup: '' });
+  const n = {};
+  for (const c of base) for (const cle of (c.coups || [])) n[cle] = (n[cle] || 0) + 1;
+  return n;
 }
 
 const emojiCat = cle => CATEGORIES.find(x => x.cle === cle)?.emoji || '💡';
@@ -55,6 +69,7 @@ function carteConseil(c) {
       </div>
       ${c.texte ? `<p class="conseil-texte">${hMulti(c.texte)}</p>` : ''}
       <div class="conseil-bas">
+        ${(c.coups || []).map(x => puce(nomCoup(x), 'puce-coup')).join('')}
         ${(c.profils || []).map(p => puce(nomProfil(p), 'puce-profil')).join('')}
         ${(c.moments || []).map(m => puce(nomMoment(m), 'puce-moment')).join('')}
         ${c.source ? `<span class="muted">— ${h(c.source)}</span>` : ''}
@@ -68,8 +83,9 @@ function carteConseil(c) {
 //  Le carnet
 // =====================================================================
 export function render() {
-  const liste = trouver();
+  const liste = trouver(filtre);
   const total = store.conseils.length;
+  const ouvert = filtre.profil || filtre.moment || filtre.categorie || filtre.coup;
 
   return `
     ${total === 0 ? amorce() : ''}
@@ -83,9 +99,15 @@ export function render() {
       </div>
     </section>
 
-    <details class="replis" ${filtre.profil || filtre.moment || filtre.categorie ? 'open' : ''}>
+    <details class="replis" ${ouvert ? 'open' : ''}>
       <summary>Filtrer par situation</summary>
       <div class="groupe-filtres">
+        <span class="etiquette">Sur le terrain</span>
+        ${blocTerrain({
+          selection: filtre.coup ? [filtre.coup] : [],
+          gaucher: !!store.profil.gaucher,
+          compte: compterParCoup(filtre),
+        })}
         <span class="etiquette">Face à</span>
         <div class="pastilles">
           ${PROFILS.map(p => `<button data-f-profil="${p.cle}"
@@ -113,8 +135,7 @@ export function render() {
 }
 
 /** Au premier lancement : on ne meuble pas avec des conseils inventés, on
- *  montre les situations à remplir. Le carnet doit se remplir de la voix
- *  du prof, pas de la mienne. */
+ *  montre les situations à remplir. */
 function amorce() {
   return `<section class="carte carte-amorce">
     <h3>Ton carnet est vide — c'est normal</h3>
@@ -134,11 +155,17 @@ function amorce() {
   </section>`;
 }
 
+const neuf = () => ({
+  date: new Date().toISOString().slice(0, 10),
+  titre: '', texte: '', categorie: 'tactique',
+  profils: [], moments: [], coups: [], source: '', favori: false,
+});
+
 export function wire(vue, rerendre) {
   vue.querySelector('#q')?.addEventListener('input', e => {
     filtre.texte = e.target.value;
     const ul = vue.querySelector('.conseils');
-    if (ul) ul.innerHTML = trouver().map(carteConseil).join('');
+    if (ul) ul.innerHTML = trouver(filtre).map(carteConseil).join('');
   });
 
   vue.addEventListener('click', e => {
@@ -151,6 +178,9 @@ export function wire(vue, rerendre) {
       if (c) conseilForm(c);
       return;
     }
+
+    const coup = e.target.closest('[data-coup]');
+    if (coup) { filtre.coup = filtre.coup === coup.dataset.coup ? '' : coup.dataset.coup; rerendre(); return; }
 
     const bf = e.target.closest('[data-fav]');
     if (bf) { filtre.favoris = bf.dataset.fav === '1'; rerendre(); return; }
@@ -165,12 +195,11 @@ export function wire(vue, rerendre) {
     if (c) { filtre.categorie = filtre.categorie === c.dataset.fCat ? '' : c.dataset.fCat; rerendre(); return; }
 
     if (e.target.closest('[data-raz]')) {
-      filtre = { profil: '', moment: '', categorie: '', texte: '', favoris: false };
+      filtre = { profil: '', moment: '', categorie: '', coup: '', texte: '', favoris: false };
       rerendre();
       return;
     }
 
-    // Depuis l'amorce : on ouvre le formulaire avec la situation déjà cochée.
     const ap = e.target.closest('[data-amorce-profil]');
     if (ap) { conseilForm({ ...neuf(), profils: [ap.dataset.amorceProfil] }); return; }
     const am = e.target.closest('[data-amorce-moment]');
@@ -178,45 +207,63 @@ export function wire(vue, rerendre) {
   });
 }
 
-const neuf = () => ({
-  date: new Date().toISOString().slice(0, 10),
-  titre: '', texte: '', categorie: 'tactique',
-  profils: [], moments: [], source: '', favori: false,
-});
-
 // =====================================================================
 //  Le mode court
 // =====================================================================
-/* Ce que je consulte pendant le match. Deux gestes maximum : le profil de
-   l'adversaire, puis éventuellement le moment. Pas de recherche, pas de
-   clavier — on ne tape pas au clavier avec une raquette à la main. */
 export function renderCourt() {
-  const conseils = trouver({
-    profil: profilCourt, moment: momentCourt,
-    categorie: '', texte: '', favoris: false,
-  });
+  const f = { profil: court.profil, moment: court.moment, coup: court.coup,
+              categorie: '', texte: '', favoris: false };
+  const aucunFiltre = !court.profil && !court.moment && !court.coup;
 
-  /* Sans filtre, on montre les essentiels : c'est ce qu'on veut relire
-     par défaut quand on ouvre l'écran en pleine partie. */
-  const rien = !profilCourt && !momentCourt;
-  const affiches = rien ? store.conseils.filter(c => c.favori) : conseils;
+  /* Sans filtre, on montre les essentiels : c'est ce qu'on veut relire par
+     défaut quand on ouvre l'écran en pleine partie. */
+  const affiches = aucunFiltre ? store.conseils.filter(c => c.favori) : trouver(f);
+
+  const actifs = [
+    court.coup ? ['coup', nomCoup(court.coup)] : null,
+    court.profil ? ['profil', nomProfil(court.profil)] : null,
+    court.moment ? ['moment', nomMoment(court.moment)] : null,
+  ].filter(Boolean);
 
   return `
     <section class="court-choix">
-      <span class="etiquette">En face de moi</span>
-      <div class="pastilles pastilles-grosses">
-        ${PROFILS.map(p => `<button data-court-profil="${p.cle}"
-          class="pastille ${profilCourt === p.cle ? 'actif' : ''}">
-          <span class="gros-emoji">${p.emoji}</span>${h(p.nom)}</button>`).join('')}
+      <div class="segments" style="width:100%">
+        <button data-onglet="terrain" class="${court.onglet === 'terrain' ? 'actif' : ''}"
+                style="flex:1">🎾 Coup</button>
+        <button data-onglet="adversaire" class="${court.onglet === 'adversaire' ? 'actif' : ''}"
+                style="flex:1">👤 En face</button>
+        <button data-onglet="moment" class="${court.onglet === 'moment' ? 'actif' : ''}"
+                style="flex:1">⏱️ Moment</button>
       </div>
-      <span class="etiquette">Moment</span>
-      <div class="pastilles pastilles-grosses">
-        ${MOMENTS.map(m => `<button data-court-moment="${m.cle}"
-          class="pastille ${momentCourt === m.cle ? 'actif' : ''}">
-          <span class="gros-emoji">${m.emoji}</span>${h(m.nom)}</button>`).join('')}
-      </div>
-      ${(profilCourt || momentCourt)
-        ? `<button class="btn btn-ghost" data-court-raz>Revenir aux essentiels</button>` : ''}
+
+      ${actifs.length ? `<div class="pastilles" style="margin-top:10px">
+        ${actifs.map(([axe, nom]) => `<button class="pastille actif" data-retirer="${axe}">
+          ${h(nom)} ✕</button>`).join('')}
+        <button class="pastille" data-court-raz>Tout enlever</button>
+      </div>` : ''}
+
+      ${court.onglet === 'terrain' ? `
+        ${blocTerrain({
+          selection: court.coup ? [court.coup] : [],
+          gaucher: !!store.profil.gaucher,
+          compte: compterParCoup(f),
+        })}
+        <p class="tiny muted terrain-aide">Touche la zone, la direction ou la pastille
+          qui correspond à ce que tu cherches.</p>` : ''}
+
+      ${court.onglet === 'adversaire' ? `
+        <div class="pastilles pastilles-grosses">
+          ${PROFILS.map(p => `<button data-court-profil="${p.cle}"
+            class="pastille ${court.profil === p.cle ? 'actif' : ''}">
+            <span class="gros-emoji">${p.emoji}</span>${h(p.nom)}</button>`).join('')}
+        </div>` : ''}
+
+      ${court.onglet === 'moment' ? `
+        <div class="pastilles pastilles-grosses">
+          ${MOMENTS.map(m => `<button data-court-moment="${m.cle}"
+            class="pastille ${court.moment === m.cle ? 'actif' : ''}">
+            <span class="gros-emoji">${m.emoji}</span>${h(m.nom)}</button>`).join('')}
+        </div>` : ''}
     </section>
 
     <section class="court-liste">
@@ -225,12 +272,13 @@ export function renderCourt() {
           <h2>${h(c.titre)}</h2>
           ${c.texte ? `<p>${hMulti(c.texte)}</p>` : ''}
           <div class="court-bas">
+            ${(c.coups || []).map(x => puce(nomCoup(x), 'puce-coup')).join('')}
             ${(c.profils || []).map(p => puce(nomProfil(p), 'puce-profil')).join('')}
             ${c.source ? `<span class="muted">— ${h(c.source)}</span>` : ''}
           </div>
         </article>`).join('')
         : `<div class="vide"><span class="emoji">🎾</span>
-            ${rien
+            ${aucunFiltre
               ? `Aucun conseil marqué « essentiel ». Dans le carnet, touche l'étoile
                  des conseils que tu veux retrouver ici en plein match.`
               : `Rien de noté pour cette situation. C'est peut-être la question à
@@ -241,10 +289,26 @@ export function renderCourt() {
 
 export function wireCourt(vue, rerendre) {
   vue.addEventListener('click', e => {
+    const o = e.target.closest('[data-onglet]');
+    if (o) { court.onglet = o.dataset.onglet; rerendre(); return; }
+
+    const r = e.target.closest('[data-retirer]');
+    if (r) { court[r.dataset.retirer] = ''; rerendre(); return; }
+
+    const coup = e.target.closest('[data-coup]');
+    if (coup) { court.coup = court.coup === coup.dataset.coup ? '' : coup.dataset.coup; rerendre(); return; }
+
     const p = e.target.closest('[data-court-profil]');
-    if (p) { profilCourt = profilCourt === p.dataset.courtProfil ? '' : p.dataset.courtProfil; rerendre(); return; }
+    if (p) { court.profil = court.profil === p.dataset.courtProfil ? '' : p.dataset.courtProfil; rerendre(); return; }
+
     const m = e.target.closest('[data-court-moment]');
-    if (m) { momentCourt = momentCourt === m.dataset.courtMoment ? '' : m.dataset.courtMoment; rerendre(); return; }
-    if (e.target.closest('[data-court-raz]')) { profilCourt = ''; momentCourt = ''; rerendre(); }
+    if (m) { court.moment = court.moment === m.dataset.courtMoment ? '' : m.dataset.courtMoment; rerendre(); return; }
+
+    if (e.target.closest('[data-court-raz]')) {
+      court = { ...court, profil: '', moment: '', coup: '' };
+      rerendre();
+    }
   });
 }
+
+export { COUPS };
