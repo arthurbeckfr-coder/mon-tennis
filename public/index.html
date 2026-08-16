@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4a7c3f">
+<title>Mon tennis</title>
+<meta name="description" content="Historique de matchs, simulateur de classement FFT et carnet de conseils.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎾</text></svg>">
+<!-- Le ?v= force le navigateur à retélécharger la feuille de style :
+     à incrémenter quand un correctif CSS doit arriver partout. -->
+<link rel="stylesheet" href="css/style.css?v=1">
+</head>
+<body>
+
+<div id="boot" class="boot">
+  <div class="boot-logo">🎾</div>
+  <div class="boot-text">Chargement…</div>
+  <div id="boot-diag" class="boot-diag" hidden></div>
+</div>
+
+<div id="shell" hidden>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <h1 id="page-title">Mes matchs</h1>
+      <button id="btn-donnees" class="icon-btn" title="Sauvegarde et transfert"
+              aria-label="Sauvegarde et transfert">💾</button>
+      <button id="btn-theme" class="icon-btn" title="Clair, sombre ou comme l'appareil"
+              aria-label="Changer le thème">🌗</button>
+    </div>
+  </header>
+
+  <main id="view" class="view"></main>
+
+  <button id="fab" class="fab" aria-label="Ajouter">+</button>
+
+  <nav class="tabbar">
+    <a href="#/"           data-tab="/"><span>🎾</span>Matchs</a>
+    <a href="#/classement" data-tab="/classement"><span>🏅</span>Classement</a>
+    <a href="#/conseils"   data-tab="/conseils"><span>💡</span>Conseils</a>
+    <a href="#/court"      data-tab="/court"><span>🎯</span>Sur le court</a>
+    <a href="#/clubs"      data-tab="/clubs"><span>📡</span>Clubs</a>
+  </nav>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root" class="toast-root"></div>
+
+<!-- Chien de garde du démarrage : sans lui, un module qui ne se charge pas
+     laisse la page bloquée sur « Chargement… » sans rien expliquer. -->
+<script>
+(function () {
+  var diag = document.getElementById('boot-diag');
+  var problemes = [];
+
+  function montrer(genre, detail) {
+    if (window.__appReady || !diag) return;
+    problemes.push(detail);
+    diag.hidden = false;
+    diag.innerHTML =
+      '<strong>Le site n\'a pas pu démarrer.</strong>' +
+      '<p>' + genre + '</p>' +
+      '<ul><li>Recharge la page (Ctrl+Maj+R) pour ignorer le cache.</li>' +
+      '<li>Désactive un éventuel bloqueur sur ce site.</li>' +
+      '<li>Essaie un autre navigateur.</li></ul>' +
+      '<pre>' + problemes.join('\n').replace(/[<&]/g, function (c) {
+        return c === '<' ? '&lt;' : '&amp;'; }) + '</pre>';
+  }
+
+  window.addEventListener('error', function (e) {
+    if (e.target && e.target.tagName === 'SCRIPT') {
+      montrer('Un fichier JavaScript n\'a pas pu être téléchargé.',
+              'script : ' + (e.target.src || '?'));
+    } else if (e.message) {
+      montrer('Une erreur JavaScript a interrompu le démarrage.',
+              e.message + ' (' + (e.filename || '?') + ':' + (e.lineno || 0) + ')');
+    }
+  }, true);
+
+  window.addEventListener('unhandledrejection', function (e) {
+    montrer('Une opération a échoué.', String((e.reason && e.reason.message) || e.reason));
+  });
+
+  setTimeout(function () {
+    montrer('Le démarrage dépasse 10 secondes sans qu\'aucun écran ne s\'affiche.',
+            'délai de démarrage dépassé');
+  }, 10000);
+})();
+</script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

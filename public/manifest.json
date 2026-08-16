@@ -1,0 +1,20 @@
+{
+  "name": "Mon tennis",
+  "short_name": "Tennis",
+  "description": "Historique de matchs, simulateur de classement FFT et carnet de conseils.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f4",
+  "theme_color": "#4a7c3f",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%234a7c3f'/><text x='50' y='72' font-size='62' text-anchor='middle'>%F0%9F%8E%BE</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+/* La petite boîte à outils : échapper du texte, dire un mot à l'écran,
+   ouvrir une fenêtre, écrire une date en français. */
+
+/** Échappe tout ce qui vient de l'utilisateur avant de l'injecter en HTML.
+ *  Les conseils du prof sont du texte libre : un chevron mal placé ne doit
+ *  pas casser la page. */
+export const h = (s) => String(s ?? '').replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/** Conserve les retours à la ligne d'un texte saisi au clavier. */
+export const hMulti = (s) => h(s).replace(/\n/g, '<br>');
+
+export const uid = () => (crypto.randomUUID?.() ??
+  `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
+
+// =====================================================================
+//  Dates
+// =====================================================================
+export const aujourdhui = () => new Date().toISOString().slice(0, 10);
+
+/** « 12 mai 2025 ». Rend la chaîne telle quelle si elle n'est pas une date. */
+export function dateLongue(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/** « 12/05/25 », pour les listes serrées. */
+export function dateCourte(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+/** Le classement FFT se calcule sur les douze derniers mois glissants. */
+export function dansLesDouzeMois(iso) {
+  if (!iso) return false;
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return false;
+  const limite = new Date();
+  limite.setFullYear(limite.getFullYear() - 1);
+  return d >= limite;
+}
+
+export const parAnneeDescendante = (a, b) => (b.date || '').localeCompare(a.date || '');
+
+// =====================================================================
+//  Messages passagers
+// =====================================================================
+export function toast(message, duree = 2600) {
+  const racine = document.getElementById('toast-root');
+  if (!racine) return;
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = message;
+  racine.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('vu'));
+  setTimeout(() => {
+    el.classList.remove('vu');
+    setTimeout(() => el.remove(), 300);
+  }, duree);
+}
+
+// =====================================================================
+//  Fenêtres
+// =====================================================================
+let fermerCourant = null;
+
+export function closeModal() {
+  const racine = document.getElementById('modal-root');
+  if (racine) racine.innerHTML = '';
+  document.body.classList.remove('modal-ouvert');
+  fermerCourant = null;
+}
+
+/**
+ * Ouvre une fenêtre modale.
+ * @param {object} o
+ * @param {string} o.title
+ * @param {string} o.body        HTML déjà échappé par l'appelant
+ * @param {string} [o.footer]
+ * @param {boolean} [o.large]
+ * @param {(el: HTMLElement) => void} [o.onMount]
+ */
+export function openModal({ title, body, footer = '', large = false, onMount }) {
+  const racine = document.getElementById('modal-root');
+  racine.innerHTML = `
+    <div class="modal-fond">
+      <div class="modal ${large ? 'modal-large' : ''}" role="dialog" aria-modal="true"
+           aria-label="${h(title)}">
+        <div class="modal-tete">
+          <h2>${h(title)}</h2>
+          <button class="icon-btn" data-fermer aria-label="Fermer">✕</button>
+        </div>
+        <div class="modal-corps">${body}</div>
+        ${footer ? `<div class="modal-pied">${footer}</div>` : ''}
+      </div>
+    </div>`;
+  document.body.classList.add('modal-ouvert');
+
+  const fond = racine.querySelector('.modal-fond');
+  // Un clic sur le fond ferme ; un clic dans la fenêtre ne doit pas remonter.
+  fond.addEventListener('click', e => { if (e.target === fond) closeModal(); });
+  racine.querySelector('[data-fermer]').addEventListener('click', closeModal);
+
+  fermerCourant = closeModal;
+  onMount?.(racine.querySelector('.modal-corps'));
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && fermerCourant) fermerCourant();
+});
+
+// =====================================================================
+//  Confirmation
+// =====================================================================
+/* Une suppression se confirme, mais sans dramatiser : la phrase dit ce
+   qui disparaît, le bouton dit ce qu'il fait. */
+export function confirmer(question, detail = '') {
+  return new Promise(resolve => {
+    openModal({
+      title: question,
+      body: detail ? `<p class="muted">${h(detail)}</p>` : '<p class="muted">Cette action est définitive.</p>',
+      footer: `<button class="btn" data-non>Annuler</button>
+               <button class="btn btn-danger" data-oui>Supprimer</button>`,
+      onMount: () => {
+        const racine = document.getElementById('modal-root');
+        racine.querySelector('[data-non]').onclick = () => { closeModal(); resolve(false); };
+        racine.querySelector('[data-oui]').onclick = () => { closeModal(); resolve(true); };
+      },
+    });
+  });
+}
+
+/** Balise colorée réutilisée partout (profil d'adversaire, moment, issue). */
+export const puce = (texte, teinte = '') =>
+  `<span class="puce ${teinte}">${h(texte)}</span>`;

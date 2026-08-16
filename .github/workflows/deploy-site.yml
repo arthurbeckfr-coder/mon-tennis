@@ -1,0 +1,56 @@
+# Publie le site sur GitHub Pages à chaque push sur main.
+#
+# Aucun secret à configurer, et c'est délibéré : GitHub Pages s'authentifie
+# avec le jeton que l'action reçoit d'office. C'est la leçon tirée du site
+# santé, dont le workflow réclamait un CLOUDFLARE_API_TOKEN qui n'a jamais
+# été créé — d'où des déploiements manuels à répétition. Ici, il n'y a rien
+# à créer : pousser suffit.
+name: Déployer le site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+# Les trois droits exigés par Pages, et rien de plus.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un déploiement à la fois ; un push qui en double un autre annule le premier.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deployer:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publication.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ce carnet doit rester lisible sur un court sans réseau. Une police
+      # ou un script appelé chez un tiers casserait cette promesse sans
+      # qu'on s'en aperçoive : le déploiement échoue plutôt.
+      - name: Vérifier que le site reste autonome
+        run: |
+          if grep -rnE "from ['\"]https?://|src=\"https?://|href=\"https?://[^\"]*\.(css|js)" public/; then
+            echo "::error::Une ressource externe s'est glissée dans public/. Le site doit fonctionner hors ligne."
+            exit 1
+          fi
+          echo "OK — aucune ressource externe."
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - id: publication
+        uses: actions/deploy-pages@v4

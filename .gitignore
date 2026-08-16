@@ -1,0 +1,12 @@
+# Rien de ce carnet ne vit sur GitHub : les matchs et les conseils restent
+# dans le navigateur. Ce dépôt ne contient que du code.
+
+node_modules/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# Sauvegardes exportées depuis le site : ce sont des données personnelles,
+# elles n'ont rien à faire dans un dépôt public.
+tennis-*.json
