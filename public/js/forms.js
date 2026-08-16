@@ -482,6 +482,11 @@ export function donneesForm() {
       </div>
 
       <h3>Reprendre</h3>
+      <label>Choisir un fichier
+        <input type="file" id="import-fichier" accept="application/json,.json">
+      </label>
+      <p class="tiny muted">Ou coller le contenu à la main, si le fichier vient d'un
+        téléphone où il n'est pas facile à retrouver.</p>
       <label>Coller ici l'export d'un autre appareil
         <textarea id="import-json" rows="5" placeholder='{ "version": 1, … }'></textarea>
       </label>
@@ -527,6 +532,19 @@ export function donneesForm() {
           toast('Copie refusée par le navigateur.');
         }
       };
+
+      /* Un fichier choisi remplit la zone de texte : le reste du chemin
+         est alors identique, et l'on peut relire avant de valider. */
+      racine.querySelector('#import-fichier').addEventListener('change', async e => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        try {
+          racine.querySelector('#import-json').value = await f.text();
+          toast(`${f.name} chargé — reste à valider.`);
+        } catch (err) {
+          toast(`Fichier illisible : ${err.message}`);
+        }
+      });
 
       racine.querySelector('[data-importer]').onclick = () => {
         const texte = racine.querySelector('#import-json').value.trim();
