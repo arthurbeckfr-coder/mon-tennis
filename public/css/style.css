@@ -955,6 +955,12 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
 /* Une ville repère se distingue d'un club par la forme autant que par la
    couleur : un carré gris n'est pas un disque vert, et cela se lit encore
    en noir et blanc. */
+/* Le domicile et le bureau : deux emoji plutôt que deux formes de plus.
+   On les cherche du regard, et rien ne se repère plus vite qu'une maison
+   dessinée au milieu de disques. */
+.carte-ancre-marque { text-anchor: middle; }
+.carte-ancre { pointer-events: none; }
+
 .carte-ville-marque { fill: var(--muet); opacity: .75; }
 .carte-ville-nom {
   fill: var(--muet);
@@ -1015,13 +1021,30 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
 }
 .carte-bulle-nom { display: block; font-size: .92rem; line-height: 1.25; }
 .carte-bulle-detail { display: block; margin-top: 2px; }
-.carte-bulle .carte-bulle-voir {
+.carte-bulle .carte-bulle-voir,
+.carte-bulle .carte-bulle-route {
   margin-top: 8px;
   width: 100%;
   min-height: 36px;
   padding: 6px 10px;
   font-size: .82rem;
 }
+a.carte-bulle-route {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  line-height: 24px;
+}
+
+/* Le bouton « Situer » et son résultat, côte à côte sous le champ. */
+.rangee-lieu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -6px 0 12px;
+}
+.rangee-lieu .btn { flex: 0 0 auto; }
+.rangee-lieu span { flex: 1; min-width: 0; }
 .carte-bulle-fermer {
   position: absolute;
   top: 4px;

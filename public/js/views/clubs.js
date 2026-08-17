@@ -22,7 +22,8 @@ import {
   estParEquipes, PLATEFORMES,
 } from '../store.js';
 import { clubConnuPour, MOTS_EN_PLUS, LIENS_CONNUS, urlTenupClub } from '../clubs-connus.js';
-import { carteClubs, brancherCarte } from '../carte.js';
+import { carteClubs, brancherCarte, pointDuClub } from '../carte.js';
+import { distanceKm, direDistance, lienItineraire } from '../geocodage.js';
 import { clubForm, matchForm } from '../forms.js';
 
 /* ─── Les rattachements proposés ───────────────────────────────────────
@@ -410,6 +411,19 @@ export function renderFiche(params) {
   const lignes = [
     club.adresse ? ['📍', `<a href="${h(carteMaps(club.adresse))}" target="_blank"
                             rel="noopener noreferrer">${h(club.adresse)}</a>`] : null,
+    /* La distance depuis chez soi, quand les deux points sont connus. On
+       la dit à vol d'oiseau et l'on renvoie l'itinéraire à qui connaît les
+       routes : inventer un temps de trajet à partir d'une distance
+       donnerait un chiffre faux avec l'air d'être juste. */
+    (() => {
+      const chez = store.profil?.domicile?.point;
+      const ici = pointDuClub(club);
+      const d = distanceKm(chez, ici);
+      if (d == null) return null;
+      return ['🚗', `${h(direDistance(d))} de chez toi —
+        <a href="${h(lienItineraire(chez, ici))}" target="_blank"
+           rel="noopener noreferrer">voir l'itinéraire ↗</a>`];
+    })(),
     club.telephone ? ['📞', `<a href="tel:${h(club.telephone.replace(/\s/g, ''))}">${h(club.telephone)}</a>`] : null,
     club.mail ? ['✉️', `<a href="mailto:${h(club.mail)}">${h(club.mail)}</a>`] : null,
     club.jugeArbitre ? ['⚖️', (() => {

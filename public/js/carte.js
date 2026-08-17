@@ -29,6 +29,8 @@
    placé au hasard — il est dit absent, et compté. */
 
 import { h } from './util.js';
+import { store } from './store.js';
+import { distanceKm, direDistance, lienItineraire } from './geocodage.js';
 import { CONTOURS } from './contours.js';
 import { ROUTES, VILLES } from './reperes.js';
 
@@ -163,6 +165,23 @@ export function carteClubs(clubs) {
      Elles se distinguent des clubs par la forme autant que par la
      couleur : un carré gris n'est pas un disque vert, même en noir et
      blanc. */
+  /* Le domicile et le bureau, s'ils ont été situés. Ils ne sont pas des
+     clubs et ne doivent pas s'y confondre : une forme à eux, et un nom
+     écrit à côté, parce qu'on les cherche du regard. */
+  const repereAncres = [
+    { cle: 'domicile', nom: 'Chez moi', emoji: '🏠', lieu: store?.profil?.domicile },
+    { cle: 'bureau', nom: 'Le bureau', emoji: '💼', lieu: store?.profil?.bureau },
+  ].filter(x => Array.isArray(x.lieu?.point));
+
+  const ancres = repereAncres.map(a => {
+    const [x, y] = projete(a.lieu.point);
+    return `<g class="carte-ancre" data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}">
+      <title>${h(a.nom)} — ${h(a.lieu.libelle || a.lieu.adresse)}</title>
+      <text class="carte-ancre-marque" x="${x.toFixed(4)}" y="${y.toFixed(4)}"
+            >${a.emoji}</text>
+    </g>`;
+  }).join('');
+
   const villes = VILLES.map(v => {
     const [x, y] = projete(v.point);
     return `<g class="carte-ville" data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}">
@@ -179,6 +198,7 @@ export function carteClubs(clubs) {
       ${fond}
       ${routes}
       ${villes}
+      ${ancres}
       ${pts.map(p => {
         const [x, y] = p.xy;
         const rpx = rayonPx(p.matchs.length);
@@ -199,7 +219,15 @@ export function carteClubs(clubs) {
              data-rpx="${rpx.toFixed(2)}"
              data-nom="${h(p.club.nom)}"
              data-detail="${p.matchs.length} match${p.matchs.length > 1 ? 's' : ''} — ${p.bilan.v}V–${p.bilan.d}D${
-               p.club.ville ? ' — ' + h(p.club.ville) : ''}">
+               p.club.ville ? ' — ' + h(p.club.ville) : ''}${
+               (() => {
+                 /* La distance depuis chez soi, quand on sait d'où l'on
+                    part. À vol d'oiseau et dit comme tel : la route est
+                    plus longue, et de combien dépend du relief. */
+                 const d = distanceKm(store?.profil?.domicile?.point, p.point);
+                 return d == null ? '' : ' — ' + h(direDistance(d));
+               })()}"
+             data-lon="${p.point[0]}" data-lat="${p.point[1]}">
           <title>${h(p.club.nom)} — ${p.matchs.length} match(s), ${p.bilan.v}V–${p.bilan.d}D</title>
           <circle class="carte-halo" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
                   r="${(r * 1.9).toFixed(4)}"/>
@@ -214,6 +242,12 @@ export function carteClubs(clubs) {
       <strong class="carte-bulle-nom"></strong>
       <span class="carte-bulle-detail tiny muted"></span>
       <button class="btn btn-primary carte-bulle-voir">Voir la fiche</button>
+      ${/* L'itinéraire s'ouvre dans l'application de cartes du téléphone :
+            elle seule connaît les routes, les travaux et l'heure. Le carnet
+            ne calcule pas de temps de trajet — il n'en a pas les moyens et
+            n'inventera pas un chiffre qui aurait l'air juste. */''}
+      <a class="btn btn-ghost carte-bulle-route" target="_blank"
+         rel="noopener noreferrer" hidden>Itinéraire depuis chez moi ↗</a>
     </div>
 
     <div class="carte-outils">
@@ -305,12 +339,20 @@ export function brancherCarte(racine, ouvrirClub) {
      s'approche : ils s'écartent sans grossir. */
   const clubs = [...bloc.querySelectorAll('.carte-club')];
   const villes = [...bloc.querySelectorAll('.carte-ville')];
+  const ancresDom = [...bloc.querySelectorAll('.carte-ancre')];
 
   const redimensionner = ech => {
     for (const g of clubs) {
       const r = Number(g.dataset.rpx) / ech;
       g.querySelector('.carte-point').setAttribute('r', r.toFixed(5));
       g.querySelector('.carte-halo').setAttribute('r', (r * 1.9).toFixed(5));
+    }
+    for (const g of ancresDom) {
+      const x = Number(g.dataset.x), y = Number(g.dataset.y);
+      const t = g.querySelector('text');
+      t.setAttribute('font-size', (17 / ech).toFixed(5));
+      t.setAttribute('x', x.toFixed(5));
+      t.setAttribute('y', (y + 6 / ech).toFixed(5));
     }
     for (const g of villes) {
       const x = Number(g.dataset.x), y = Number(g.dataset.y);
@@ -345,6 +387,13 @@ export function brancherCarte(racine, ouvrirClub) {
     choisi = { x: Number(g.dataset.x), y: Number(g.dataset.y), id: g.dataset.clubCarte };
     bulle.querySelector('.carte-bulle-nom').textContent = g.dataset.nom;
     bulle.querySelector('.carte-bulle-detail').textContent = g.dataset.detail;
+
+    const route = bulle.querySelector('.carte-bulle-route');
+    const depuis = store?.profil?.domicile?.point;
+    const vers = [Number(g.dataset.lon), Number(g.dataset.lat)];
+    route.hidden = !depuis;
+    if (depuis) route.href = lienItineraire(depuis, vers);
+
     bulle.hidden = false;
     bloc.querySelectorAll('.carte-club').forEach(x => x.classList.toggle('choisi', x === g));
     placerBulle();

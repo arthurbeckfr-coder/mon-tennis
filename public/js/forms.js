@@ -19,6 +19,7 @@ import {
 import { ICONES, CATEGORIES_COURSES, CAUSES_CORDAGE } from './materiel.js';
 import { analyser, EXEMPLE } from './import-fft.js';
 import { URL_TENUP } from './config.js';
+import { situer } from './geocodage.js';
 import { blocTerrain, brancherTerrain } from './terrain.js';
 import * as nuage from './nuage.js';
 
@@ -343,6 +344,23 @@ export function conseilForm(existant = null) {
 // =====================================================================
 //  Mon profil
 // =====================================================================
+/* Un lieu de départ : son adresse, et le point qu'on en a tiré. Les deux
+   vont ensemble — l'adresse pour la relire, le point pour calculer — et le
+   second ne s'obtient qu'en le demandant, ce que dit le bouton. */
+function champLieu(cle, libelle, lieu, exemple) {
+  const situe = lieu?.point;
+  return `<label>${h(libelle)}
+    <input name="${cle}" value="${h(lieu?.adresse || '')}" placeholder="${h(exemple)}"
+           autocomplete="off">
+  </label>
+  <div class="rangee-lieu">
+    <button type="button" class="btn btn-ghost" data-situer="${cle}">Situer</button>
+    <span class="tiny muted" data-etat="${cle}">${situe
+      ? `📍 ${h(lieu.libelle || lieu.adresse)}`
+      : 'pas encore situé'}</span>
+  </div>`;
+}
+
 export function profilForm() {
   const p = store.profil;
   openModal({
@@ -397,12 +415,65 @@ export function profilForm() {
       </label>
       <p class="tiny muted">Sert uniquement de contrôle. Si le calcul ne tombe pas dessus,
         c'est qu'il manque des matchs à l'historique — le site te le dira.</p>
+
+      <fieldset>
+        <legend>D'où je pars</legend>
+        <p class="tiny muted">Pour situer les clubs par rapport à chez toi et savoir
+          lesquels sont à côté. Ces adresses ne quittent ton carnet qu'au moment où tu
+          demandes à les situer, et rien n'est deviné : une adresse non reconnue reste
+          sans point plutôt que d'être placée au hasard.</p>
+        ${/* Des exemples inventés, et c'est délibéré : ce dépôt est public,
+              et le repère de saisie d'un formulaire n'est pas l'endroit où
+              écrire l'adresse de quelqu'un. */''}
+        ${champLieu('domicile', 'Mon domicile', p.domicile, '12 rue des Écoles, 76000 Rouen')}
+        ${champLieu('bureau', 'Mon travail', p.bureau, '3 place du Marché, 76200 Dieppe')}
+        <p class="tiny muted">Mets la commune et le code postal : sans eux, le service des
+          adresses cherche dans toute la France et se trompe de rue.</p>
+      </fieldset>
     </form>`,
     footer: `<button class="btn btn-primary" data-ok>Enregistrer</button>`,
     onMount: () => {
-      document.getElementById('modal-root').querySelector('[data-ok]').onclick = () => {
+      const racine = document.getElementById('modal-root');
+
+      /* Ce qu'on a situé pendant la saisie, en attendant l'enregistrement.
+         On ne touche au carnet qu'au bouton « Enregistrer » : chercher une
+         adresse ne doit pas décider à la place du lecteur. */
+      const situes = { domicile: p.domicile || null, bureau: p.bureau || null };
+
+      racine.querySelectorAll('[data-situer]').forEach(b => {
+        b.addEventListener('click', async () => {
+          const cle = b.dataset.situer;
+          const champ = racine.querySelector(`[name="${cle}"]`);
+          const etat = racine.querySelector(`[data-etat="${cle}"]`);
+          const adresse = champ.value.trim();
+
+          if (!adresse) { situes[cle] = null; etat.textContent = 'pas encore situé'; return; }
+
+          b.disabled = true;
+          etat.textContent = 'recherche…';
+          const r = await situer(adresse);
+          b.disabled = false;
+
+          if (!r.ok) { situes[cle] = null; etat.textContent = `⚠️ ${r.erreur}`; return; }
+          situes[cle] = { adresse, point: r.point, libelle: r.libelle };
+          etat.textContent = `📍 ${r.libelle}`;
+        });
+      });
+
+      racine.querySelector('[data-ok]').onclick = () => {
         const form = document.getElementById('f-profil');
         const d = Object.fromEntries(new FormData(form));
+
+        /* Une adresse retouchée sans être resituée garderait l'ancien
+           point, donc un domicile faux à l'autre bout du département. On
+           préfère perdre le point et le redemander. */
+        const lieu = cle => {
+          const a = (d[cle] || '').trim();
+          if (!a) return null;
+          const s = situes[cle];
+          return s && s.adresse === a ? s : { adresse: a, point: null, libelle: '' };
+        };
+
         conclure(maj(s => {
           s.profil = {
             ...s.profil,
@@ -413,6 +484,8 @@ export function profilForm() {
             bonusVictoires: Number(d.bonusVictoires) || 0,
             bonusPoints: Number(d.bonusPoints) || 0,
             bilanOfficiel: d.bilanOfficiel === '' ? null : Number(d.bilanOfficiel),
+            domicile: lieu('domicile'),
+            bureau: lieu('bureau'),
           };
         }), 'Classement enregistré.');
       };
