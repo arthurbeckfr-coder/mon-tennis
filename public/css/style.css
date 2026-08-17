@@ -906,6 +906,34 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
   stroke-linejoin: round;
 }
 
+/* Les axes : présents pour situer, jamais pour être lus. Un trait fin et
+   discret, d'épaisseur constante à l'écran. */
+.carte-route {
+  fill: none;
+  stroke: var(--muet);
+  stroke-width: 1.6;
+  stroke-opacity: .38;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Une ville repère se distingue d'un club par la forme autant que par la
+   couleur : un carré gris n'est pas un disque vert, et cela se lit encore
+   en noir et blanc. */
+.carte-ville-marque { fill: var(--muet); opacity: .75; }
+.carte-ville-nom {
+  fill: var(--muet);
+  text-anchor: middle;
+  font-family: inherit;
+  font-weight: 500;
+  paint-order: stroke;
+  stroke: var(--carte);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
 .carte-halo { fill: var(--accent); opacity: .12; }
 .carte-point { fill: var(--muet); stroke: var(--carte); stroke-width: .0006; }
 .carte-club.gagnant .carte-point { fill: var(--victoire); }

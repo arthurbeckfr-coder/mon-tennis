@@ -30,6 +30,7 @@
 
 import { h } from './util.js';
 import { CONTOURS } from './contours.js';
+import { ROUTES, VILLES } from './reperes.js';
 
 /* Le centre officiel de chaque commune où l'on a joué, en [longitude,
    latitude]. Auffay a fusionné dans Val-de-Scie et Belleville-sur-Mer
@@ -116,18 +117,24 @@ export function carteClubs(clubs) {
 
   const maxMatchs = Math.max(1, ...pts.map(p => p.matchs.length));
 
-  /* Le rayon dit le nombre de matchs, en racine carrée : c'est l'aire du
-     disque qu'on lit, pas son rayon, et proportionner le rayon ferait
-     paraître un club de quarante-six matchs vingt fois plus gros qu'un
-     club de deux.
+  /* Le rayon est donné en pixels d'écran, et non en unités de carte.
+     C'est tout le sujet : exprimé en unités de carte, un disque grossit
+     avec le zoom, si bien qu'en s'approchant on obtenait des pastilles
+     énormes — et deux clubs voisins restaient superposés quel que soit
+     le grossissement, puisqu'ils enflaient ensemble. En pixels, zoomer
+     écarte les clubs sans les gonfler, ce qui est précisément ce qu'on
+     attend d'une carte.
 
-     Le diviseur est calé sur le rendu réel et non choisi au jugé : à
-     l'échelle où s'affiche un département sur un téléphone, il donne des
-     pastilles de treize à trente pixels. Plus gros, quatorze clubs voisins
-     ne feraient qu'une tache ; plus petit, on ne pourrait plus les viser
-     au pouce. Le plancher de 1,4 existe pour cela — un club à deux matchs
-     doit rester touchable. */
-  const rayon = n => (1.4 + 1.8 * Math.sqrt(n / maxMatchs)) * etendue / 62;
+     La taille suit la racine carrée du nombre de matchs : c'est l'aire du
+     disque qu'on lit, pas son rayon. Six à douze pixels de rayon — assez
+     pour viser au pouce, assez peu pour que quatorze clubs ne fassent pas
+     une tache. */
+  const rayonPx = n => 6 + 6 * Math.sqrt(n / maxMatchs);
+
+  /* La hauteur de la carte est fixée par la feuille de style. On s'en sert
+     pour poser une première taille cohérente ; `brancherCarte` la corrige
+     dès le premier affichage, avec les dimensions réelles. */
+  const echInitiale = 340 / boite.h;
 
   /* Le fond passe par la même projection que les clubs : sans cela, les
      points flotteraient à côté de leur pays au lieu d'être dedans. */
@@ -142,15 +149,40 @@ export function carteClubs(clubs) {
     .map(anneau => `<path class="carte-terre" d="${chemin(anneau)}"/>`)
     .join('');
 
+  /* Les axes ne sont pas fermés : on reprend le même tracé sans le « Z »,
+     sans quoi l'autoroute se refermerait sur elle-même en travers. */
+  const routes = ROUTES.map(r => {
+    const d = r.trace.map((c, i) => {
+      const [x, y] = projete(c);
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(4)} ${y.toFixed(4)}`;
+    }).join('');
+    return `<path class="carte-route" d="${d}"><title>${h(r.ref)}</title></path>`;
+  }).join('');
+
+  /* Les villes citées pour se situer portent un petit carré et leur nom.
+     Elles se distinguent des clubs par la forme autant que par la
+     couleur : un carré gris n'est pas un disque vert, même en noir et
+     blanc. */
+  const villes = VILLES.map(v => {
+    const [x, y] = projete(v.point);
+    return `<g class="carte-ville" data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}">
+      <rect class="carte-ville-marque" x="${x.toFixed(4)}" y="${y.toFixed(4)}"/>
+      <text class="carte-ville-nom" x="${x.toFixed(4)}" y="${y.toFixed(4)}">${h(v.nom)}</text>
+    </g>`;
+  }).join('');
+
   return `<div class="carte-clubs" data-carte
        data-boite="${boite.x} ${boite.y} ${boite.w} ${boite.h}">
     <svg viewBox="${boite.x} ${boite.y} ${boite.w} ${boite.h}"
          preserveAspectRatio="xMidYMid meet" role="img"
          aria-label="Carte des clubs où j'ai joué">
       ${fond}
+      ${routes}
+      ${villes}
       ${pts.map(p => {
         const [x, y] = p.xy;
-        const r = rayon(p.matchs.length);
+        const rpx = rayonPx(p.matchs.length);
+        const r = rpx / echInitiale;
         const gagne = p.bilan.total && p.bilan.v > p.bilan.d;
         /* `data-club-carte` et non `data-club` : la liste des clubs
            utilise déjà `data-club`, et son gestionnaire attraperait le
@@ -164,6 +196,7 @@ export function carteClubs(clubs) {
         return `<g class="carte-club ${gagne ? 'gagnant' : ''}"
              data-club-carte="${h(p.club.id)}" role="button" tabindex="0"
              data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}"
+             data-rpx="${rpx.toFixed(2)}"
              data-nom="${h(p.club.nom)}"
              data-detail="${p.matchs.length} match${p.matchs.length > 1 ? 's' : ''} — ${p.bilan.v}V–${p.bilan.d}D${
                p.club.ville ? ' — ' + h(p.club.ville) : ''}">
@@ -191,7 +224,10 @@ export function carteClubs(clubs) {
   </div>
   <p class="tiny muted">Chaque disque est un club, sa taille dit le nombre de matchs joués,
     sa couleur si ton bilan y est positif. Touche un club pour voir son nom, puis « Voir la
-    fiche » pour l'ouvrir ; glisse pour te déplacer, pince ou molette pour zoomer.
+    fiche » pour l'ouvrir ; glisse pour te déplacer, pince ou molette pour zoomer — les
+    disques gardent leur taille, ce sont les distances qui s'écartent.
+    Les carrés gris et les traits fins sont des repères — quelques villes et les grands
+    axes — et non des lieux où tu as joué.
     ${absents ? `${absents} club(s) ne figurent pas ici : leur ville n'est pas dans la
       table des communes, et les placer au hasard vaudrait moins que de le dire.` : ''}</p>`;
 }
@@ -260,8 +296,50 @@ export function brancherCarte(racine, ouvrirClub) {
     }
   };
 
+  /* Tout ce qui doit garder sa taille à l'écran est redimensionné ici, à
+     chaque changement de cadrage : les disques, les carrés des villes et
+     leurs noms. Le SVG ne sait pas faire « constant en pixels » tout seul
+     — `vector-effect` ne vaut que pour l'épaisseur des traits — et une
+     taille exprimée en unités de carte enfle avec le zoom.
+     C'est aussi ce qui sépare enfin deux clubs voisins quand on
+     s'approche : ils s'écartent sans grossir. */
+  const clubs = [...bloc.querySelectorAll('.carte-club')];
+  const villes = [...bloc.querySelectorAll('.carte-ville')];
+
+  const redimensionner = ech => {
+    for (const g of clubs) {
+      const r = Number(g.dataset.rpx) / ech;
+      g.querySelector('.carte-point').setAttribute('r', r.toFixed(5));
+      g.querySelector('.carte-halo').setAttribute('r', (r * 1.9).toFixed(5));
+    }
+    for (const g of villes) {
+      const x = Number(g.dataset.x), y = Number(g.dataset.y);
+      const c = 3.5 / ech;                    // le carré, 7 px de côté
+      const rect = g.querySelector('rect');
+      rect.setAttribute('x', (x - c).toFixed(5));
+      rect.setAttribute('y', (y - c).toFixed(5));
+      rect.setAttribute('width', (c * 2).toFixed(5));
+      rect.setAttribute('height', (c * 2).toFixed(5));
+      const t = g.querySelector('text');
+      t.setAttribute('font-size', (11 / ech).toFixed(5));
+      t.setAttribute('x', x.toFixed(5));
+      t.setAttribute('y', (y - 6 / ech).toFixed(5));
+    }
+  };
+
+  /* L'échelle du moment : le viewBox est ajusté en « meet », donc la même
+     sur les deux axes. */
+  const echelle = () => {
+    const r = svg.getBoundingClientRect();
+    return Math.min(r.width / vue[2], r.height / vue[3]) || 1;
+  };
+
   let vue = [...depart];
-  const poser = () => { svg.setAttribute('viewBox', vue.join(' ')); placerBulle(); };
+  const poser = () => {
+    svg.setAttribute('viewBox', vue.join(' '));
+    redimensionner(echelle());
+    placerBulle();
+  };
 
   const ouvrirBulle = g => {
     choisi = { x: Number(g.dataset.x), y: Number(g.dataset.y), id: g.dataset.clubCarte };
@@ -399,4 +477,9 @@ export function brancherCarte(racine, ouvrirClub) {
     e.preventDefault();
     ouvrirBulle(g);
   });
+
+  /* Premier calage : le rendu initial a posé des tailles estimées à partir
+     de la hauteur déclarée dans la feuille de style. On les corrige ici
+     avec les dimensions réelles, sitôt la carte dans la page. */
+  poser();
 }
