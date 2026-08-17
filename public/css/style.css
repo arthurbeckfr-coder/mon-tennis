@@ -384,6 +384,12 @@ body.mode-court .fab { display: none; }
   padding: 10px 13px;
   min-height: 44px;
   cursor: pointer;
+  /* Un libellé coupé en deux lignes (« Chaussur / es ») est illisible :
+     on préfère resserrer la police que casser le mot. */
+  white-space: nowrap;
+}
+@media (max-width: 430px) {
+  .segments button { font-size: .74rem; padding: 10px 7px; }
 }
 .segments button + button { border-left: 1px solid var(--bord); }
 .segments button.actif { background: var(--accent); color: var(--accent-txt); font-weight: 600; }
@@ -840,6 +846,104 @@ body.mode-court .view { padding-top: 6px; }
 .comptes a:hover { color: var(--accent); }
 .compte-nom { display: flex; flex-direction: column; }
 .compte-nom small { font-size: .76rem; }
+
+/* ===================================================================
+   Le sac : courses, raquettes, cordages, chaussures
+   =================================================================== */
+.courses { list-style: none; margin: 8px 0 0; padding: 0; }
+.course {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--bord);
+  min-height: 46px;
+}
+.course:first-child { border-top: 0; }
+.course.pris { opacity: .5; }
+.course.pris .course-nom { text-decoration: line-through; }
+
+/* Une case dessinée plutôt qu'un emoji : les emoji de case à cocher
+   prennent la couleur de la police système et jurent avec le thème. */
+.coche {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid var(--bord);
+  border-radius: 7px;
+  background: var(--fond);
+  color: transparent;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.coche:hover { border-color: var(--accent); }
+.course.pris .coche {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-txt);
+}
+.course-icone { font-size: 20px; flex: 0 0 24px; text-align: center; }
+.course-nom {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font-size: .92rem;
+}
+.course-nom small { font-size: .76rem; }
+
+/* La palette d'icônes : on choisit plus vite qu'on ne tape. */
+.palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  margin: 4px 0 12px;
+}
+@media (max-width: 420px) { .palette { grid-template-columns: repeat(6, 1fr); } }
+.icone {
+  aspect-ratio: 1;
+  border: 1px solid var(--bord);
+  border-radius: 9px;
+  background: var(--fond);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.icone:hover { background: var(--carte-2); }
+.icone.actif { background: var(--accent); border-color: var(--accent); }
+
+.carte-retiree { opacity: .62; }
+
+.cordages { list-style: none; margin: 8px 0 0; padding: 0; }
+.cordage {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  background: var(--carte);
+  border: 1px solid var(--bord);
+  border-left: 4px solid var(--bord);
+  border-radius: 12px;
+  padding: 10px 13px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.cordage:hover { background: var(--carte-2); }
+.cordage.casse { border-left-color: var(--defaite); }
+.cordage-date {
+  flex: 0 0 auto;
+  font-size: .78rem;
+  color: var(--muet);
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+}
+.cordage-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 
 /* ===================================================================
    Fenêtres

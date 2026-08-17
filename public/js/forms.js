@@ -13,8 +13,10 @@ import {
   ajouterConseil, modifierConseil, supprimerConseil,
   ajouterSource, ajouterClub, modifierClub, clubDuMatch, surfaceDuMatch,
   exporterJSON, importerJSON, toutEffacer,
+  raquettes, cordages, chaussures, courses,
   PROFILS, MOMENTS, CATEGORIES, PLATEFORMES, SURFACES,
 } from './store.js';
+import { ICONES, CATEGORIES_COURSES, CAUSES_CORDAGE } from './materiel.js';
 import { analyser, EXEMPLE } from './import-fft.js';
 import { blocTerrain, brancherTerrain } from './terrain.js';
 
@@ -693,6 +695,230 @@ export function importFFTForm() {
         });
         conclure(r, `${prises.length} match(s) importé(s).`);
       };
+    },
+  });
+}
+
+// =====================================================================
+//  Matériel et intendance
+// =====================================================================
+/** Le sélecteur d'icône, partagé par les articles de courses. Une palette
+ *  fermée plutôt qu'un champ libre : on choisit plus vite qu'on ne tape,
+ *  et la liste reste lisible d'un coup d'œil. */
+function palette(choisie) {
+  return `<div class="palette">
+    ${ICONES.map(i => `<button type="button" class="icone ${i === choisie ? 'actif' : ''}"
+        data-icone="${i}" aria-label="${i}">${i}</button>`).join('')}
+  </div>`;
+}
+
+export function courseForm(existant = null) {
+  const a = existant || { nom: '', icone: '🎾', categorie: 'materiel', recurrent: false, note: '' };
+  let icone = a.icone;
+
+  openModal({
+    title: existant ? 'Modifier l\'article' : 'À acheter',
+    body: `<form id="f-course" class="form">
+      <label>Quoi<input name="nom" value="${h(a.nom)}" required placeholder="Tube de balles"></label>
+      <label>Rayon
+        <select name="categorie">
+          ${CATEGORIES_COURSES.map(c => `<option value="${c.cle}" ${c.cle === a.categorie ? 'selected' : ''}>
+            ${c.emoji} ${h(c.nom)}</option>`).join('')}
+        </select>
+      </label>
+      <span class="etiquette">Icône</span>
+      <div id="palette">${palette(icone)}</div>
+      <label class="case case-seule">
+        <input type="checkbox" name="recurrent" ${a.recurrent ? 'checked' : ''}>
+        <span>Article récurrent — à racheter régulièrement</span>
+      </label>
+      <p class="tiny muted">Un article récurrent ne disparaît pas quand on range la liste :
+        il se décoche, prêt pour la prochaine fois. Les balles, les surgrips.</p>
+      <label>Note<input name="note" value="${h(a.note || '')}" placeholder="Marque, taille, référence…"></label>
+    </form>`,
+    footer: `${existant ? '<button class="btn btn-danger" data-suppr>Supprimer</button>' : ''}
+             <button class="btn btn-primary" data-ok>${existant ? 'Enregistrer' : 'Ajouter'}</button>`,
+    onMount: () => {
+      const racine = document.getElementById('modal-root');
+      racine.querySelector('#palette').addEventListener('click', e => {
+        const b = e.target.closest('[data-icone]');
+        if (!b) return;
+        icone = b.dataset.icone;
+        racine.querySelector('#palette').innerHTML = palette(icone);
+      });
+
+      racine.querySelector('[data-ok]').onclick = () => {
+        const form = racine.querySelector('#f-course');
+        if (!form.reportValidity()) return;
+        const d = Object.fromEntries(new FormData(form));
+        d.recurrent = form.recurrent.checked;
+        d.icone = icone;
+        if (!existant) { d.achete = false; d.dateAchat = ''; }
+        conclure(existant ? courses.modifier(existant.id, d) : courses.ajouter(d),
+                 existant ? 'Article modifié.' : 'Ajouté à la liste.');
+      };
+      racine.querySelector('[data-suppr]')?.addEventListener('click', () => {
+        courses.supprimer(existant.id);
+        closeModal();
+        toast('Article retiré.');
+      });
+    },
+  });
+}
+
+export function raquetteForm(existant = null) {
+  const r = existant || {
+    marque: '', modele: '', annee: '', tamis: '', poids: '',
+    cordageHabituel: '', tensionHabituelle: '', dateAchat: '', active: true, note: '',
+  };
+
+  openModal({
+    title: existant ? 'Modifier la raquette' : 'Nouvelle raquette',
+    body: `<form id="f-raquette" class="form">
+      <div class="duo">
+        <label>Marque<input name="marque" value="${h(r.marque)}" required placeholder="Babolat"></label>
+        <label>Modèle<input name="modele" value="${h(r.modele)}" placeholder="Pure Drive"></label>
+      </div>
+      <div class="duo">
+        <label>Année<input name="annee" value="${h(r.annee)}" placeholder="2024"></label>
+        <label>Tamis<input name="tamis" value="${h(r.tamis)}" placeholder="100 in²"></label>
+      </div>
+      <div class="duo">
+        <label>Cordage habituel<input name="cordageHabituel" value="${h(r.cordageHabituel)}"
+               placeholder="RPM Blast 1.25"></label>
+        <label>Tension<input name="tensionHabituelle" value="${h(r.tensionHabituelle)}"
+               placeholder="24 kg"></label>
+      </div>
+      <div class="duo">
+        <label>Achetée le<input type="date" name="dateAchat" value="${h(r.dateAchat)}"></label>
+        <label>Poids<input name="poids" value="${h(r.poids)}" placeholder="300 g"></label>
+      </div>
+      <label class="case case-seule">
+        <input type="checkbox" name="active" ${r.active ? 'checked' : ''}>
+        <span>Raquette en service</span>
+      </label>
+      <label>Note<textarea name="note" rows="2">${h(r.note || '')}</textarea></label>
+    </form>`,
+    footer: `${existant ? '<button class="btn btn-danger" data-suppr>Supprimer</button>' : ''}
+             <button class="btn btn-primary" data-ok>${existant ? 'Enregistrer' : 'Ajouter'}</button>`,
+    onMount: () => {
+      const racine = document.getElementById('modal-root');
+      racine.querySelector('[data-ok]').onclick = () => {
+        const form = racine.querySelector('#f-raquette');
+        if (!form.reportValidity()) return;
+        const d = Object.fromEntries(new FormData(form));
+        d.active = form.active.checked;
+        conclure(existant ? raquettes.modifier(existant.id, d) : raquettes.ajouter(d),
+                 existant ? 'Raquette modifiée.' : 'Raquette ajoutée.');
+      };
+      racine.querySelector('[data-suppr]')?.addEventListener('click', async () => {
+        closeModal();
+        if (await confirmer('Supprimer cette raquette ?',
+            'Les cordages qui lui sont rattachés resteront dans l\'historique.')) {
+          raquettes.supprimer(existant.id);
+          toast('Raquette supprimée.');
+        }
+      });
+    },
+  });
+}
+
+/* Poser un cordage se note en trois secondes ou ne se note pas. D'où les
+   valeurs pré-remplies depuis la raquette : dans la plupart des cas il n'y
+   a qu'à valider. */
+export function cordageForm(existant = null, raquetteId = null) {
+  const rq = store.raquettes.find(x => x.id === (existant?.raquetteId || raquetteId))
+          || store.raquettes.find(x => x.active) || store.raquettes[0];
+
+  const c = existant || {
+    date: aujourdhui(), raquetteId: rq?.id || '', cause: 'casse',
+    marque: rq?.cordageHabituel || '', tension: rq?.tensionHabituelle || '', note: '',
+  };
+
+  openModal({
+    title: existant ? 'Modifier le cordage' : 'Cordage cassé ou changé',
+    body: `<form id="f-cordage" class="form">
+      <div class="duo">
+        <label>Date<input type="date" name="date" value="${h(c.date)}" required></label>
+        <label>Raquette
+          <select name="raquetteId">
+            <option value="">—</option>
+            ${store.raquettes.map(x => `<option value="${h(x.id)}" ${x.id === c.raquetteId ? 'selected' : ''}>
+              ${h(x.marque)} ${h(x.modele)}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      <label>Pourquoi
+        <select name="cause">
+          ${CAUSES_CORDAGE.map(x => `<option value="${x.cle}" ${x.cle === c.cause ? 'selected' : ''}>
+            ${h(x.nom)}</option>`).join('')}
+        </select>
+      </label>
+      <div class="duo">
+        <label>Cordage posé<input name="marque" value="${h(c.marque)}" placeholder="RPM Blast 1.25"></label>
+        <label>Tension<input name="tension" value="${h(c.tension)}" placeholder="24 kg"></label>
+      </div>
+      <label>Note<input name="note" value="${h(c.note || '')}" placeholder="Cassé au service, 2e set…"></label>
+      ${!store.raquettes.length ? `<p class="tiny muted">Aucune raquette enregistrée :
+        ajoute-la d'abord pour suivre la durée de vie des cordages.</p>` : ''}
+    </form>`,
+    footer: `${existant ? '<button class="btn btn-danger" data-suppr>Supprimer</button>' : ''}
+             <button class="btn btn-primary" data-ok>${existant ? 'Enregistrer' : 'Noter'}</button>`,
+    onMount: () => {
+      const racine = document.getElementById('modal-root');
+      racine.querySelector('[data-ok]').onclick = () => {
+        const form = racine.querySelector('#f-cordage');
+        if (!form.reportValidity()) return;
+        const d = Object.fromEntries(new FormData(form));
+        conclure(existant ? cordages.modifier(existant.id, d) : cordages.ajouter(d),
+                 existant ? 'Cordage modifié.' : 'Cordage noté.');
+      };
+      racine.querySelector('[data-suppr]')?.addEventListener('click', () => {
+        cordages.supprimer(existant.id);
+        closeModal();
+        toast('Cordage supprimé.');
+      });
+    },
+  });
+}
+
+export function chaussureForm(existant = null) {
+  const c = existant || {
+    marque: '', modele: '', surface: '', dateAchat: aujourdhui(), dateFin: '', note: '',
+  };
+
+  openModal({
+    title: existant ? 'Modifier les chaussures' : 'Nouvelles chaussures',
+    body: `<form id="f-chaussure" class="form">
+      <div class="duo">
+        <label>Marque<input name="marque" value="${h(c.marque)}" required placeholder="Asics"></label>
+        <label>Modèle<input name="modele" value="${h(c.modele)}" placeholder="Gel Resolution"></label>
+      </div>
+      <label>Pour quelle surface
+        <select name="surface"><option value="">Toutes</option>${opts(SURFACES, c.surface)}</select>
+      </label>
+      <div class="duo">
+        <label>Achetées le<input type="date" name="dateAchat" value="${h(c.dateAchat)}"></label>
+        <label>Mises au rebut<input type="date" name="dateFin" value="${h(c.dateFin)}"></label>
+      </div>
+      <label>Note<input name="note" value="${h(c.note || '')}" placeholder="Pointure, ressenti…"></label>
+    </form>`,
+    footer: `${existant ? '<button class="btn btn-danger" data-suppr>Supprimer</button>' : ''}
+             <button class="btn btn-primary" data-ok>${existant ? 'Enregistrer' : 'Ajouter'}</button>`,
+    onMount: () => {
+      const racine = document.getElementById('modal-root');
+      racine.querySelector('[data-ok]').onclick = () => {
+        const form = racine.querySelector('#f-chaussure');
+        if (!form.reportValidity()) return;
+        const d = Object.fromEntries(new FormData(form));
+        conclure(existant ? chaussures.modifier(existant.id, d) : chaussures.ajouter(d),
+                 existant ? 'Chaussures modifiées.' : 'Chaussures ajoutées.');
+      };
+      racine.querySelector('[data-suppr]')?.addEventListener('click', () => {
+        chaussures.supprimer(existant.id);
+        closeModal();
+        toast('Chaussures supprimées.');
+      });
     },
   });
 }

@@ -93,6 +93,10 @@ function vide() {
     conseils: [],
     clubs: [],
     sources: [],
+    raquettes: [],
+    cordages: [],
+    chaussures: [],
+    courses: [],
   };
 }
 
@@ -168,6 +172,45 @@ export const supprimerClub = id => maj(s => {
   // de pointer dans le vide.
   s.matchs.forEach(m => { if (m.clubId === id) delete m.clubId; });
 });
+
+// =====================================================================
+//  Matériel et intendance
+// =====================================================================
+/* Quatre listes de même nature, donc un seul jeu de fonctions. Les écrire
+   à la main quatre fois n'aurait rien apporté qu'une occasion de se
+   tromper à la quatrième. */
+const listeDe = (cle) => ({
+  ajouter: x => maj(s => s[cle].unshift({ id: uid(), ...x })),
+  modifier: (id, x) => maj(s => {
+    const i = s[cle].findIndex(y => y.id === id);
+    if (i >= 0) s[cle][i] = { ...s[cle][i], ...x };
+  }),
+  supprimer: id => maj(s => { s[cle] = s[cle].filter(y => y.id !== id); }),
+});
+
+export const raquettes  = listeDe('raquettes');
+export const cordages   = listeDe('cordages');
+export const chaussures = listeDe('chaussures');
+export const courses    = listeDe('courses');
+
+/** Coche ou décoche un article de la liste de courses. Un article coché
+ *  garde sa date d'achat : c'est ce qui permettra de savoir dans six mois
+ *  qu'on rachète des balles toutes les huit semaines. */
+export const basculerAchat = id => maj(s => {
+  const a = s.courses.find(x => x.id === id);
+  if (!a) return;
+  a.achete = !a.achete;
+  a.dateAchat = a.achete ? new Date().toISOString().slice(0, 10) : '';
+});
+
+/** Vide les articles cochés qui ne sont pas récurrents. Les récurrents
+ *  restent : on rachètera des balles, ce serait absurde de les ressaisir. */
+export const rangerCourses = () => maj(s => {
+  s.courses = s.courses.filter(a => !a.achete || a.recurrent);
+  s.courses.forEach(a => { if (a.achete && a.recurrent) { a.achete = false; } });
+});
+
+export const raquetteDe = id => store.raquettes.find(r => r.id === id) || null;
 
 // =====================================================================
 //  Rattacher un match à un club
@@ -348,9 +391,23 @@ export function importerJSON(texte, mode = 'fusion') {
     nc2++;
   }
 
+  /* Le matériel se fusionne sur l'identité seule : deux raquettes du même
+     modèle sont deux raquettes, et deux cordages du même jour peuvent être
+     deux cordages. Rien ici ne se déduplique sur le contenu. */
+  let nMat = 0;
+  for (const cle of ['raquettes', 'cordages', 'chaussures', 'courses']) {
+    const vus = new Set(store[cle].map(x => x.id));
+    for (const x of (lu[cle] || [])) {
+      if (x.id && vus.has(x.id)) continue;
+      store[cle].push({ ...x, id: x.id || uid() });
+      if (x.id) vus.add(x.id);
+      nMat++;
+    }
+  }
+
   store.matchs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const r = sauver();
-  return r.ok ? { ok: true, matchs: nm, conseils: nc, sources: ns, clubs: nc2, mode }
+  return r.ok ? { ok: true, matchs: nm, conseils: nc, sources: ns, clubs: nc2, materiel: nMat, mode }
               : { ok: false, erreur: r.erreur };
 }
 

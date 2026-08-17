@@ -10,6 +10,7 @@ import * as matchs     from './views/matchs.js';
 import * as simulateur from './views/simulateur.js';
 import * as coaching   from './views/coaching.js';
 import * as clubs      from './views/clubs.js';
+import * as materiel   from './views/materiel.js';
 
 const $ = id => document.getElementById(id);
 
@@ -33,6 +34,8 @@ const ROUTES = [
     render: () => clubs.render(),       wire: clubs.wire },
   { match: /^\/clubs\/(.+)$/, title: 'Club',         tab: '/clubs',
     render: p => clubs.renderFiche(p),  wire: clubs.wireFiche },
+  { match: /^\/matos$/,       title: 'Mon sac',      tab: '/matos',
+    render: () => materiel.render(),    wire: materiel.wire },
 ];
 
 function routeCourante() {
