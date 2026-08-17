@@ -418,6 +418,36 @@ body.mode-court .fab { display: none; }
   font-size: .92rem;
 }
 
+/* Le tri : un menu natif, et non une rangée de segments. À cinq ou six
+   critères, les segments débordent de l'écran d'un téléphone et se
+   coupent en deux lignes ; le sélecteur natif s'ouvre en pleine page et
+   se lit d'un coup. */
+.tri {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1 1 220px;
+  min-height: 44px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--bord);
+  border-radius: 11px;
+  background: var(--carte);
+}
+.tri:focus-within { border-color: var(--accent); }
+.tri > span { font-size: .78rem; color: var(--muet); white-space: nowrap; }
+.tri select {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  border: 0;
+  background: transparent;
+  color: var(--texte);
+  font: inherit;
+  font-size: .88rem;
+  cursor: pointer;
+}
+.tri select:focus { outline: none; }
+
 .segments {
   display: inline-flex;
   border: 1px solid var(--bord);

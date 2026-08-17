@@ -21,6 +21,7 @@ import { rang } from '../classement.js';
 import { joueurForm, matchForm } from '../forms.js';
 
 let recherche = '';
+let tri = 'matchs';
 
 /** L'identité d'un joueur, c'est son nom débarrassé de sa casse et de ses
  *  accents : « Éliott TRAN » et « ELIOTT TRAN » sont le même adversaire. */
@@ -66,10 +67,50 @@ export function repertoire() {
 }
 
 // =====================================================================
+//  Les tris
+// =====================================================================
+/* La question de la veille d'un match n'est pas toujours la même. « Qui
+   je croise tout le temps » se lit par nombre de matchs ; « qui je n'ai
+   jamais réussi à battre » par défaites ; « le plus fort que j'aie
+   battu » par classement ; et quand on cherche simplement quelqu'un dont
+   on a le nom en tête, c'est l'ordre alphabétique qu'on veut.
+
+   Le tri ne change que l'ordre, jamais le contenu : la recherche reste
+   maîtresse de ce qui s'affiche.
+
+   Les victoires et les défaites se départagent par le nombre de matchs :
+   à deux défaites chacun, celui qu'on a joué six fois est un adversaire
+   installé, celui qu'on a joué deux fois est un accident. */
+const TRIS = [
+  { cle: 'matchs',    nom: 'matchs joués',
+    comparer: (a, b) => b.total - a.total },
+  { cle: 'victoires', nom: 'mes victoires',
+    comparer: (a, b) => b.v - a.v || b.total - a.total },
+  { cle: 'defaites',  nom: 'mes défaites',
+    comparer: (a, b) => b.d - a.d || (b.d - b.v) - (a.d - a.v) },
+  { cle: 'ratio',     nom: 'mon taux de victoires',
+    comparer: (a, b) => b.ratio - a.ratio || b.total - a.total },
+  { cle: 'recent',    nom: 'dernière rencontre',
+    comparer: (a, b) => (b.derniere || '').localeCompare(a.derniere || '') },
+  /* Un adversaire sans classement connu vaut −1 au rang, et tombe donc
+     naturellement en fin de liste : on ne lui invente pas un niveau. */
+  { cle: 'niveau',    nom: 'classement (le plus fort d\'abord)',
+    comparer: (a, b) => rang(b.echelon) - rang(a.echelon) || b.total - a.total },
+  { cle: 'nom',       nom: 'nom (A→Z)',
+    comparer: (a, b) => a.nom.localeCompare(b.nom, 'fr') },
+];
+
+const triCourant = () => TRIS.find(t => t.cle === tri) || TRIS[0];
+
+// =====================================================================
 //  La liste
 // =====================================================================
 export function render() {
-  const tous = repertoire();
+  const t = triCourant();
+  // Le nom départage en dernier ressort, sinon deux adversaires à égalité
+  // s'échangeraient de place d'un affichage à l'autre.
+  const tous = repertoire()
+    .sort((a, b) => t.comparer(a, b) || a.nom.localeCompare(b.nom, 'fr'));
   const q = recherche.trim().toUpperCase();
   const liste = q ? tous.filter(j => cleJoueur(j.nom).includes(cleJoueur(q))) : tous;
 
@@ -93,6 +134,13 @@ export function render() {
     <section class="barre-filtres">
       <input id="q-joueur" class="recherche" placeholder="Chercher un adversaire…"
              value="${h(recherche)}">
+      ${tous.length > 1 ? `<label class="tri">
+        <span>Trier par</span>
+        <select id="tri-joueur">
+          ${TRIS.map(x => `<option value="${x.cle}"${x.cle === tri ? ' selected' : ''}
+            >${h(x.nom)}</option>`).join('')}
+        </select>
+      </label>` : ''}
     </section>
 
     ${anonymes ? `<p class="tiny muted" style="margin:0 4px 10px">${anonymes} match(s) contre
@@ -106,6 +154,7 @@ export function render() {
           <div class="club-bas">
             ${j.echelon ? puce(j.echelon) : ''}
             <span>${j.total} match${j.total > 1 ? 's' : ''}</span>
+            ${tri === 'ratio' ? `<span>${j.ratio}% pour toi</span>` : ''}
             ${j.derniere ? `<span class="muted">dernier ${h(dateCourte(j.derniere))}</span>` : ''}
             ${(j.fiche?.profils || []).map(p => puce(nomProfil(p), 'puce-profil')).join('')}
           </div>
@@ -186,6 +235,11 @@ export function renderFiche(params) {
 //  Branchements
 // =====================================================================
 export function wire(vue, rerendre) {
+  vue.querySelector('#tri-joueur')?.addEventListener('change', e => {
+    tri = e.target.value;
+    rerendre();
+  });
+
   vue.querySelector('#q-joueur')?.addEventListener('input', e => {
     recherche = e.target.value;
     const ul = vue.querySelector('.joueurs');

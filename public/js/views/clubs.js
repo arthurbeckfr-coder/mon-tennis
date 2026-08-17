@@ -28,13 +28,84 @@ const carteMaps = adresse =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adresse)}`;
 
 // =====================================================================
+//  Les tris
+// =====================================================================
+/* Une liste de clubs ne se lit pas toujours dans le même ordre. « Où
+   est-ce que je joue » se lit par nombre de matchs, « où est-ce que je
+   gagne » par taux de victoires, « où ne suis-je pas retourné depuis
+   deux ans » par dernière visite. Un ordre unique répondrait à une
+   question sur trois.
+
+   Chaque tri affiche le chiffre sur lequel il trie : trier sur un nombre
+   qu'on ne voit pas, c'est demander de croire sur parole.
+
+   Le taux de victoires se départage par le nombre de matchs, et c'est ce
+   qui compte le plus dans ce tri : 100 % sur un match unique n'est pas
+   un fort, et n'a rien à faire devant un club où l'on gagne trois fois
+   sur quatre depuis quatorze matchs. */
+let tri = 'matchs';
+
+const pluriel = n => `${n} match${n > 1 ? 's' : ''}`;
+
+const TRIS = [
+  { cle: 'matchs', nom: 'fréquentation',
+    gros: c => String(c.matchs.length),
+    petit: c => `${c.bilan.v}V–${c.bilan.d}D`,
+    comparer: (a, b) => b.matchs.length - a.matchs.length },
+
+  { cle: 'victoires', nom: 'mes victoires',
+    gros: c => String(c.bilan.v),
+    petit: c => `sur ${pluriel(c.matchs.length)}`,
+    comparer: (a, b) => b.bilan.v - a.bilan.v || b.matchs.length - a.matchs.length },
+
+  { cle: 'reussite', nom: 'mon taux de victoires',
+    gros: c => c.matchs.length ? `${c.bilan.ratio}%` : '—',
+    petit: c => c.matchs.length ? `${c.bilan.v}V–${c.bilan.d}D` : 'jamais joué',
+    comparer: (a, b) => b.bilan.ratio - a.bilan.ratio || b.matchs.length - a.matchs.length },
+
+  { cle: 'recent', nom: 'ma dernière visite',
+    gros: c => String(c.matchs.length),
+    petit: c => c.derniere ? dateCourte(c.derniere) : 'jamais',
+    comparer: (a, b) => (b.derniere || '').localeCompare(a.derniere || '') },
+
+  { cle: 'surfaces', nom: 'nombre de surfaces',
+    gros: c => String((c.club.surfaces || []).length || '—'),
+    petit: c => `${pluriel(c.matchs.length)}`,
+    comparer: (a, b) => (b.club.surfaces || []).length - (a.club.surfaces || []).length ||
+                        b.matchs.length - a.matchs.length },
+
+  { cle: 'nom', nom: 'nom (A→Z)',
+    gros: c => String(c.matchs.length),
+    petit: c => `${c.bilan.v}V–${c.bilan.d}D`,
+    comparer: (a, b) => a.club.nom.localeCompare(b.club.nom, 'fr') },
+];
+
+const triCourant = () => TRIS.find(t => t.cle === tri) || TRIS[0];
+
+const barreTri = () => `<section class="barre-filtres">
+  <label class="tri">
+    <span>Trier par</span>
+    <select id="tri-club">
+      ${TRIS.map(t => `<option value="${t.cle}"${t.cle === tri ? ' selected' : ''}
+        >${h(t.nom)}</option>`).join('')}
+    </select>
+  </label>
+</section>`;
+
+// =====================================================================
 //  La liste
 // =====================================================================
 export function render() {
+  const t = triCourant();
   const clubs = [...store.clubs]
-    .map(c => ({ club: c, matchs: matchsDuClub(c) }))
-    .sort((a, b) => b.matchs.length - a.matchs.length ||
-                    a.club.nom.localeCompare(b.club.nom, 'fr'));
+    .map(c => {
+      const matchs = matchsDuClub(c);
+      // `matchsDuClub` rend les matchs du plus récent au plus ancien.
+      return { club: c, matchs, bilan: bilanMatchs(matchs), derniere: matchs[0]?.date || '' };
+    })
+    // Le nom départage en dernier ressort : sans lui, deux clubs à égalité
+    // s'échangeraient de place d'un affichage à l'autre.
+    .sort((a, b) => t.comparer(a, b) || a.club.nom.localeCompare(b.club.nom, 'fr'));
 
   const orphelines = epreuvesOrphelines();
   const sansClub = orphelines.reduce((t, [, n]) => t + n, 0);
@@ -57,24 +128,23 @@ export function render() {
       <div class="chiffre"><b>${sansClub}</b><span>à rattacher</span></div>
     </section>
 
+    ${store.clubs.length > 1 ? barreTri() : ''}
+
     <ul class="clubs">
-      ${clubs.map(({ club, matchs }) => {
-        const b = bilanMatchs(matchs);
-        return `<li class="club-ligne" data-club="${h(club.id)}">
+      ${clubs.map(c => `<li class="club-ligne" data-club="${h(c.club.id)}">
           <div class="club-corps">
-            <strong>${h(club.nom)}</strong>
+            <strong>${h(c.club.nom)}</strong>
             <div class="club-bas">
-              ${club.ville ? `<span>${h(club.ville)}</span>` : ''}
-              ${(club.surfaces || []).map(s => puce(s)).join('')}
-              ${club.jugeArbitre ? `<span class="muted">JA ${h(club.jugeArbitre)}</span>` : ''}
+              ${c.club.ville ? `<span>${h(c.club.ville)}</span>` : ''}
+              ${(c.club.surfaces || []).map(s => puce(s)).join('')}
+              ${c.club.jugeArbitre ? `<span class="muted">JA ${h(c.club.jugeArbitre)}</span>` : ''}
             </div>
           </div>
           <div class="club-score">
-            <b>${matchs.length}</b>
-            <span class="tiny muted">${b.v}V–${b.d}D</span>
+            <b>${h(t.gros(c))}</b>
+            <span class="tiny muted">${h(t.petit(c))}</span>
           </div>
-        </li>`;
-      }).join('')}
+        </li>`).join('')}
     </ul>
 
     <div class="rangee-boutons" style="justify-content:center">
@@ -184,7 +254,12 @@ export function renderFiche(params) {
 // =====================================================================
 //  Branchements
 // =====================================================================
-export function wire(vue) {
+export function wire(vue, rerendre) {
+  vue.querySelector('#tri-club')?.addEventListener('change', e => {
+    tri = e.target.value;
+    rerendre();
+  });
+
   vue.addEventListener('click', e => {
     if (e.target.closest('[data-nouveau]')) { clubForm(); return; }
     const l = e.target.closest('[data-club]');
