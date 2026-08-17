@@ -16,7 +16,7 @@ Publié automatiquement sur GitHub Pages à chaque push sur `main`.
 | **Classement** | « Combien de matchs pour monter ? », répondu en scénarios concrets plutôt qu'en points. |
 | **Conseils** | Ce que disent les profs, rangé par profil d'adversaire et par moment du match. |
 | **Sur le court** | Le même carnet, en gros caractères, filtrable en deux gestes. Conçu pour les 90 secondes du changement de côté. |
-| **Clubs** | Les comptes des clubs suivis, ouvrables d'un geste. |
+| **Clubs** | Les clubs où l'on a joué, déduits de l'historique : adresse, juge-arbitre, surfaces, comptes à suivre, et le bilan des matchs joués là-bas. |
 
 ---
 
