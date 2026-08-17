@@ -22,6 +22,7 @@ import {
   estParEquipes, PLATEFORMES,
 } from '../store.js';
 import { clubConnuPour, MOTS_EN_PLUS, LIENS_CONNUS, urlTenupClub } from '../clubs-connus.js';
+import { carteClubs, brancherCarte } from '../carte.js';
 import { clubForm, matchForm } from '../forms.js';
 
 /* ─── Les rattachements proposés ───────────────────────────────────────
@@ -136,6 +137,18 @@ let tri = 'matchs';
    pour rien. */
 let epreuveOuverte = null;
 
+/* Liste ou carte. La liste répond à « lequel je fréquente le plus », la
+   carte à « lesquels sont groupés, lequel est loin » — deux questions que
+   le même écran ne peut pas servir en même temps sans devenir long. */
+let ongletClubs = 'liste';
+
+const barreClubs = () => `<div class="segments" style="width:100%;margin-bottom:12px">
+  <button data-onglet-club="liste" class="${ongletClubs === 'liste' ? 'actif' : ''}"
+          style="flex:1">Liste</button>
+  <button data-onglet-club="carte" class="${ongletClubs === 'carte' ? 'actif' : ''}"
+          style="flex:1">Carte</button>
+</div>`;
+
 const pluriel = n => `${n} match${n > 1 ? 's' : ''}`;
 
 const TRIS = [
@@ -239,6 +252,12 @@ export function render() {
       joue chez soi, la suivante chez l'adversaire. Leur bilan se lit dans les
       <a href="#/">statistiques</a>.</p>` : ''}
 
+    ${store.clubs.length > 1 ? barreClubs() : ''}
+
+    ${ongletClubs === 'carte' ? `<section class="carte">
+      <h3>Où j'ai joué</h3>
+      ${carteClubs(clubs)}
+    </section>` : `
     ${store.clubs.length > 1 ? barreTri() : ''}
 
     <ul class="clubs">
@@ -256,7 +275,7 @@ export function render() {
             <span class="tiny muted">${h(t.petit(c))}</span>
           </div>
         </li>`).join('')}
-    </ul>
+    </ul>`}
 
     <div class="rangee-boutons" style="justify-content:center">
       <button class="btn" data-nouveau>Ajouter un club</button>
@@ -473,6 +492,8 @@ export function renderFiche(params) {
 //  Branchements
 // =====================================================================
 export function wire(vue, rerendre) {
+  brancherCarte(vue, id => { location.hash = `#/clubs/${id}`; });
+
   vue.querySelector('#tri-club')?.addEventListener('change', e => {
     tri = e.target.value;
     rerendre();
@@ -505,6 +526,9 @@ export function wire(vue, rerendre) {
 
   vue.addEventListener('click', e => {
     if (e.target.closest('[data-nouveau]')) { clubForm(); return; }
+
+    const oc = e.target.closest('[data-onglet-club]');
+    if (oc) { ongletClubs = oc.dataset.ongletClub; rerendre(); return; }
 
     /* Deux compteurs mènent quelque part, les deux autres non : le nombre
        de clubs et les matchs situés ne cachent rien qu'on ne voie déjà à

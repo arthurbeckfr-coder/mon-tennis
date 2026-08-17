@@ -31,7 +31,10 @@ const ROUTES = [
     render: () => simulateur.render(),  wire: simulateur.wire },
   { match: /^\/conseils$/,    title: 'Mes conseils', tab: '/conseils',
     render: () => coaching.render(),    wire: coaching.wire },
-  { match: /^\/court$/,       title: 'Sur le court', tab: '/court',
+  /* Le mode court garde son adresse — il se met en raccourci d'écran
+     d'accueil, et l'onglet du haut y renvoie — mais il allume l'entrée
+     « Conseils » de la barre du bas, dont il est le second onglet. */
+  { match: /^\/court$/,       title: 'Sur le court', tab: '/conseils',
     render: () => coaching.renderCourt(), wire: coaching.wireCourt, nu: true },
   { match: /^\/clubs$/,       title: 'Mes clubs',    tab: '/clubs',
     render: () => clubs.render(),       wire: clubs.wire },

@@ -872,6 +872,60 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
 .titre-ligne.actif { border-color: var(--accent); background: var(--accent-doux); }
 .titre-coupe { font-size: 20px; flex: 0 0 auto; }
 
+/* ===================================================================
+   La carte des clubs
+   =================================================================== */
+.carte-clubs {
+  position: relative;
+  margin-top: 10px;
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  background: var(--carte-2);
+  overflow: hidden;
+  /* Le geste vertical du navigateur est rendu à la carte : sans cela, un
+     glissement vers le bas ferait défiler la page au lieu de se déplacer,
+     et la carte serait inutilisable au doigt. */
+  touch-action: none;
+}
+.carte-clubs svg { display: block; width: 100%; height: 340px; cursor: grab; }
+.carte-clubs svg:active { cursor: grabbing; }
+
+.carte-halo { fill: var(--accent); opacity: .1; }
+.carte-point { fill: var(--muet); stroke: var(--carte); stroke-width: .0006; }
+.carte-club.gagnant .carte-point { fill: var(--victoire); }
+.carte-club.gagnant .carte-halo { fill: var(--victoire); }
+.carte-club { cursor: pointer; }
+.carte-club:hover .carte-halo, .carte-club:focus-visible .carte-halo { opacity: .32; }
+.carte-club:focus-visible { outline: none; }
+.carte-club:focus-visible .carte-point { stroke: var(--accent); stroke-width: .0018; }
+
+/* Le nom reste lisible à tous les zooms parce qu'il grandit avec la carte :
+   c'est le viewBox qu'on manipule, pas une mise à l'échelle CSS. */
+.carte-nom {
+  fill: var(--texte);
+  text-anchor: middle;
+  font-family: inherit;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--carte-2);
+  stroke-width: .0022;
+  stroke-linejoin: round;
+}
+
+.carte-outils {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--carte);
+  border: 1px solid var(--bord);
+  border-radius: 11px;
+  padding: 2px;
+}
+.carte-outils .icon-btn { min-width: 36px; height: 36px; font-size: 17px; }
+
 .clubs-adverses { list-style: none; margin: 10px 0 0; padding: 0; }
 .clubs-adverses li {
   display: flex;

@@ -10,7 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎾</text></svg>">
 <!-- Le ?v= force le navigateur à retélécharger la feuille de style :
      à incrémenter quand un correctif CSS doit arriver partout. -->
-<link rel="stylesheet" href="css/style.css?v=14">
+<link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
 
@@ -49,13 +49,16 @@
   <button id="fab-micro" class="fab fab-2" aria-label="Dicter une note">🎤</button>
   <button id="fab" class="fab" aria-label="Ajouter">+</button>
 
-  <!-- Cinq onglets pour les écrans du quotidien. Les deux répertoires
-       (adversaires, clubs) vivent dans la barre du haut. -->
+  <!-- Quatre onglets pour les écrans du quotidien. Les deux répertoires
+       (adversaires, clubs) vivent dans la barre du haut.
+
+       Le carnet de conseils et le mode court n'en occupent qu'un : ce sont
+       deux onglets d'un même écran, et leur donner deux entrées revenait à
+       demander de choisir en bas ce qui se choisit déjà en haut. -->
   <nav class="tabbar">
     <a href="#/"           data-tab="/"><span>🎾</span>Matchs</a>
     <a href="#/classement" data-tab="/classement"><span>🏅</span>Classement</a>
     <a href="#/conseils"   data-tab="/conseils"><span>💡</span>Conseils</a>
-    <a href="#/court"      data-tab="/court"><span>🎯</span>Court</a>
     <a href="#/matos"      data-tab="/matos"><span>🎒</span>Sac</a>
   </nav>
 </div>
@@ -111,6 +114,6 @@
      module d'entrée : les modules qu'il importe gardent leur propre
      cache, et il faut le savoir avant de conclure qu'un correctif ne
      marche pas. En cas de doute, un rechargement forcé tranche. -->
-<script type="module" src="js/app.js?v=14"></script>
+<script type="module" src="js/app.js?v=15"></script>
 </body>
 </html>
