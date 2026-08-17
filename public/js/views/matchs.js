@@ -20,9 +20,55 @@ let ongletVue = 'liste';
 const estExploit = m =>
   m.issue === 'V' && rang(m.echelonAdverse) > rang(store.profil.echelon);
 
+/* ─── Les saisons ──────────────────────────────────────────────────────
+
+   Une saison de tennis ne suit pas l'année civile : elle court de
+   septembre à août, et c'est ainsi qu'on s'en souvient — « la saison où
+   on est montés », pas « l'année 2023 ». Un tournoi d'octobre et un
+   championnat de mars appartiennent à la même, ce que le découpage par
+   année civile coupe en deux.
+
+   La saison rejoint les douze mois glissants et le « tout » dans un même
+   choix, plutôt que d'ajouter un second contrôle de temps à côté du
+   premier : deux filtres qui portent sur la même chose finissent toujours
+   par se contredire à l'écran. */
+const SEPTEMBRE = 8;   // les mois de JavaScript comptent depuis zéro
+
+export function saisonDe(dateISO) {
+  const d = new Date((dateISO || '') + 'T12:00:00');
+  if (isNaN(d)) return null;
+  return d.getMonth() >= SEPTEMBRE ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+const nomSaison = a => `${a}-${String(a + 1).slice(2)}`;
+
+/** Les saisons où l'on a joué, de la plus récente à la plus ancienne. */
+function saisonsJouees() {
+  const vues = new Set();
+  for (const m of store.matchs) {
+    const s = saisonDe(m.date);
+    if (s != null) vues.add(s);
+  }
+  return [...vues].sort((a, b) => b - a);
+}
+
+/** Le test de période, quel que soit le mode choisi. */
+function dansLaPeriode(m) {
+  if (filtre.periode === 'tout') return true;
+  if (filtre.periode === '12') return dansLesDouzeMois(m.date);
+  const a = Number(filtre.periode.slice(1));
+  return saisonDe(m.date) === a;
+}
+
+/** Ce que le filtre de période désigne, dit en français. */
+const direPeriode = () =>
+  filtre.periode === 'tout' ? 'depuis toujours'
+  : filtre.periode === '12' ? 'sur 12 mois'
+  : `en ${nomSaison(Number(filtre.periode.slice(1)))}`;
+
 function filtrer() {
   return store.matchs
-    .filter(m => filtre.periode === 'tout' || dansLesDouzeMois(m.date))
+    .filter(dansLaPeriode)
     .filter(m => filtre.issue === 'tout' || m.issue === filtre.issue)
     .filter(m => !filtre.exploit || estExploit(m))
     .filter(m => {
@@ -45,19 +91,20 @@ function filtrer() {
    fenêtre de douze mois comprise. Recliquer sur un compteur déjà ouvert
    le referme : sans quoi on se retrouve prisonnier d'un filtre sans
    savoir comment en sortir. */
+/* Les compteurs ne touchent pas à la période : ils comptent ce que la
+   période choisie contient, et l'ouvrir ne doit pas la changer sous les
+   pieds du lecteur. */
 const FILTRES = {
-  tout:    { periode: '12', issue: 'tout', exploit: false },
-  V:       { periode: '12', issue: 'V',    exploit: false },
-  D:       { periode: '12', issue: 'D',    exploit: false },
-  exploit: { periode: '12', issue: 'V',    exploit: true  },
+  tout:    { issue: 'tout', exploit: false },
+  V:       { issue: 'V',    exploit: false },
+  D:       { issue: 'D',    exploit: false },
+  exploit: { issue: 'V',    exploit: true  },
 };
 
 function filtreActif(cle) {
   if (cle === 'exploit') return filtre.exploit;
   if (filtre.exploit) return false;
-  return cle === 'tout'
-    ? filtre.periode === '12' && filtre.issue === 'tout'
-    : filtre.issue === cle;
+  return cle === 'tout' ? filtre.issue === 'tout' : filtre.issue === cle;
 }
 
 /** « 95 » se lit mal ; « 1 h 35 » se lit d'un coup. En dessous de l'heure
@@ -523,19 +570,23 @@ export function render() {
   if (ongletVue === 'stats') return barreVue() + vueStats();
 
   const liste = filtrer();
-  const sur12 = store.matchs.filter(m => dansLesDouzeMois(m.date));
-  const b = bilanMatchs(sur12);
+  /* Les compteurs comptent la période choisie, et non douze mois figés :
+     choisir la saison 2019-20 pour ne lire ensuite qu'un bilan de l'année
+     en cours n'aurait aucun sens. */
+  const dansPeriode = store.matchs.filter(dansLaPeriode);
+  const b = bilanMatchs(dansPeriode);
 
   /* Les victoires contre plus fort que soi sont le vrai marqueur de
      progression : elles rapportent le plus, et ce sont celles dont on se
      souvient. Elles méritent leur compteur. */
-  const exploits = sur12.filter(estExploit).length;
+  const exploits = dansPeriode.filter(estExploit).length;
+  const saisons = saisonsJouees();
 
   return `
     ${barreVue()}
     <section class="chiffres">
       <div class="chiffre ${filtreActif('tout') ? 'actif' : ''}" data-filtre="tout"
-        title="Voir ces matchs"><b>${b.total}</b><span>matchs sur 12 mois</span></div>
+        title="Voir ces matchs"><b>${b.total}</b><span>matchs ${h(direPeriode())}</span></div>
       <div class="chiffre"><b><span class="moitie ${filtreActif('V') ? 'actif' : ''}"
           data-filtre="V" title="Voir les victoires">${b.v}</span><span
           class="separateur">–</span><span
@@ -551,10 +602,15 @@ export function render() {
     <section class="barre-filtres">
       <input id="q" class="recherche" placeholder="Chercher un nom, un tournoi…"
              value="${h(filtre.texte)}">
-      <div class="segments" role="group">
-        <button data-p="12" class="${filtre.periode === '12' ? 'actif' : ''}">12 mois</button>
-        <button data-p="tout" class="${filtre.periode === 'tout' ? 'actif' : ''}">Tout</button>
-      </div>
+      <label class="tri">
+        <span>Période</span>
+        <select id="periode">
+          <option value="12" ${filtre.periode === '12' ? 'selected' : ''}>12 derniers mois</option>
+          <option value="tout" ${filtre.periode === 'tout' ? 'selected' : ''}>Toutes les saisons</option>
+          ${saisons.map(a => `<option value="S${a}"
+            ${filtre.periode === `S${a}` ? 'selected' : ''}>saison ${nomSaison(a)}</option>`).join('')}
+        </select>
+      </label>
       <div class="segments" role="group">
         <button data-i="tout" class="${filtre.issue === 'tout' ? 'actif' : ''}">Tous</button>
         <button data-i="V" class="${filtre.issue === 'V' ? 'actif' : ''}">Victoires</button>
@@ -584,6 +640,11 @@ export function render() {
 }
 
 export function wire(vue, rerendre) {
+  vue.querySelector('#periode')?.addEventListener('change', e => {
+    filtre.periode = e.target.value;
+    rerendre();
+  });
+
   vue.querySelector('#q')?.addEventListener('input', e => {
     filtre.texte = e.target.value;
     // On ne redessine que la liste : redessiner tout ferait perdre le curseur.
@@ -632,8 +693,6 @@ export function wire(vue, rerendre) {
       return;
     }
 
-    const p = e.target.closest('[data-p]');
-    if (p) { filtre.periode = p.dataset.p; rerendre(); return; }
 
     /* Choisir « Défaites » à la main annule le filtre des exploits : une
        défaite contre plus fort n'est pas un exploit, et laisser les deux
