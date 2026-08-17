@@ -10,3 +10,6 @@ desktop.ini
 # Sauvegardes exportées depuis le site : ce sont des données personnelles,
 # elles n'ont rien à faire dans un dépôt public.
 tennis-*.json
+
+# Secrets des fonctions en local — ne doit jamais être commité.
+.dev.vars

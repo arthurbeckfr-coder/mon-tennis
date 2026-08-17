@@ -258,6 +258,37 @@ a.icon-btn { display: grid; place-items: center; text-decoration: none; }
 }
 body.mode-court .fab { display: none; }
 
+/* Le micro se pose au-dessus du « + » : c'est le geste le plus rapide
+   après un match, il mérite d'être atteignable sans viser. */
+.fab-2 {
+  bottom: calc(136px + env(safe-area-inset-bottom));
+  background: var(--carte);
+  color: var(--texte);
+  border: 1px solid var(--bord);
+  font-size: 22px;
+}
+
+.btn-micro.ecoute {
+  background: var(--defaite);
+  border-color: var(--defaite);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: .68; } }
+@media (prefers-reduced-motion: reduce) { .btn-micro.ecoute { animation: none; } }
+
+.propositions { list-style: none; margin: 10px 0 0; padding: 0; }
+.propositions li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--bord);
+  font-size: .88rem;
+}
+.propositions li:first-child { border-top: 0; }
+.prop-dest { flex: 0 0 auto; font-weight: 600; white-space: nowrap; }
+.prop-resume { flex: 1; min-width: 0; color: var(--muet); font-size: .82rem; }
+
 /* ===================================================================
    Boutons
    =================================================================== */

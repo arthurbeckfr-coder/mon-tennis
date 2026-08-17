@@ -1,0 +1,7 @@
+# Copie ce fichier en `.dev.vars` (ignoré par git) pour tester les fonctions
+# en local avec `npx wrangler pages dev public`.
+#
+# La vraie clé ne doit exister QUE dans les secrets Cloudflare et dans ce
+# fichier local. Jamais dans public/, jamais dans un commit.
+ANTHROPIC_API_KEY=sk-ant-…
+COMPTES_AUTORISES=ton.email@exemple.fr

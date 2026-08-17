@@ -109,6 +109,14 @@ async function jeton() {
   }
 }
 
+/** Le jeton d'accès valide, pour les appels aux fonctions serveur.
+ *  Rend null si la session est morte — l'appelant se rabat alors sur ce
+ *  qui marche hors ligne. */
+export async function jetonCourant() {
+  const s = await jeton();
+  return s?.access_token || null;
+}
+
 // =====================================================================
 //  Le carnet distant
 // =====================================================================

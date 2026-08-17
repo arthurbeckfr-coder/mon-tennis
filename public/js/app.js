@@ -13,6 +13,7 @@ import * as clubs      from './views/clubs.js';
 import * as materiel   from './views/materiel.js';
 import * as joueurs    from './views/joueurs.js';
 import * as nuage      from './nuage.js';
+import { dicterModal } from './dictee.js';
 
 const $ = id => document.getElementById(id);
 
@@ -132,6 +133,7 @@ rafraichirBoutonTheme();
 
 $('btn-donnees').addEventListener('click', donneesForm);
 $('fab').addEventListener('click', ajoutRapide);
+$('fab-micro').addEventListener('click', dicterModal);
 
 // =====================================================================
 //  Démarrage
