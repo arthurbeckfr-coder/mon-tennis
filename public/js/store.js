@@ -326,11 +326,12 @@ export function saisonEquipe(m) {
    les journées quoi qu'il arrive, si bien qu'une saison sans défaite ne
    veut pas dire la même chose.
 
-   Une réserve, et elle est réelle : une seule victoire sans défaite ne
-   prouve rien. Ce peut être un petit tableau gagné en une rencontre, mais
-   aussi un tournoi dont la défaite manque à l'historique, ou un forfait
-   adverse au tour suivant. Ces cas-là sont donc rendus à part, sans être
-   cachés — c'est au joueur de savoir, pas au carnet de trancher.
+   Les éditions à une seule victoire ont d'abord été mises à part : une
+   victoire unique pouvait aussi bien être un petit tableau gagné en une
+   rencontre qu'un tournoi dont la défaite manque à l'historique. Le
+   joueur les a vérifiées une à une et confirmé que c'étaient bien des
+   titres. Elles comptent donc comme les autres — c'est à lui de savoir,
+   pas au carnet de trancher, et il a tranché.
 
    L'édition, et non le tournoi : le même open revient chaque année, et
    gagner celui de 2023 ne dit rien de celui de 2024. D'où l'année dans la
@@ -347,15 +348,11 @@ export function tournoisRemportes() {
     if ((m.date || '') > editions[cle].derniere) editions[cle].derniere = m.date || '';
   }
 
-  const parfaites = Object.values(editions)
+  const titres = Object.values(editions)
     .filter(e => e.d === 0 && e.v > 0)
     .sort((a, b) => (b.derniere || '').localeCompare(a.derniere || ''));
 
-  return {
-    titres: parfaites.filter(e => e.v >= 2),
-    incertains: parfaites.filter(e => e.v === 1),
-    editions: Object.keys(editions).length,
-  };
+  return { titres, editions: Object.keys(editions).length };
 }
 
 /** Les épreuves qu'aucun club ne réclame : de quoi compléter les

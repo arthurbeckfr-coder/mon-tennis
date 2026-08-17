@@ -848,6 +848,40 @@ body.mode-court .fab { display: none; }
    sortir du site, et on doit le savoir avant de le toucher. */
 a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; }
 
+/* Une carte de statistiques qui se replie sous son titre. Sept cartes
+   ouvertes font un écran interminable ; fermées, elles font un sommaire
+   qu'on parcourt d'un coup d'œil. */
+.carte-depliable > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* La zone de touche couvre toute la largeur du titre, et non le seul
+     texte : on vise une ligne, pas trois mots. */
+  margin: -2px 0;
+  padding: 2px 0;
+}
+.carte-depliable > summary::-webkit-details-marker { display: none; }
+.carte-depliable > summary h3 { flex: 1; margin: 0; }
+/* Le chevron dit dans quel sens ça va s'ouvrir, et tourne quand ça s'ouvre. */
+.carte-depliable > summary::after {
+  content: '⌄';
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--muet);
+  font-size: 17px;
+  line-height: 1;
+  transition: transform .15s;
+}
+.carte-depliable[open] > summary::after { transform: rotate(180deg); }
+.carte-depliable > summary:hover::after { background: var(--carte-2); color: var(--accent); }
+.carte-depliable-corps { margin-top: 12px; }
+
 /* Les rattachements proposés et les tournois gagnés : deux listes de
    lignes qu'on parcourt et qu'on ouvre, même charpente. */
 .propositions, .titres { list-style: none; margin: 10px 0 0; padding: 0; }

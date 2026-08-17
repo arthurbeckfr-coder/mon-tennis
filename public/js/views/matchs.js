@@ -5,7 +5,7 @@
    que moi ? Est-ce que je perds toujours contre les gauchers ? Les
    compteurs du haut sont là pour ça, et non pour décorer. */
 
-import { h, hMulti, dateCourte, puce, dansLesDouzeMois } from '../util.js';
+import { h, hMulti, dateCourte, puce, dansLesDouzeMois, openModal } from '../util.js';
 import { store, bilanMatchs, surfaceDuMatch, estParEquipes, saisonEquipe,
          tournoisRemportes } from '../store.js';
 import { pointsVictoire, rang, ECHELONS } from '../classement.js';
@@ -117,6 +117,32 @@ function ligneMatch(m) {
    ils se gênent. */
 let detail = null;
 
+/* ─── Les sections qu'on déplie ────────────────────────────────────────
+
+   Sept cartes de statistiques font un écran très long, où l'on fait
+   défiler beaucoup pour retrouver la seule chose qu'on cherchait. Chaque
+   carte se replie donc sous son titre, et l'on n'ouvre que ce qu'on lit.
+
+   La première reste ouverte : arriver sur une pile de titres fermés
+   donnerait un écran vide, qui n'apprend rien non plus.
+
+   L'état est gardé ici plutôt que dans le DOM, parce qu'un redessin — une
+   synchronisation qui rapporte un match — repartirait sinon de zéro et
+   refermerait ce qu'on venait d'ouvrir. */
+const replies = new Set(['durees', 'titres', 'echelon', 'surface', 'epreuve', 'equipes']);
+
+function carteDepliable(cle, titre, contenu, chapeau = '') {
+  if (!contenu) return '';
+  return `<details class="carte carte-depliable" data-repli="${h(cle)}"
+      ${replies.has(cle) ? '' : 'open'}>
+    <summary><h3>${h(titre)}</h3></summary>
+    <div class="carte-depliable-corps">
+      ${chapeau}
+      ${contenu}
+    </div>
+  </details>`;
+}
+
 const AXES = {
   annee: {
     titre: c => `Mes matchs en ${c}`,
@@ -147,15 +173,57 @@ const AXES = {
   },
 };
 
+/** Les matchs d'une tranche, du plus récent au plus ancien, avec leur
+ *  bilan. Sert au panneau sous un graphique comme à la fenêtre d'un
+ *  tournoi : c'est le même contenu, présenté à deux endroits. */
+function matchsDeLAxe(axe, cle) {
+  const a = AXES[axe];
+  const liste = store.matchs
+    .filter(m => a.porte(m, cle))
+    .sort((x, y) => (y.date || '').localeCompare(x.date || ''));
+  return { liste, bilan: bilanMatchs(liste), titre: a.titre(cle) };
+}
+
+const phraseBilan = b =>
+  `${b.total} match${b.total > 1 ? 's' : ''} — ${b.v} victoire${b.v > 1 ? 's' : ''},
+   ${b.d} défaite${b.d > 1 ? 's' : ''}, ${b.ratio}% de réussite.`;
+
+/* ─── La fenêtre d'un tournoi gagné ────────────────────────────────────
+
+   Les titres se lisent en liste, et le détail d'un titre s'ouvrait sous
+   la liste entière — c'est-à-dire loin, tout en bas, après les quinze
+   autres. On ne voyait plus ce qu'on venait de toucher. Une fenêtre le
+   remet là où on regarde.
+
+   Les colonnes des graphiques gardent leur panneau sur place : celui-là
+   s'ouvre juste sous la colonne cliquée, donc au bon endroit déjà. */
+function fenetreEdition(cle) {
+  const { liste, bilan, titre } = matchsDeLAxe('edition', cle);
+  openModal({
+    title: titre,
+    large: true,
+    body: `<p class="tiny muted">${phraseBilan(bilan)}</p>
+      ${liste.length ? `<ul class="matchs" style="margin-top:10px">
+        ${liste.map(ligneMatch).join('')}</ul>` : ''}`,
+    onMount: corps => {
+      corps.addEventListener('click', e => {
+        const li = e.target.closest('.match');
+        if (!li) return;
+        const m = store.matchs.find(x => x.id === li.dataset.id);
+        // Une fenêtre à la fois : celle du match remplace celle du tournoi.
+        if (m) matchForm(m);
+      });
+    },
+  });
+}
+
 /** Le panneau qui s'ouvre sous une colonne : le bilan de la tranche, puis
  *  ses matchs, cliquables comme partout ailleurs. */
 function rendreDetail(axe) {
   if (!detail || detail.axe !== axe) return '';
+  const { liste, bilan } = matchsDeLAxe(axe, detail.cle);
   const a = AXES[axe];
-  const liste = store.matchs
-    .filter(m => a.porte(m, detail.cle))
-    .sort((x, y) => (y.date || '').localeCompare(x.date || ''));
-  const b = bilanMatchs(liste);
+  const b = bilan;
 
   return `<section class="detail-graphe">
     <div class="detail-tete">
@@ -218,8 +286,7 @@ function vueStats() {
   const epreuves = Object.keys(parEpreuve);
 
   return `
-    <section class="carte">
-      <h3>Victoires et défaites, année par année</h3>
+    ${carteDepliable('annee', 'Victoires et défaites, année par année', `
       ${barresGroupees({
         groupes: versGroupes(parAn, annees), series, axe: 'annee',
         ouvert: detail?.axe === 'annee' ? detail.cle : null,
@@ -227,10 +294,9 @@ function vueStats() {
       <p class="tiny muted">Touche une année pour voir les matchs qu'elle compte.</p>
       ${rendreDetail('annee')}
       ${tableauDouble(['Année', 'Victoires', 'Défaites', '%'], versTableau(parAn, annees))}
-    </section>
+    `)}
 
-    <section class="carte">
-      <h3>Face à quel classement</h3>
+    ${carteDepliable('echelon', 'Face à quel classement', `
       ${meilleur ? `<p class="tiny muted">Ton meilleur scalp : un joueur classé
         <strong>${h(meilleur)}</strong>.</p>` : ''}
       ${barresGroupees({
@@ -243,7 +309,7 @@ function vueStats() {
       ${rendreDetail('echelon')}
       ${tableauDouble(['Classement', 'Victoires', 'Défaites', '%'],
         versTableau(parEchelon, echelons))}
-    </section>
+    `)}
 
     ${rendreDurees()}
 
@@ -276,8 +342,7 @@ function rendreDurees() {
   const gagnes = avec.filter(m => m.issue === 'V');
   const perdus = avec.filter(m => m.issue === 'D');
 
-  return `<section class="carte">
-    <h3>Le temps passé sur le court</h3>
+  return carteDepliable('durees', 'Le temps passé sur le court', `
     <section class="chiffres">
       <div class="chiffre"><b>${direDuree(moyenne)}</b><span>en moyenne</span></div>
       <div class="chiffre"><b>${direDuree(total)}</b><span>au total</span></div>
@@ -292,7 +357,7 @@ function rendreDurees() {
         ? `Tes victoires durent ${direDuree(moy(gagnes))} en moyenne, tes défaites
            ${direDuree(moy(perdus))}.`
         : 'Il faudra quelques matchs de plus pour comparer victoires et défaites.'}</p>
-  </section>`;
+  `);
 }
 
 /* ─── Les tournois gagnés ──────────────────────────────────────────────
@@ -303,12 +368,11 @@ function rendreDurees() {
    fois, donc une édition sans défaite est une édition gagnée — et sa
    limite est affichée plutôt que masquée. */
 function rendreTitres() {
-  const { titres, incertains } = tournoisRemportes();
-  if (!titres.length && !incertains.length) return '';
+  const { titres } = tournoisRemportes();
+  if (!titres.length) return '';
 
-  const ligne = e => `<li class="titre-ligne ${detail?.axe === 'edition'
-      && detail.cle === e.cle ? 'actif' : ''}"
-      data-axe="edition" data-cle="${h(e.cle)}" role="button" tabindex="0"
+  const ligne = e => `<li class="titre-ligne"
+      data-edition="${h(e.cle)}" role="button" tabindex="0"
       title="Voir ces matchs">
     <span class="titre-coupe">🏆</span>
     <div>
@@ -318,23 +382,16 @@ function rendreTitres() {
     </div>
   </li>`;
 
-  return `<section class="carte">
-    <h3>${titres.length} tournoi${titres.length > 1 ? 's' : ''} gagné${titres.length > 1 ? 's' : ''}</h3>
+  return carteDepliable('titres',
+    `${titres.length} tournoi${titres.length > 1 ? 's' : ''} gagné${titres.length > 1 ? 's' : ''}`, `
     <p class="tiny muted">Aucune trace de cela dans les données de la fédération : elle
       donne des matchs, pas des trophées. Mais un tournoi se perd en une fois — dès la
       première défaite on est sorti. Une édition sans aucune défaite est donc une édition
       qu'on est allé gagner. Le championnat par équipes est exclu : on y joue toutes les
       journées quoi qu'il arrive.</p>
-    ${titres.length ? `<ul class="titres">${titres.map(ligne).join('')}</ul>` : ''}
-    ${rendreDetail('edition')}
-    ${incertains.length ? `<details class="replis">
-      <summary>${incertains.length} édition(s) à confirmer</summary>
-      <p class="tiny muted">Une seule victoire et aucune défaite : ce peut être un petit
-        tableau gagné en une rencontre, mais aussi un tournoi dont la défaite manque à
-        l'historique, ou un forfait adverse. Le carnet ne tranche pas — toi seul sais.</p>
-      <ul class="titres">${incertains.map(ligne).join('')}</ul>
-    </details>` : ''}
-  </section>`;
+    <ul class="titres">${titres.map(ligne).join('')}</ul>
+    <p class="tiny muted">Touche un titre pour revoir ses matchs.</p>
+  `);
 }
 
 /* ─── La surface ───────────────────────────────────────────────────────
@@ -357,8 +414,7 @@ function rendreSurfaces(parSurface, surfaces, series) {
   const meilleure = [...assez].sort((a, b) => taux(b) - taux(a))[0];
   const pire = [...assez].sort((a, b) => taux(a) - taux(b))[0];
 
-  return `<section class="carte">
-    <h3>Sur quelle surface</h3>
+  return carteDepliable('surface', 'Sur quelle surface', `
     ${barresGroupees({
       groupes: surfaces.map(s => ({ label: s === '?' ? 'inconnue' : s, cle: s,
                                     valeurs: [parSurface[s].v, parSurface[s].d] })),
@@ -377,7 +433,7 @@ function rendreSurfaces(parSurface, surfaces, series) {
     ${rendreDetail('surface')}
     ${tableauDouble(['Surface', 'Victoires', 'Défaites', '%'],
       versTableau(parSurface, surfaces, s => s === '?' ? 'inconnue' : s))}
-  </section>`;
+  `);
 }
 
 /* ─── Tournoi ou championnat par équipes ───────────────────────────────
@@ -394,8 +450,7 @@ function rendreEpreuves(parEpreuve, epreuves, series) {
   const pc = c => Math.round((parEpreuve[c].v / t(c)) * 100);
   const ecart = pc('tournoi') - pc('equipes');
 
-  return `<section class="carte">
-    <h3>Tournoi ou championnat par équipes</h3>
+  return carteDepliable('epreuve', 'Tournoi ou championnat par équipes', `
     ${barresGroupees({
       groupes: [
         { label: 'Tournoi', cle: 'tournoi', valeurs: [parEpreuve.tournoi.v, parEpreuve.tournoi.d] },
@@ -415,7 +470,7 @@ function rendreEpreuves(parEpreuve, epreuves, series) {
              banal : le format y est plus dur pour la plupart des joueurs.`
         : `L'écart est trop faible pour signifier quoi que ce soit.`}</p>
     ${rendreDetail('epreuve')}
-  </section>`;
+  `);
 }
 
 /* ─── Le détail du championnat par équipes ─────────────────────────────
@@ -442,8 +497,7 @@ function rendreEquipes(series) {
     return ty - tx;
   })[0];
 
-  return `<section class="carte">
-    <h3>Le championnat par équipes, saison par saison</h3>
+  return carteDepliable('equipes', 'Le championnat par équipes, saison par saison', `
     <p class="tiny muted">${matchs.length} rencontres reconnues au libellé de l'épreuve
       (« LIGUE-2023… », « 76-2024… ») : ${b.v} victoires, ${b.d} défaites, ${b.ratio}%.
       Ces matchs n'appartiennent à aucun club — une journée se joue chez soi, la suivante
@@ -457,7 +511,7 @@ function rendreEquipes(series) {
       parmi celles d'au moins trois rencontres.</p>` : ''}
     ${rendreDetail('saison')}
     ${tableauDouble(['Saison', 'Victoires', 'Défaites', '%'], versTableau(parSaison, saisons))}
-  </section>`;
+  `);
 }
 
 const barreVue = () => `<div class="segments" style="width:100%;margin-bottom:14px">
@@ -542,7 +596,7 @@ export function wire(vue, rerendre) {
      porte role="button", ce qui promet Entrée et Espace. */
   vue.addEventListener('keydown', e => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    const g = e.target.closest('[data-axe]');
+    const g = e.target.closest('[data-axe], [data-edition]');
     if (!g) return;
     e.preventDefault();
     g.click();
@@ -553,6 +607,21 @@ export function wire(vue, rerendre) {
     if (v) { ongletVue = v.dataset.vue; detail = null; rerendre(); return; }
 
     if (e.target.closest('[data-fermer-detail]')) { detail = null; rerendre(); return; }
+
+    const t = e.target.closest('[data-edition]');
+    if (t) { fenetreEdition(t.dataset.edition); return; }
+
+    /* Ouvrir ou fermer une section se retient : sinon le prochain redessin
+       refermerait ce qu'on vient d'ouvrir. On laisse le navigateur faire
+       le geste — `<details>` s'en charge — et l'on ne fait qu'en prendre
+       note, sans redessiner. */
+    const r = e.target.closest('[data-repli] > summary');
+    if (r) {
+      const d = r.parentElement;
+      // Le clic précède le basculement : `open` est encore l'état d'avant.
+      if (d.open) replies.add(d.dataset.repli); else replies.delete(d.dataset.repli);
+      return;
+    }
 
     const g = e.target.closest('[data-axe]');
     if (g) {
