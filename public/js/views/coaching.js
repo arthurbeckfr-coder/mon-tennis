@@ -1,6 +1,10 @@
 /* Le carnet de conseils, et le mode qu'on ouvre sur le court.
 
-   Deux écrans pour deux moments qui n'ont rien à voir.
+   Deux onglets d'une même chose, pour deux moments qui n'ont rien à voir.
+   On note d'un côté, on relit de l'autre — et passer de l'un à l'autre est
+   le geste le plus naturel qui soit (« je viens de noter ça, à quoi ça
+   ressemble en match ? »). Ils partagent donc une barre d'onglets, au lieu
+   de s'ignorer depuis deux coins opposés de l'écran.
 
    Le carnet sert après le cours, au calme : on note ce que le prof vient
    de dire, on range, on relit. Il peut être dense.
@@ -57,6 +61,38 @@ function compterParCoup(f) {
 
 const emojiCat = cle => CATEGORIES.find(x => x.cle === cle)?.emoji || '💡';
 
+/* ─── Les deux onglets ─────────────────────────────────────────────────
+
+   Le carnet et le court sont deux moments d'une même chose : on note
+   d'un côté, on relit de l'autre. Les séparer en deux entrées de la barre
+   du bas obligeait à redescendre tout en bas de l'écran pour passer de
+   l'un à l'autre — alors que c'est le geste le plus naturel qui soit
+   (« je viens de noter ça, à quoi ça ressemble en match ? »).
+
+   Les onglets restent deux adresses et non un état interne, et c'est
+   voulu : le mode court dépouille l'écran de son décorum, ce que seule la
+   route sait faire. Changer d'onglet change donc de route, et le
+   dépouillement suit tout seul.
+
+   Les deux entrées de la barre du bas restent, elles aussi : sur un
+   court, entre deux jeux, on a quatre-vingt-dix secondes et une main
+   libre. Ce n'est pas le moment de traverser un écran pour trouver un
+   onglet. */
+const barreOnglets = actif => `<div class="segments" style="width:100%;margin-bottom:12px">
+  <button data-onglet-page="#/conseils" class="${actif === 'carnet' ? 'actif' : ''}"
+          style="flex:1">📓 Le carnet</button>
+  <button data-onglet-page="#/court" class="${actif === 'court' ? 'actif' : ''}"
+          style="flex:1">🎯 Sur le court</button>
+</div>`;
+
+/** Le passage d'un onglet à l'autre, posé par les deux écrans. */
+function brancherOnglets(vue) {
+  vue.addEventListener('click', e => {
+    const o = e.target.closest('[data-onglet-page]');
+    if (o) location.hash = o.dataset.ongletPage;
+  });
+}
+
 function carteConseil(c) {
   return `<li class="conseil" data-id="${h(c.id)}">
     <button class="etoile ${c.favori ? 'pleine' : ''}" data-favori="${h(c.id)}"
@@ -88,6 +124,8 @@ export function render() {
   const ouvert = filtre.profil || filtre.moment || filtre.categorie || filtre.coup;
 
   return `
+    ${barreOnglets('carnet')}
+
     ${total === 0 ? amorce() : ''}
 
     <section class="barre-filtres">
@@ -162,6 +200,7 @@ const neuf = () => ({
 });
 
 export function wire(vue, rerendre) {
+  brancherOnglets(vue);
   vue.querySelector('#q')?.addEventListener('input', e => {
     filtre.texte = e.target.value;
     const ul = vue.querySelector('.conseils');
@@ -226,6 +265,8 @@ export function renderCourt() {
   ].filter(Boolean);
 
   return `
+    ${barreOnglets('court')}
+
     <section class="court-choix">
       <div class="segments" style="width:100%">
         <button data-onglet="terrain" class="${court.onglet === 'terrain' ? 'actif' : ''}"
@@ -288,6 +329,8 @@ export function renderCourt() {
 }
 
 export function wireCourt(vue, rerendre) {
+  brancherOnglets(vue);
+
   vue.addEventListener('click', e => {
     const o = e.target.closest('[data-onglet]');
     if (o) { court.onglet = o.dataset.onglet; rerendre(); return; }
