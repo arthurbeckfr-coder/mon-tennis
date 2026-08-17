@@ -11,7 +11,8 @@
 
 import { h, puce, dateCourte } from '../util.js';
 import { store, reglagesCalcul, bonusVictoiresPour } from '../store.js';
-import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang } from '../classement.js';
+import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang,
+         projeter, echeance, rendementParEchelon } from '../classement.js';
 import { profilForm, baremeForm } from '../forms.js';
 
 let cibleChoisie = null;
@@ -81,6 +82,10 @@ export function render() {
 
     ${r.erreur ? `<div class="avis">${h(r.erreur)}</div>` : rendreResultat(r)}
 
+    ${rendreCalendrier(reglages, cible, r)}
+
+    ${rendreRendement(reglages, cible, r)}
+
     ${rendreBanque(r)}
 
     <section class="carte">
@@ -145,6 +150,101 @@ function rendreResultat(r) {
       </ul>`
       : `<div class="avis">Aucun scénario réaliste ne comble cet écart en huit victoires.
          Vise d'abord l'échelon juste au-dessus.</div>`}`;
+}
+
+/* ─── Le calendrier ────────────────────────────────────────────────────
+
+   La question « qu'est-ce qu'il me faut » a une jumelle qu'on oublie :
+   « jusqu'à quand ». Le bilan glisse sur douze mois, donc une victoire
+   finit par sortir de la fenêtre et le total baisse sans qu'on ait rien
+   fait. Attendre coûte. */
+function rendreCalendrier(reglages, cible, r) {
+  if (!r.seuil || r.seuil.points == null) return '';
+
+  const etapes = projeter({ ...reglages, cible,
+                            bonusVictoires: bonusVictoiresPour(cible), mois: 12 });
+  if (etapes.length < 2) return '';
+
+  const ech = echeance(etapes);
+  /* Une marge en haut : sans elle le trait de seuil, qui est la plus
+     grande valeur, se colle au bord et se lit mal. */
+  const max = Math.max(r.seuil.points, ...etapes.map(e => e.bilan)) * 1.08;
+  const hauteur = v => Math.max(2, Math.round((v / max) * 100));
+
+  /* Les victoires qui vont sortir, et ce qu'elles emportent. C'est le
+     détail qui rend la baisse concrète plutôt que fatale. */
+  const pertes = etapes.flatMap(e =>
+    e.sortants.map(s => ({ mois: e.libelle, ...s }))).slice(0, 4);
+
+  return `<section class="carte">
+    <h3>Le temps joue contre toi</h3>
+    ${ech
+      ? `<p>Tant que tu ne rejoues pas, il te manque <strong>${etapes[0].manque} points</strong>.
+         À partir de <strong>${h(ech.apres.libelle)}</strong> il t'en manquera
+         <strong>${ech.apres.manque}</strong> : des victoires sortent de la fenêtre des douze
+         mois et cessent de compter. Agir avant coûte ${ech.surcout} points de moins.</p>`
+      : `<p class="tiny muted">Aucune de tes victoires comptées ne sort de la fenêtre dans
+         l'année qui vient : l'écart ne se creusera pas tout seul.</p>`}
+
+    <div class="frise" role="img"
+         aria-label="Bilan projeté sur douze mois, à résultats constants">
+      <div class="frise-zone">
+        ${etapes.map(e => `<div class="frise-col ${e.bilan < r.seuil.points ? '' : 'atteint'}"
+               title="${h(e.libelle)} — bilan ${e.bilan}${e.manque
+                 ? `, il manquerait ${e.manque} points` : ', seuil atteint'}">
+          <div class="frise-barre" style="height:${hauteur(e.bilan)}%"></div>
+        </div>`).join('')}
+        <div class="frise-seuil" style="bottom:${hauteur(r.seuil.points)}%"></div>
+      </div>
+      <div class="frise-legende">
+        ${etapes.map((e, i) => `<span class="frise-mois">
+          ${i % 2 === 0 ? h(e.libelle.split(' ')[0]) : ''}</span>`).join('')}
+      </div>
+    </div>
+    <p class="tiny muted">Bilan projeté à ${h(cible)} si tu ne joues plus, mois par mois.
+      Le trait marque les ${r.seuil.points} points demandés.</p>
+
+    ${pertes.length ? `<ul class="fiche-infos" style="margin-top:10px">
+      ${pertes.map(p => `<li><span class="fiche-emoji">📉</span><div>
+        <strong>${h(p.mois)}</strong> — ${h(p.match.adversaire || 'une victoire')}
+        (${h(p.match.echelonAdverse)}, ${h(dateCourte(p.match.date))}) cesse de compter,
+        ${p.points} points.</div></li>`).join('')}
+    </ul>` : ''}
+  </section>`;
+}
+
+/* ─── Le rendement ─────────────────────────────────────────────────────
+
+   Le contre-intuitif du système : une fois le quota atteint, battre un
+   joueur moins bien classé que ses propres victoires déjà comptées ne
+   rapporte rien du tout. Zéro. Autant le dire avant de s'inscrire. */
+function rendreRendement(reglages, cible, r) {
+  if (!r.seuil || r.seuil.points == null) return '';
+
+  const lignes = rendementParEchelon({ ...reglages, cible,
+                                       bonusVictoires: bonusVictoiresPour(cible) });
+  const inutiles = lignes.filter(l => l.gain === 0);
+
+  return `<section class="carte">
+    <h3>Ce que rapporterait une victoire, aujourd'hui</h3>
+    <table class="rendement">
+      <thead><tr><th>Battre un…</th><th>Barème</th><th>Gain réel</th></tr></thead>
+      <tbody>
+        ${lignes.map(l => `<tr class="${l.gain === 0 ? 'nul' : ''}">
+          <td><strong>${h(l.echelon)}</strong></td>
+          <td class="muted">${l.bareme} pts</td>
+          <td>${l.gain > 0 ? `<strong>+${l.gain}</strong>` : '<span class="muted">rien</span>'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <p class="tiny muted">Le barème est ce que vaut la victoire ; le gain réel est ce qu'elle
+      ajoute vraiment à ton bilan une fois les remplacements faits.
+      ${inutiles.length
+        ? `Battre ${inutiles.map(l => l.echelon).join(', ')} ne changerait
+           strictement rien : ces victoires ne feraient que remplacer des victoires
+           équivalentes déjà comptées.`
+        : 'Toutes ces victoires te feraient progresser.'}</p>
+  </section>`;
 }
 
 /** La limitation de montée, règle officielle et souvent la vraie raison

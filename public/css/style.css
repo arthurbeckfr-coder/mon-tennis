@@ -577,6 +577,61 @@ body.mode-court .fab { display: none; }
 .banque-liste li:first-child { border-top: 0; }
 .banque-nom { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
 
+/* La frise du bilan projeté : douze barres et un trait de seuil. Un
+   graphique minuscule, mais c'est le seul endroit où « quand » se lit
+   d'un coup d'œil. */
+.frise { margin: 14px 0 6px; }
+
+/* La zone des barres est un bloc à part, sans marge intérieure : c'est ce
+   qui permet au trait de seuil de se poser au bon pourcentage. Mélanger
+   les deux dans un seul conteneur décalait le trait de la hauteur du
+   bandeau des mois. */
+.frise-zone {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 104px;
+}
+.frise-col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.frise-barre {
+  width: 100%;
+  background: var(--defaite);
+  border-radius: 3px 3px 0 0;
+  opacity: .75;
+}
+.frise-col.atteint .frise-barre { background: var(--victoire); opacity: .9; }
+.frise-seuil {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px dashed var(--accent);
+  pointer-events: none;
+}
+.frise-legende { display: flex; gap: 3px; margin-top: 5px; }
+.frise-mois {
+  flex: 1;
+  text-align: center;
+  font-size: .58rem;
+  color: var(--muet);
+  white-space: nowrap;
+}
+
+.rendement { width: 100%; border-collapse: collapse; font-size: .88rem; margin-top: 8px; }
+.rendement th {
+  text-align: left;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muet);
+  padding: 4px 6px;
+  font-weight: 600;
+}
+.rendement td { padding: 7px 6px; border-top: 1px solid var(--bord); }
+.rendement td:last-child, .rendement th:last-child { text-align: right; }
+.rendement tr.nul td { opacity: .55; }
+
 .banque { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .jeton {
   background: var(--accent-doux);

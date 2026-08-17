@@ -348,6 +348,95 @@ export function simuler({ matchs = [], echelon, cible, sexe = 'h',
   return { ...base, manque, matchsManquants, montee, atteint: false, scenarios: retenus };
 }
 
+// =====================================================================
+//  Le temps qui passe
+// =====================================================================
+/* Le bilan glisse sur douze mois : une victoire finit toujours par sortir
+   de la fenêtre, et le bilan baisse tout seul si l'on ne rejoue pas. C'est
+   l'information qui manque partout — on sait ce qu'il faut faire, jamais
+   avant quand. Une victoire à 120 points qui expire dans six semaines
+   transforme un écart de 35 points en écart de 155.
+
+   On projette donc le bilan mois par mois, à résultats constants, en
+   déplaçant la fin de la fenêtre. */
+
+/** Le dernier jour du mois, `n` mois après aujourd'hui. */
+function finDeMois(n) {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n + 1);
+  d.setDate(0);
+  return d.toISOString().slice(0, 10);
+}
+
+const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+              'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+/**
+ * Ce que devient le bilan si l'on ne joue plus, mois par mois.
+ * @returns {Array<{fin, libelle, bilan, manque, sortants}>}
+ */
+export function projeter({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAUT,
+                           bonusVictoires = 0, bonusPoints = 0, mois = 12 }) {
+  const s = seuil(cible, sexe);
+  const etapes = [];
+  let precedentes = null;
+
+  for (let n = 0; n <= mois; n++) {
+    const fin = finDeMois(n);
+    const b = bilanA({ matchs, cible, sexe, bareme, bonusVictoires, bonusPoints, finISO: fin });
+
+    /* Ce qui sort n'est pas « ce qui quitte la fenêtre » mais « ce qui
+       cessera de compter » : une victoire hors quota qui expire ne change
+       rien au bilan et n'a pas à être annoncée. */
+    const idsMaintenant = new Set(b.retenues.map(x => x.match.id));
+    const sortants = precedentes
+      ? precedentes.filter(x => !idsMaintenant.has(x.match.id))
+      : [];
+    precedentes = b.retenues;
+
+    const d = new Date(fin + 'T12:00:00');
+    etapes.push({
+      fin,
+      libelle: `${MOIS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
+      bilan: b.bilan,
+      manque: s?.points != null ? Math.max(0, s.points - b.bilan) : null,
+      sortants,
+    });
+  }
+  return etapes;
+}
+
+/** Le premier mois où l'écart se creuse : la date avant laquelle il faut
+ *  avoir agi, si l'on ne veut pas voir la marche monter. */
+export function echeance(etapes) {
+  const depart = etapes[0]?.manque;
+  if (depart == null) return null;
+  for (let i = 1; i < etapes.length; i++) {
+    if (etapes[i].manque > depart) {
+      return { avant: etapes[i - 1], apres: etapes[i], surcout: etapes[i].manque - depart };
+    }
+  }
+  return null;
+}
+
+/** Ce que rapporterait une victoire à chaque échelon, une fois les
+ *  remplacements appliqués. Sert à montrer aussi ce qui ne rapporte
+ *  **rien** : c'est contre-intuitif, et c'est la première chose à savoir
+ *  avant de s'inscrire à un tournoi. */
+export function rendementParEchelon({ matchs = [], cible, sexe = 'h',
+                                      bareme = BAREME_DEFAUT, bonusVictoires = 0, bonusPoints = 0 }) {
+  const base = bilanA({ matchs, cible, sexe, bareme, bonusVictoires, bonusPoints });
+  return adversairesPlausibles(cible).map(adv => {
+    const p = pointsVictoire(cible, adv, bareme);
+    const avant = base.retenues.reduce((t, x) => t + x.points, 0);
+    const toutes = [...base.retenues.map(x => x.points),
+                    ...base.ecartees.map(x => x.points), p].sort((a, b) => b - a);
+    const apres = toutes.slice(0, base.quota).reduce((t, x) => t + x, 0);
+    return { echelon: adv, bareme: p, gain: apres - avant };
+  });
+}
+
 /** Formule un scénario en français : « 2 victoires à 15/1 ». */
 export function direScenario(sc) {
   return sc.parts
