@@ -6,17 +6,21 @@
    se dire, les empiler ne ferait que rallonger le défilement. */
 
 import { h, dateCourte, dateLongue, puce, confirmer, toast } from '../util.js';
-import { store, basculerAchat, rangerCourses, courses as coursesCRUD, raquetteDe } from '../store.js';
+import { store, basculerAchat, rangerCourses, courses as coursesCRUD, raquetteDe,
+         clubDuMatch, CATEGORIES_DEPENSE, nomCategorieDepense } from '../store.js';
+import { pointDuClub } from '../carte.js';
+import { distanceKm } from '../geocodage.js';
 import {
   CATEGORIES_COURSES, TROUSSE_TYPE, nomCause,
   statsCordages, ageCordage, dureesDeVie,
 } from '../materiel.js';
-import { courseForm, raquetteForm, cordageForm, chaussureForm } from '../forms.js';
+import { courseForm, raquetteForm, cordageForm, chaussureForm, depenseForm } from '../forms.js';
 
 let onglet = 'courses';
 
 const ONGLETS = [
   { cle: 'courses',    emoji: '🛒', nom: 'Courses' },
+  { cle: 'argent',     emoji: '💶', nom: 'Argent' },
   { cle: 'raquettes',  emoji: '🎾', nom: 'Raquettes' },
   { cle: 'cordages',   emoji: '🪢', nom: 'Cordages' },
   { cle: 'chaussures', emoji: '👟', nom: 'Chaussures' },
@@ -28,10 +32,138 @@ export function render() {
       class="${onglet === o.cle ? 'actif' : ''}">${o.emoji} ${h(o.nom)}</button>`).join('')}
   </div>`;
 
-  const corps = { courses: vueCourses, raquettes: vueRaquettes,
+  const corps = { courses: vueCourses, argent: vueArgent, raquettes: vueRaquettes,
                   cordages: vueCordages, chaussures: vueChaussures }[onglet]();
 
   return barre + corps;
+}
+
+/* ─── Ce que le tennis coûte ───────────────────────────────────────────
+
+   Deux natures de chiffres, et l'écran ne les mélange jamais.
+
+   Ce qui est **payé** se saisit : une inscription de tournoi, une licence,
+   un cordage. Rien ne s'en déduit d'un palmarès — la fédération enregistre
+   des résultats, pas des factures.
+
+   Ce qui est **estimé** se calcule : les déplacements, à partir du
+   domicile et des clubs où l'on a joué. À vol d'oiseau, aller-retour, au
+   tarif qu'on aura réglé soi-même. C'est un ordre de grandeur et c'est dit
+   comme tel — la route est plus longue que le vol d'oiseau, et de combien
+   dépend du relief.
+
+   Les additionner dans un même total ferait passer l'estimation pour une
+   dépense constatée. Ils restent donc côte à côte, jamais confondus. */
+const euros = n => `${n.toLocaleString('fr-FR', { maximumFractionDigits: n < 100 ? 2 : 0 })} €`;
+
+/** Les kilomètres parcourus pour aller jouer, club par club. */
+function deplacements() {
+  const chez = store.profil?.domicile?.point;
+  if (!chez) return null;
+
+  const parClub = new Map();
+  for (const m of store.matchs) {
+    const club = clubDuMatch(m);
+    if (!club) continue;
+    const p = pointDuClub(club);
+    if (!p) continue;
+    if (!parClub.has(club.id)) {
+      parClub.set(club.id, { club, trajets: 0, km: distanceKm(chez, p) });
+    }
+    parClub.get(club.id).trajets++;
+  }
+
+  const lignes = [...parClub.values()]
+    .map(x => ({ ...x, kmTotal: x.km * 2 * x.trajets }))
+    .sort((a, b) => b.kmTotal - a.kmTotal);
+
+  return { lignes, kmTotal: lignes.reduce((t, x) => t + x.kmTotal, 0) };
+}
+
+function vueArgent() {
+  const saisies = [...(store.depenses || [])]
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const total = saisies.reduce((t, d) => t + (Number(d.montant) || 0), 0);
+
+  const parCat = {};
+  for (const d of saisies) {
+    parCat[d.categorie] = (parCat[d.categorie] || 0) + (Number(d.montant) || 0);
+  }
+
+  const route = deplacements();
+  const tarif = Number(store.profil?.coutKm) || 0;
+
+  return `
+    <section class="chiffres">
+      <div class="chiffre"><b>${euros(total)}</b><span>dépenses notées</span></div>
+      <div class="chiffre"><b>${saisies.length}</b><span>lignes</span></div>
+      ${route ? `<div class="chiffre"><b>${Math.round(route.kmTotal)}</b>
+        <span>km estimés</span></div>` : ''}
+      ${route && tarif ? `<div class="chiffre"><b>${euros(route.kmTotal * tarif)}</b>
+        <span>de route estimés</span></div>` : ''}
+    </section>
+
+    <div class="rangee-boutons" style="justify-content:center">
+      <button class="btn btn-primary" data-depense>Noter une dépense</button>
+    </div>
+
+    ${saisies.length ? `<section class="carte">
+      <h3>Par catégorie</h3>
+      <ul class="clubs-adverses">
+        ${CATEGORIES_DEPENSE.filter(c => parCat[c.cle]).map(c => `<li>
+          <div><strong>${c.emoji} ${h(c.nom)}</strong></div>
+          <div class="club-score"><b>${euros(parCat[c.cle])}</b></div>
+        </li>`).join('')}
+      </ul>
+    </section>` : `<div class="vide"><span class="emoji">💶</span>
+      Rien de noté pour l'instant. Une inscription de tournoi ne figure nulle part dans un
+      palmarès : c'est à toi de l'écrire, et le carnet ne l'inventera pas.</div>`}
+
+    ${saisies.length ? `<section class="carte">
+      <h3>Le détail</h3>
+      <ul class="clubs-adverses">
+        ${saisies.map(d => `<li data-depense-id="${h(d.id)}" style="cursor:pointer">
+          <div>
+            <strong>${h(d.libelle)}</strong>
+            <div class="tiny muted">${h(dateCourte(d.date))} —
+              ${h(nomCategorieDepense(d.categorie))}${d.note ? ` · ${h(d.note)}` : ''}</div>
+          </div>
+          <div class="club-score"><b>${euros(Number(d.montant) || 0)}</b></div>
+        </li>`).join('')}
+      </ul>
+    </section>` : ''}
+
+    ${route ? `<section class="carte">
+      <h3>La route, estimée</h3>
+      <p class="tiny muted">${Math.round(route.kmTotal)} km pour aller jouer, tous clubs
+        confondus : la distance de chez toi à chaque club, comptée aller-retour et
+        multipliée par le nombre de matchs qui s'y sont joués.
+        <strong>C'est un ordre de grandeur.</strong> La distance est à vol d'oiseau et la
+        route fait toujours plus ; on ignore le covoiturage, les allers pour rien et les
+        matchs dont on ne connaît pas le club.</p>
+      ${tarif
+        ? `<p class="tiny muted">Au tarif de ${euros(tarif)} du kilomètre que tu as réglé,
+           cela ferait <strong>${euros(route.kmTotal * tarif)}</strong>.</p>`
+        : `<p class="tiny muted">Aucun tarif kilométrique réglé : le carnet ne compte donc
+           que les kilomètres, et n'invente pas un prix. Il se règle dans ton profil.</p>`}
+      <ul class="clubs-adverses">
+        ${route.lignes.slice(0, 8).map(x => `<li>
+          <div>
+            <strong>${h(x.club.nom)}</strong>
+            <div class="tiny muted">${x.trajets} trajet(s) —
+              ${x.km < 10 ? x.km.toFixed(1) : Math.round(x.km)} km à l'aller</div>
+          </div>
+          <div class="club-score">
+            <b>${Math.round(x.kmTotal)}</b>
+            <span class="tiny muted">km</span>
+          </div>
+        </li>`).join('')}
+      </ul>
+    </section>` : `<section class="carte">
+      <h3>La route</h3>
+      <p class="tiny muted">Renseigne ton domicile dans le profil et le carnet saura dire
+        combien de kilomètres tu fais pour aller jouer.</p>
+    </section>`}`;
 }
 
 // =====================================================================
@@ -272,6 +404,15 @@ export function wire(vue, rerendre) {
   vue.addEventListener('click', async e => {
     const o = e.target.closest('[data-onglet]');
     if (o) { onglet = o.dataset.onglet; rerendre(); return; }
+
+    if (e.target.closest('[data-depense]')) { depenseForm(); return; }
+
+    const dep = e.target.closest('[data-depense-id]');
+    if (dep) {
+      const x = (store.depenses || []).find(y => y.id === dep.dataset.depenseId);
+      if (x) depenseForm(x);
+      return;
+    }
 
     const c = e.target.closest('[data-cocher]');
     if (c) { basculerAchat(c.dataset.cocher); return; }

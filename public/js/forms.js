@@ -14,7 +14,8 @@ import {
   ajouterSource, ajouterClub, modifierClub, clubDuMatch, surfaceDuMatch,
   exporterJSON, importerJSON, toutEffacer,
   raquettes, cordages, chaussures, courses, noterJoueur,
-  PROFILS, MOMENTS, CATEGORIES, PLATEFORMES, SURFACES,
+  ajouterDepense, modifierDepense, supprimerDepense,
+  PROFILS, MOMENTS, CATEGORIES, PLATEFORMES, SURFACES, CATEGORIES_DEPENSE,
 } from './store.js';
 import { ICONES, CATEGORIES_COURSES, CAUSES_CORDAGE } from './materiel.js';
 import { analyser, EXEMPLE } from './import-fft.js';
@@ -429,6 +430,14 @@ export function profilForm() {
         ${champLieu('bureau', 'Mon travail', p.bureau, '3 place du Marché, 76200 Dieppe')}
         <p class="tiny muted">Mets la commune et le code postal : sans eux, le service des
           adresses cherche dans toute la France et se trompe de rue.</p>
+
+        <label>Coût du kilomètre (facultatif)
+          <input type="number" name="coutKm" min="0" step="0.01" inputmode="decimal"
+                 value="${p.coutKm ?? ''}" placeholder="par exemple 0,30">
+        </label>
+        <p class="tiny muted">Sert à estimer ce que la route coûte, dans l'onglet Argent du
+          sac. Laissé vide, le carnet compte les kilomètres et s'arrête là plutôt que
+          d'inventer un prix.</p>
       </fieldset>
     </form>`,
     footer: `<button class="btn btn-primary" data-ok>Enregistrer</button>`,
@@ -486,6 +495,7 @@ export function profilForm() {
             bilanOfficiel: d.bilanOfficiel === '' ? null : Number(d.bilanOfficiel),
             domicile: lieu('domicile'),
             bureau: lieu('bureau'),
+            coutKm: d.coutKm === '' ? null : Number(d.coutKm),
           };
         }), 'Classement enregistré.');
       };
@@ -921,6 +931,76 @@ export function joueurForm(joueur) {
           profils: valeurs(form, 'profils'),
         }), 'Noté.');
       };
+    },
+  });
+}
+
+// =====================================================================
+//  Une dépense
+// =====================================================================
+/* Une seule règle ici : rien n'est prérempli qu'on ne sache. La date
+   d'aujourd'hui, oui — c'est en rentrant du tournoi qu'on note. Le
+   montant, jamais. */
+export function depenseForm(existant = null) {
+  const d = existant || {
+    date: aujourdhui(), libelle: '', montant: '', categorie: 'inscription', note: '',
+  };
+
+  /* Les épreuves déjà jouées se proposent : une inscription se rattache
+     presque toujours à un tournoi qu'on a dans son historique, et le
+     retaper à la main invite à l'écrire deux fois différemment. */
+  const epreuves = [...new Set(store.matchs.map(m => (m.tournoi || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'fr'));
+
+  openModal({
+    title: existant ? 'Modifier la dépense' : 'Une dépense',
+    body: `<form id="f-depense" class="form">
+      <div class="duo">
+        <label>Date<input type="date" name="date" value="${h(d.date)}" required></label>
+        <label>Montant (€)
+          <input type="number" name="montant" min="0" step="0.01" inputmode="decimal"
+                 value="${h(d.montant ?? '')}" placeholder="18" required>
+        </label>
+      </div>
+      <label>Catégorie
+        <select name="categorie">
+          ${CATEGORIES_DEPENSE.map(c => `<option value="${c.cle}"
+            ${d.categorie === c.cle ? 'selected' : ''}>${c.emoji} ${h(c.nom)}</option>`).join('')}
+        </select>
+      </label>
+      <label>À quoi ça correspond
+        <input name="libelle" list="epreuves-connues" value="${h(d.libelle)}"
+               placeholder="Le nom du tournoi, du cordage…" required>
+      </label>
+      <datalist id="epreuves-connues">
+        ${epreuves.map(e => `<option value="${h(e)}"></option>`).join('')}
+      </datalist>
+      <label>Note (facultatif)
+        <textarea name="note" rows="2"
+          placeholder="Payé sur place, remboursé par le club…">${h(d.note || '')}</textarea>
+      </label>
+    </form>`,
+    footer: `${existant ? '<button class="btn btn-danger" data-suppr>Supprimer</button>' : ''}
+             <button class="btn btn-primary" data-ok>${existant ? 'Enregistrer' : 'Ajouter'}</button>`,
+    onMount: () => {
+      const racine = document.getElementById('modal-root');
+      const form = racine.querySelector('#f-depense');
+
+      racine.querySelector('[data-ok]').onclick = () => {
+        if (!form.reportValidity()) return;
+        const v = Object.fromEntries(new FormData(form));
+        v.montant = Number(v.montant) || 0;
+        conclure(existant ? modifierDepense(existant.id, v) : ajouterDepense(v),
+                 existant ? 'Dépense modifiée.' : 'Dépense ajoutée.');
+      };
+
+      racine.querySelector('[data-suppr]')?.addEventListener('click', async () => {
+        closeModal();
+        if (await confirmer('Supprimer cette dépense ?', `${d.libelle} — ${d.montant} €`)) {
+          supprimerDepense(existant.id);
+          toast('Dépense supprimée.');
+        }
+      });
     },
   });
 }

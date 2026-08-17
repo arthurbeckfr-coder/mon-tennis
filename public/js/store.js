@@ -100,6 +100,10 @@ function vide() {
     /* Les adversaires ne sont pas stockés : ils se déduisent des matchs.
        Seul ce qu'on ajoute à leur sujet — leur façon de jouer — vit ici. */
     joueurs: [],
+    /* Ce que le tennis coûte. Rien ne s'en déduit : une inscription de
+       tournoi n'est écrite nulle part dans un palmarès, et le carnet ne
+       l'inventera pas. */
+    depenses: [],
   };
 }
 
@@ -217,6 +221,39 @@ export const raquetteDe = id => store.raquettes.find(r => r.id === id) || null;
 
 /** Enregistre ce qu'on a retenu d'un adversaire. La fiche est créée à la
  *  première note : tant qu'on n'a rien à dire, il n'y a rien à stocker. */
+/* ─── Ce que ça coûte ──────────────────────────────────────────────────
+
+   Rien de tout cela ne se déduit d'un palmarès : la fédération enregistre
+   des résultats, pas des factures. Ces lignes se saisissent donc à la
+   main, et le carnet ne remplit que ce qu'on lui donne.
+
+   Le déplacement fait exception, et c'est le seul calcul du lot : on
+   connaît le domicile et le club, donc la distance. Mais c'est un ordre
+   de grandeur et rien d'autre — à vol d'oiseau, aller-retour, au tarif
+   qu'on aura réglé soi-même. Il est compté à part du reste pour cette
+   raison : mélanger un chiffre saisi et un chiffre estimé dans un même
+   total ferait passer l'estimation pour une dépense constatée. */
+export const CATEGORIES_DEPENSE = [
+  { cle: 'inscription', emoji: '🎟️', nom: 'Inscription à un tournoi' },
+  { cle: 'licence',     emoji: '🪪', nom: 'Licence et cotisation' },
+  { cle: 'cordage',     emoji: '🧵', nom: 'Cordage et pose' },
+  { cle: 'materiel',    emoji: '🎒', nom: 'Matériel' },
+  { cle: 'cours',       emoji: '💡', nom: 'Cours et stages' },
+  { cle: 'autre',       emoji: '💶', nom: 'Autre' },
+];
+
+export const nomCategorieDepense = cle =>
+  CATEGORIES_DEPENSE.find(c => c.cle === cle)?.nom || cle;
+
+export const ajouterDepense = d => maj(s => s.depenses.push({ id: uid(), ...d }));
+export const modifierDepense = (id, d) => maj(s => {
+  const i = s.depenses.findIndex(x => x.id === id);
+  if (i >= 0) s.depenses[i] = { ...s.depenses[i], ...d };
+});
+export const supprimerDepense = id => maj(s => {
+  s.depenses = s.depenses.filter(d => d.id !== id);
+});
+
 export const noterJoueur = (nom, donnees) => maj(s => {
   const cle = (n) => (n || '').trim().toUpperCase();
   const i = s.joueurs.findIndex(j => cle(j.nom) === cle(nom));
@@ -475,7 +512,7 @@ export function importerJSON(texte, mode = 'fusion') {
      modèle sont deux raquettes, et deux cordages du même jour peuvent être
      deux cordages. Rien ici ne se déduplique sur le contenu. */
   let nMat = 0;
-  for (const cle of ['raquettes', 'cordages', 'chaussures', 'courses', 'joueurs']) {
+  for (const cle of ['raquettes', 'cordages', 'chaussures', 'courses', 'joueurs', 'depenses']) {
     const vus = new Set(store[cle].map(x => x.id));
     for (const x of (lu[cle] || [])) {
       if (x.id && vus.has(x.id)) continue;
