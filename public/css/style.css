@@ -190,6 +190,23 @@ a { color: var(--accent); }
 a.icon-btn { display: grid; place-items: center; text-decoration: none; }
 .icon-btn.active { background: var(--accent-doux); }
 
+/* Une pastille discrète sur l'icône de sauvegarde : verte quand le carnet
+   est relié à un compte, orange pendant l'envoi. Discrète parce qu'elle
+   n'appelle aucune action — elle rassure, elle ne réclame pas. */
+.icon-btn[data-sync] { position: relative; }
+.icon-btn[data-sync]::after {
+  content: '';
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--fond);
+}
+.icon-btn[data-sync="ok"]::after    { background: var(--victoire); }
+.icon-btn[data-sync="cours"]::after { background: var(--alerte); }
+
 .view {
   max-width: 780px;
   margin: 0 auto;

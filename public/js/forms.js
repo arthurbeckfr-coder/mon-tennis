@@ -5,7 +5,7 @@
    d'abord, le reste replié. Un conseil qu'on renonce à noter parce que le
    formulaire est long est un conseil perdu. */
 
-import { openModal, closeModal, toast, h, aujourdhui, uid, confirmer } from './util.js';
+import { openModal, closeModal, toast, h, aujourdhui, uid, confirmer, dateLongue } from './util.js';
 import { ECHELONS, BAREME_DEFAUT } from './classement.js';
 import {
   store, maj, sauver,
@@ -19,6 +19,23 @@ import {
 import { ICONES, CATEGORIES_COURSES, CAUSES_CORDAGE } from './materiel.js';
 import { analyser, EXEMPLE } from './import-fft.js';
 import { blocTerrain, brancherTerrain } from './terrain.js';
+import * as nuage from './nuage.js';
+
+/** Ce qu'une synchronisation a rapporté, dit en français. */
+function messageSync(r) {
+  if (r.premiere) return 'Carnet envoyé en ligne pour la première fois.';
+  const g = r.recu;
+  if (!g || !g.ok) return 'Carnet synchronisé.';
+  const parts = [
+    g.matchs ? `${g.matchs} match(s)` : null,
+    g.conseils ? `${g.conseils} conseil(s)` : null,
+    g.clubs ? `${g.clubs} club(s)` : null,
+    g.joueurs ? `${g.joueurs} adversaire(s)` : null,
+  ].filter(Boolean);
+  return parts.length
+    ? `Synchronisé — récupéré ${parts.join(', ')} de l'autre appareil.`
+    : 'Synchronisé — rien de neuf de l\'autre côté.';
+}
 
 const opts = (liste, choisi) => liste
   .map(v => `<option value="${h(v)}" ${v === choisi ? 'selected' : ''}>${h(v)}</option>`).join('');
@@ -969,12 +986,15 @@ export function donneesForm() {
     title: 'Sauvegarde et transfert',
     large: true,
     body: `<div class="form">
-      <p class="tiny muted">Ce carnet vit dans ce navigateur-ci, et nulle part ailleurs :
-        rien ne part sur internet. C'est ce qui le rend utilisable sur un court sans réseau —
-        et ce qui fait que l'ordinateur ignore ce que tu as saisi sur le téléphone.
-        Ce fichier est le pont entre les deux.</p>
+      <h3>Synchroniser</h3>
+      <div id="bloc-sync"></div>
 
-      <h3>Emporter</h3>
+      <p class="tiny muted">Le carnet vit d'abord dans ce navigateur : c'est ce qui le rend
+        utilisable sur un court sans réseau. La synchronisation ne fait que transporter
+        l'état d'un appareil à l'autre — et elle complète sans jamais écraser, donc deux
+        appareils qui ont chacun ajouté des choses se retrouvent avec la somme des deux.</p>
+
+      <h3>Emporter un fichier</h3>
       <p class="tiny muted">${store.matchs.length} match(s), ${store.conseils.length} conseil(s),
          ${store.sources.length} compte(s) suivi(s).</p>
       <div class="rangee-boutons">
@@ -1004,6 +1024,72 @@ export function donneesForm() {
     </div>`,
     onMount: () => {
       const racine = document.getElementById('modal-root');
+
+      /* Le bloc de synchronisation se redessine à chaque changement d'état :
+         connecté ou non, en cours ou non. */
+      const bloc = racine.querySelector('#bloc-sync');
+      const dessinerSync = () => {
+        if (nuage.enTrain()) {
+          bloc.innerHTML = `<p class="tiny muted">Synchronisation en cours…</p>`;
+          return;
+        }
+        if (!nuage.connecte()) {
+          bloc.innerHTML = `
+            <p class="tiny muted">Connecte-toi pour retrouver ton carnet sur tous tes
+              appareils. Tant que tu ne le fais pas, tout fonctionne comme avant, en local.</p>
+            <div class="duo">
+              <label>Email<input id="sync-mail" type="email" autocomplete="username"></label>
+              <label>Mot de passe<input id="sync-mdp" type="password"
+                     autocomplete="current-password"></label>
+            </div>
+            <button class="btn btn-primary" data-connexion>Se connecter</button>
+            <p id="sync-erreur" class="tiny alerte" hidden></p>`;
+          return;
+        }
+        const quand = nuage.derniereSync();
+        bloc.innerHTML = `
+          <p class="tiny muted">Connecté en tant que <strong>${h(nuage.courriel())}</strong>.
+            ${quand ? `Dernière synchronisation le ${h(dateLongue(quand.slice(0, 10)))}.`
+                    : 'Jamais synchronisé depuis cet appareil.'}</p>
+          <div class="rangee-boutons">
+            <button class="btn btn-primary" data-sync>Synchroniser maintenant</button>
+            <button class="btn btn-ghost" data-deconnexion>Se déconnecter</button>
+          </div>`;
+      };
+      dessinerSync();
+      document.addEventListener('sync-change', dessinerSync);
+
+      bloc.addEventListener('click', async e => {
+        if (e.target.closest('[data-connexion]')) {
+          const mail = bloc.querySelector('#sync-mail').value.trim();
+          const mdp = bloc.querySelector('#sync-mdp').value;
+          const err = bloc.querySelector('#sync-erreur');
+          if (!mail || !mdp) { err.hidden = false; err.textContent = 'Email et mot de passe.'; return; }
+          try {
+            await nuage.connexion(mail, mdp);
+            dessinerSync();
+            const r = await nuage.synchroniser();
+            toast(r.ok ? messageSync(r) : `Connecté, mais : ${r.erreur}`);
+            dessinerSync();
+          } catch (ex) {
+            err.hidden = false;
+            err.textContent = /Invalid login/i.test(ex.message)
+              ? 'Email ou mot de passe incorrect.' : ex.message;
+          }
+          return;
+        }
+        if (e.target.closest('[data-sync]')) {
+          const r = await nuage.synchroniser();
+          toast(r.ok ? messageSync(r) : r.erreur);
+          dessinerSync();
+          return;
+        }
+        if (e.target.closest('[data-deconnexion]')) {
+          nuage.deconnexion();
+          dessinerSync();
+          toast('Déconnecté — ton carnet reste sur cet appareil.');
+        }
+      });
 
       racine.querySelector('[data-fichier]').onclick = async () => {
         const nom = `tennis-${new Date().toISOString().slice(0, 10)}.json`;

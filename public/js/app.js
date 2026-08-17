@@ -12,6 +12,7 @@ import * as coaching   from './views/coaching.js';
 import * as clubs      from './views/clubs.js';
 import * as materiel   from './views/materiel.js';
 import * as joueurs    from './views/joueurs.js';
+import * as nuage      from './nuage.js';
 
 const $ = id => document.getElementById(id);
 
@@ -153,4 +154,32 @@ if (etat.neuf) {
 afficher();
 
 window.addEventListener('hashchange', afficher);
-document.addEventListener('data-changed', afficher);
+document.addEventListener('data-changed', () => {
+  afficher();
+  // Une saisie appelle un envoi, mais pas tout de suite : on note souvent
+  // trois choses d'affilée, et trois envois pour un seul geste seraient
+  // du gaspillage.
+  nuage.planifierEnvoi();
+});
+
+/* ─── La synchronisation ───────────────────────────────────────────────
+
+   Elle ne conditionne rien : sans compte, ou sans réseau, le carnet
+   fonctionne exactement comme avant. C'est la règle qui compte, parce que
+   l'écran le plus utile de ce site se consulte sur un terrain où le réseau
+   ne passe pas. */
+function rafraichirIndicateur() {
+  const b = $('btn-donnees');
+  if (nuage.enTrain()) { b.dataset.sync = 'cours'; b.title = 'Synchronisation en cours…'; }
+  else if (nuage.connecte()) { b.dataset.sync = 'ok'; b.title = `Synchronisé — ${nuage.courriel()}`; }
+  else { delete b.dataset.sync; b.title = 'Sauvegarde et transfert'; }
+}
+document.addEventListener('sync-change', rafraichirIndicateur);
+rafraichirIndicateur();
+
+if (nuage.connecte()) {
+  nuage.synchroniser().then(r => {
+    rafraichirIndicateur();
+    if (!r.ok) toast(`Synchronisation impossible : ${r.erreur}`);
+  });
+}

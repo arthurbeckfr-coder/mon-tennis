@@ -407,7 +407,7 @@ export function importerJSON(texte, mode = 'fusion') {
      modèle sont deux raquettes, et deux cordages du même jour peuvent être
      deux cordages. Rien ici ne se déduplique sur le contenu. */
   let nMat = 0;
-  for (const cle of ['raquettes', 'cordages', 'chaussures', 'courses']) {
+  for (const cle of ['raquettes', 'cordages', 'chaussures', 'courses', 'joueurs']) {
     const vus = new Set(store[cle].map(x => x.id));
     for (const x of (lu[cle] || [])) {
       if (x.id && vus.has(x.id)) continue;
@@ -421,6 +421,48 @@ export function importerJSON(texte, mode = 'fusion') {
   const r = sauver();
   return r.ok ? { ok: true, matchs: nm, conseils: nc, sources: ns, clubs: nc2, materiel: nMat, mode }
               : { ok: false, erreur: r.erreur };
+}
+
+/** Fusionne ce qui vient d'un autre appareil.
+ *
+ *  Les listes se complètent sans jamais s'écraser — c'est la propriété
+ *  qui compte : la panne qu'on ne pardonne pas est celle qui efface trois
+ *  conseils notés après un cours.
+ *
+ *  Le profil et le barème font exception, parce qu'ils ne sont pas des
+ *  listes : on ne peut pas « additionner » deux classements. On prend
+ *  alors celui d'en face uniquement si le sien n'a jamais été touché — un
+ *  appareil neuf hérite ainsi des réglages, sans qu'un appareil déjà réglé
+ *  se fasse déclasser par un autre. */
+export function fusionnerDistant(distant) {
+  const neuf = vide();
+  const profilVierge = !store.profil.prenom
+    && store.profil.echelon === neuf.profil.echelon
+    && !store.profil.bilanOfficiel;
+
+  const avant = {
+    matchs: store.matchs.length, conseils: store.conseils.length,
+    clubs: store.clubs.length, joueurs: store.joueurs.length,
+  };
+
+  const r = importerJSON(JSON.stringify(distant), 'fusion');
+  if (!r.ok) return { ok: false, erreur: r.erreur };
+
+  if (profilVierge && distant.profil) {
+    maj(s => {
+      s.profil = { ...neuf.profil, ...distant.profil };
+      s.bareme = { ...BAREME_DEFAUT, ...(distant.bareme || {}) };
+    });
+  }
+
+  return {
+    ok: true,
+    matchs: store.matchs.length - avant.matchs,
+    conseils: store.conseils.length - avant.conseils,
+    clubs: store.clubs.length - avant.clubs,
+    joueurs: store.joueurs.length - avant.joueurs,
+    profilRepris: profilVierge && !!distant.profil,
+  };
 }
 
 export function toutEffacer() {

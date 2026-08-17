@@ -46,6 +46,20 @@ jobs:
           fi
           echo "OK — aucune ressource externe."
 
+      # La page contient une clé Supabase, et c'est normal : la clé publiable
+      # ne donne rien sans compte, ce sont les règles de la base qui décident.
+      # La clé secrète, elle, contournerait tout. On vise donc l'empreinte
+      # d'une vraie clé et non le mot lui-même — sans quoi le commentaire de
+      # config.js, qui met justement en garde contre elle, ferait échouer
+      # chaque déploiement.
+      - name: Vérifier qu'aucune clé secrète ne part dans la page
+        run: |
+          if grep -rnE 'sb_secret_[A-Za-z0-9_-]{10,}|sk-ant-[A-Za-z0-9_-]{12,}|SUPABASE_SERVICE_ROLE_KEY *=' public/; then
+            echo "::error::Une clé secrète s'est glissée dans public/. Elle n'a rien à faire dans un site public."
+            exit 1
+          fi
+          echo "OK — aucune clé secrète dans le bundle."
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
