@@ -765,6 +765,59 @@ body.mode-court .view { padding-top: 6px; }
 /* ===================================================================
    Clubs
    =================================================================== */
+.clubs { list-style: none; margin: 8px 0 0; padding: 0; }
+.club-ligne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--carte);
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.club-ligne:hover { background: var(--carte-2); border-color: var(--accent); }
+.club-corps { flex: 1; min-width: 0; }
+.club-bas {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 4px;
+  font-size: .78rem;
+  color: var(--muet);
+}
+.club-score { text-align: right; flex: 0 0 auto; }
+.club-score b { display: block; font-size: 1.3rem; color: var(--accent); line-height: 1.1; }
+
+.fiche-tete { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.fiche-tete h2 { font-size: 1.2rem; }
+.fiche-tete > div { flex: 1; }
+
+.fiche-infos { list-style: none; margin: 0; padding: 0; }
+.fiche-infos li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-top: 1px solid var(--bord);
+  font-size: .9rem;
+}
+.fiche-infos li:first-child { border-top: 0; }
+.fiche-emoji { flex: 0 0 22px; font-size: 16px; line-height: 1.4; }
+
+.orphelines { list-style: none; margin: 10px 0 0; padding: 0; }
+.orphelines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  border-top: 1px solid var(--bord);
+  font-size: .82rem;
+}
+.orphelines li:first-child { border-top: 0; }
+.orphelines b { color: var(--muet); flex: 0 0 auto; }
 .comptes { list-style: none; margin: 6px 0 0; padding: 0; }
 .comptes li {
   display: flex;

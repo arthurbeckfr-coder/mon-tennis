@@ -63,7 +63,13 @@ export const PLATEFORMES = [
   { cle: 'site',      emoji: '🌐', nom: 'Site web' },
 ];
 
-export const SURFACES = ['Terre battue', 'Dur', 'Dur indoor', 'Gazon', 'Moquette', 'Autre'];
+/* Le vocabulaire de la fédération, et non le vocabulaire courant : c'est
+   celui qu'on lit sur les fiches de tournoi, donc celui qui permettra de
+   recouper. « Dur » n'y existe pas, on y parle résine et béton poreux. */
+export const SURFACES = [
+  'Terre battue traditionnelle', 'Terre artificielle', 'Résine',
+  'Béton poreux', 'Moquette', 'Green-set', 'Gazon synthétique', 'Autre',
+];
 
 export const nomProfil  = c => PROFILS.find(p => p.cle === c)?.nom || c;
 export const nomMoment  = c => MOMENTS.find(m => m.cle === c)?.nom || c;
@@ -85,6 +91,7 @@ function vide() {
     bareme: { ...BAREME_DEFAUT },
     matchs: [],
     conseils: [],
+    clubs: [],
     sources: [],
   };
 }
@@ -149,6 +156,93 @@ export const basculerFavori = id => maj(s => {
 
 export const ajouterSource = x => maj(s => s.sources.push({ id: uid(), ...x }));
 export const supprimerSource = id => maj(s => { s.sources = s.sources.filter(x => x.id !== id); });
+
+export const ajouterClub = c => maj(s => s.clubs.push({ id: uid(), sources: [], ...c }));
+export const modifierClub = (id, c) => maj(s => {
+  const i = s.clubs.findIndex(x => x.id === id);
+  if (i >= 0) s.clubs[i] = { ...s.clubs[i], ...c };
+});
+export const supprimerClub = id => maj(s => {
+  s.clubs = s.clubs.filter(c => c.id !== id);
+  // Un match rattaché à la main à ce club redevient orphelin plutôt que
+  // de pointer dans le vide.
+  s.matchs.forEach(m => { if (m.clubId === id) delete m.clubId; });
+});
+
+// =====================================================================
+//  Rattacher un match à un club
+// =====================================================================
+/* Ten'Up ne nomme le club que dans le libellé de l'épreuve, et encore :
+   « TOURNOI SENIORS » ne dit rien, et un championnat par équipes se joue
+   tantôt chez soi tantôt ailleurs sans que ce soit écrit nulle part.
+   D'où deux niveaux : le rattachement explicite, qui fait foi, et à
+   défaut la reconnaissance par mots-clés, que l'on peut corriger. */
+
+const sansAccent = s => (s || '').toUpperCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/** Où commence ce mot dans le texte, en mot entier — ou -1.
+ *  Le mot entier n'est pas un luxe : sans lui « VEULES » attraperait
+ *  « VEULETTES », qui est un autre club à quinze kilomètres. */
+function positionMot(texte, mot) {
+  const m = sansAccent(mot).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const r = new RegExp(`(^|[^A-Z])(${m})([^A-Z]|$)`);
+  const t = sansAccent(texte);
+  const trouve = r.exec(t);
+  return trouve ? trouve.index + trouve[1].length : -1;
+}
+
+/** Où s'est joué ce match.
+ *
+ *  Le rattachement explicite fait foi — c'est celui que l'import pose
+ *  quand la fédération a gardé le lien vers le tournoi, et celui qu'on
+ *  choisit à la main.
+ *
+ *  Sinon on lit le libellé de l'épreuve, et deux clubs peuvent s'y
+ *  reconnaître : « TOURNOI TPCV ACE CREDIT DIEPPE » contient à la fois le
+ *  sigle du club organisateur et le nom d'une ville où joue un autre club.
+ *  On tranche par la position : dans un nom d'épreuve, l'organisateur est
+ *  cité avant le lieu. */
+export function clubDuMatch(m) {
+  if (!m) return null;
+  if (m.clubId) return store.clubs.find(c => c.id === m.clubId) || null;
+
+  let gagnant = null, meilleure = Infinity;
+  for (const c of store.clubs) {
+    for (const mot of (c.motsCles || [])) {
+      const i = positionMot(m.tournoi, mot);
+      if (i >= 0 && i < meilleure) { meilleure = i; gagnant = c; }
+    }
+  }
+  return gagnant;
+}
+
+export const matchsDuClub = club =>
+  store.matchs.filter(m => clubDuMatch(m)?.id === club.id)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+/** La surface d'un match : saisie si on la connaît, déduite du club sinon.
+ *  Quand le club a plusieurs surfaces, on ne tranche pas — on le dit. */
+export function surfaceDuMatch(m) {
+  if (m.surface) return { surface: m.surface, origine: 'saisie' };
+  const club = clubDuMatch(m);
+  const s = club?.surfaces || [];
+  if (s.length === 1) return { surface: s[0], origine: 'club' };
+  if (s.length > 1) return { surface: '', origine: 'ambigu', choix: s };
+  return { surface: '', origine: 'inconnue' };
+}
+
+/** Les épreuves qu'aucun club ne réclame : de quoi compléter les
+ *  mots-clés, ou rattacher à la main. */
+export function epreuvesOrphelines() {
+  const n = {};
+  for (const m of store.matchs) {
+    if (clubDuMatch(m)) continue;
+    const t = (m.tournoi || '(sans nom)').trim();
+    n[t] = (n[t] || 0) + 1;
+  }
+  return Object.entries(n).sort((a, b) => b[1] - a[1]);
+}
 
 // =====================================================================
 //  Lectures calculées
@@ -245,9 +339,18 @@ export function importerJSON(texte, mode = 'fusion') {
     ns++;
   }
 
+  let nc2 = 0;
+  const vusCl = new Set(store.clubs.map(c => (c.nom || '').toLowerCase()));
+  for (const c of (lu.clubs || [])) {
+    if (vusCl.has((c.nom || '').toLowerCase())) continue;
+    store.clubs.push({ sources: [], ...c, id: c.id || uid() });
+    vusCl.add((c.nom || '').toLowerCase());
+    nc2++;
+  }
+
   store.matchs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const r = sauver();
-  return r.ok ? { ok: true, matchs: nm, conseils: nc, sources: ns, mode }
+  return r.ok ? { ok: true, matchs: nm, conseils: nc, sources: ns, clubs: nc2, mode }
               : { ok: false, erreur: r.erreur };
 }
 

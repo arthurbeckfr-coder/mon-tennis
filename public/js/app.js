@@ -3,13 +3,13 @@
 import { charger, store } from './store.js';
 import { h, toast, openModal, closeModal } from './util.js';
 import { appliquerTheme, themeSuivant, themeActuel, ETIQUETTES } from './theme.js';
-import { matchForm, conseilForm, sourceForm, profilForm,
+import { matchForm, conseilForm, clubForm, profilForm,
          importFFTForm, donneesForm } from './forms.js';
 
 import * as matchs     from './views/matchs.js';
 import * as simulateur from './views/simulateur.js';
 import * as coaching   from './views/coaching.js';
-import * as veille     from './views/veille.js';
+import * as clubs      from './views/clubs.js';
 
 const $ = id => document.getElementById(id);
 
@@ -30,7 +30,9 @@ const ROUTES = [
   { match: /^\/court$/,       title: 'Sur le court', tab: '/court',
     render: () => coaching.renderCourt(), wire: coaching.wireCourt, nu: true },
   { match: /^\/clubs$/,       title: 'Mes clubs',    tab: '/clubs',
-    render: () => veille.render(),      wire: veille.wire },
+    render: () => clubs.render(),       wire: clubs.wire },
+  { match: /^\/clubs\/(.+)$/, title: 'Club',         tab: '/clubs',
+    render: p => clubs.renderFiche(p),  wire: clubs.wireFiche },
 ];
 
 function routeCourante() {
@@ -78,7 +80,7 @@ const RAPIDE = () => [
   ['🎾', 'Un match',   'Résultat, score, ressenti',       () => matchForm()],
   ['💡', 'Un conseil', 'Ce que le prof vient de dire',     () => conseilForm()],
   ['📥', 'Importer',   'Mon palmarès depuis Ten\'Up',      () => importFFTForm()],
-  ['📡', 'Un compte',  'Le réseau social d\'un club',      () => sourceForm()],
+  ['🏟️', 'Un club',    'Adresse, surfaces, juge-arbitre',  () => clubForm()],
   ['🏅', 'Mon classement', 'Échelon et bilan',             () => profilForm()],
 ];
 

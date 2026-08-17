@@ -221,6 +221,55 @@ son conseil a déjà perdu la partie.
 
 ---
 
+## Les clubs
+
+La liste des clubs ne se saisit pas : elle se déduit des matchs. Chaque
+fiche porte l'adresse, le téléphone, le mail, le juge-arbitre, les surfaces,
+les comptes de réseaux sociaux, et l'historique des matchs joués là-bas avec
+son bilan.
+
+### Rattacher un match à un club
+
+La fédération ne conserve que le **libellé de l'épreuve** — pas le lieu. D'où
+deux niveaux, dans cet ordre :
+
+1. **Le rattachement explicite** (`clubId` sur le match) fait foi. L'import
+   le pose quand Ten'Up garde le lien vers la fiche du tournoi, laquelle
+   nomme le club organisateur.
+2. **Sinon, les mots-clés** du club sont cherchés dans le libellé, en mot
+   entier — sans quoi « VEULES » attraperait « VEULETTES », qui est un autre
+   club à quinze kilomètres.
+
+Quand deux clubs se reconnaissent dans le même libellé — « TOURNOI TPCV ACE
+CREDIT DIEPPE » contient le sigle d'un club et le nom de la ville d'un autre
+— on tranche **par la position** : dans un nom d'épreuve, l'organisateur est
+cité avant le lieu.
+
+Sur un palmarès réel de 273 matchs : 143 rattachés par le lien Ten'Up, 38 de
+plus par mots-clés, **92 sans club**. Ces 92 ne sont pas un défaut de
+l'algorithme : ce sont surtout des championnats par équipes, qui se jouent
+une fois chez soi et une fois ailleurs sans que ce soit écrit nulle part, et
+des libellés qui ne nomment personne (« TOURNOI SENIORS »). L'écran les liste
+pour qu'on les rattache à la main.
+
+### Les surfaces
+
+Trois origines, de la plus sûre à la plus faible :
+
+| Origine | Ce que ça vaut |
+|---|---|
+| **La fiche du tournoi** | Exacte. C'est elle qui tranche quand un club a plusieurs surfaces — Mers-les-Bains a de la terre battue *et* de la résine. |
+| **Le club**, s'il n'en a qu'une | Déduite, affichée comme telle. |
+| **Ambigu** | Le club en a plusieurs et le tournoi est inconnu : on ne tranche pas, on le dit. |
+
+Sur le même palmarès : 100 surfaces exactes, 43 déduites, 7 ambiguës.
+
+Le vocabulaire est celui de la fédération (résine, béton poreux, terre
+artificielle…) et non le vocabulaire courant — c'est celui des fiches de
+tournoi, donc celui qui permet de recouper.
+
+---
+
 ## Réseaux sociaux des clubs : ce qui n'est pas faisable
 
 L'écran **Clubs** range les comptes et les ouvre d'un geste. Il n'affiche pas
@@ -254,7 +303,7 @@ public/
     terrain.js          le court cliquable, en SVG
     theme.js            clair / sombre / comme l'appareil
     util.js             échappement, fenêtres, dates, messages
-    views/              un fichier par écran
+    views/              un fichier par écran (matchs, classement, coaching, clubs)
 .github/workflows/      publication automatique
 ```
 

@@ -11,7 +11,7 @@ import {
   store, maj, sauver,
   ajouterMatch, modifierMatch, supprimerMatch,
   ajouterConseil, modifierConseil, supprimerConseil,
-  ajouterSource,
+  ajouterSource, ajouterClub, modifierClub, clubDuMatch, surfaceDuMatch,
   exporterJSON, importerJSON, toutEffacer,
   PROFILS, MOMENTS, CATEGORIES, PLATEFORMES, SURFACES,
 } from './store.js';
@@ -52,6 +52,17 @@ export function matchForm(existant = null) {
     score: '', tournoi: '', surface: '', notes: '', wo: false,
   };
 
+  /* Le club se devine du libellé de l'épreuve, et la surface se devine du
+     club. On ne l'impose pas pour autant : on la propose, et le champ reste
+     vide tant qu'on n'a pas confirmé — une surface fausse dans l'historique
+     vaut moins qu'une surface absente. */
+  const deduit = clubDuMatch(m);
+  const suggestion = surfaceDuMatch(m);
+  const surfacesPossibles = [...new Set([
+    ...(deduit?.surfaces || []),
+    ...SURFACES,
+  ])];
+
   openModal({
     title: existant ? 'Modifier le match' : 'Nouveau match',
     body: `<form id="f-match" class="form">
@@ -80,8 +91,21 @@ export function matchForm(existant = null) {
         <label>Épreuve
           <input name="tournoi" value="${h(m.tournoi)}" placeholder="Tournoi, championnat par équipes…">
         </label>
+        <label>Club
+          <select name="clubId">
+            <option value="">${deduit ? `Déduit du nom : ${h(deduit.nom)}` : 'Aucun club reconnu'}</option>
+            ${store.clubs.map(c => `<option value="${h(c.id)}" ${m.clubId === c.id ? 'selected' : ''}>
+              ${h(c.nom)}</option>`).join('')}
+          </select>
+        </label>
+        ${suggestion.origine === 'ambigu' ? `<p class="tiny muted">${h(deduit.nom)} a plusieurs
+          surfaces (${h(suggestion.choix.join(', '))}) : à toi de dire laquelle.</p>` : ''}
         <label>Surface
-          <select name="surface"><option value="">—</option>${opts(SURFACES, m.surface)}</select>
+          <select name="surface">
+            <option value="">${suggestion.origine === 'club'
+              ? `Celle du club : ${h(suggestion.surface)}` : '—'}</option>
+            ${opts(surfacesPossibles, m.surface)}
+          </select>
         </label>
         <label class="case case-seule">
           <input type="checkbox" name="wo" ${m.wo ? 'checked' : ''}>
@@ -347,6 +371,117 @@ export function baremeForm() {
         conclure(maj(s => {
           s.bareme = Object.fromEntries(Object.entries(d).map(([k, v]) => [k, Number(v) || 0]));
         }), 'Barème enregistré.');
+      };
+    },
+  });
+}
+
+// =====================================================================
+//  Un club
+// =====================================================================
+/* Les mots-clés sont le cœur de cette fiche, et le seul champ dont
+   l'utilité ne saute pas aux yeux : ce sont eux qui rattachent les matchs
+   au club, en étant comparés au libellé de l'épreuve tel que la fédération
+   l'a écrit. C'est pour ça qu'ils sont visibles et modifiables plutôt que
+   cachés dans le code. */
+export function clubForm(existant = null) {
+  const c = existant || {
+    nom: '', ville: '', adresse: '', telephone: '', mail: '',
+    jugeArbitre: '', surfaces: [], motsCles: [], installations: '', note: '', sources: [],
+  };
+  let sources = [...(c.sources || [])];
+
+  const listeSources = () => sources.length
+    ? sources.map((s, i) => {
+        const p = PLATEFORMES.find(x => x.cle === s.plateforme) || { emoji: '🔗', nom: s.plateforme };
+        return `<li>${p.emoji} <span class="compte-nom">${h(p.nom)}</span>
+          <span class="tiny muted">${h((s.url || '').slice(0, 34))}…</span>
+          <button type="button" class="icon-btn" data-oter="${i}" aria-label="Retirer">✕</button></li>`;
+      }).join('')
+    : '<li class="tiny muted">Aucun compte suivi.</li>';
+
+  openModal({
+    title: existant ? 'Modifier le club' : 'Nouveau club',
+    large: true,
+    body: `<form id="f-club" class="form">
+      <label>Nom du club<input name="nom" value="${h(c.nom)}" required placeholder="TENNIS CLUB DE…"></label>
+      <div class="duo">
+        <label>Ville<input name="ville" value="${h(c.ville)}"></label>
+        <label>Téléphone<input name="telephone" value="${h(c.telephone)}" placeholder="02 35 …"></label>
+      </div>
+      <label>Adresse<input name="adresse" value="${h(c.adresse)}"></label>
+      <div class="duo">
+        <label>Mail<input name="mail" type="email" value="${h(c.mail)}"></label>
+        <label>Juge-arbitre<input name="jugeArbitre" value="${h(c.jugeArbitre)}"></label>
+      </div>
+      <label>Surfaces
+        <input name="surfaces" value="${h((c.surfaces || []).join(', '))}"
+               placeholder="Résine, Terre battue">
+      </label>
+      <p class="tiny muted">Séparées par des virgules. Quand il n'y en a qu'une, elle
+        est proposée d'office pour les matchs joués ici.</p>
+
+      <label>Mots-clés de rattachement
+        <input name="motsCles" value="${h((c.motsCles || []).join(', '))}"
+               placeholder="VEULES, TC VEULES">
+      </label>
+      <p class="tiny muted">Ce sont eux qui relient les matchs à ce club : chacun est
+        cherché dans le nom de l'épreuve, en mot entier. Sans cette précaution
+        « VEULES » attraperait « VEULETTES », qui est un autre club.</p>
+
+      <details>
+        <summary>Réseaux sociaux et notes</summary>
+        <ul class="comptes" id="liste-sources">${listeSources()}</ul>
+        <div class="duo">
+          <label>Plateforme
+            <select id="src-plateforme">
+              ${PLATEFORMES.map(p => `<option value="${p.cle}">${p.emoji} ${h(p.nom)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Adresse<input id="src-url" type="url" placeholder="https://…"></label>
+        </div>
+        <button type="button" class="btn" data-ajout-source>Ajouter ce compte</button>
+        <label style="margin-top:12px">Installations
+          <input name="installations" value="${h(c.installations || '')}" placeholder="3 terrains, 1 surface">
+        </label>
+        <label>Note<textarea name="note" rows="3">${h(c.note || '')}</textarea></label>
+      </details>
+    </form>`,
+    footer: `<button class="btn btn-primary" data-ok>${existant ? 'Enregistrer' : 'Ajouter'}</button>`,
+    onMount: () => {
+      const racine = document.getElementById('modal-root');
+      const form = racine.querySelector('#f-club');
+
+      const rafraichir = () => { racine.querySelector('#liste-sources').innerHTML = listeSources(); };
+
+      racine.querySelector('[data-ajout-source]').onclick = () => {
+        const url = racine.querySelector('#src-url').value.trim();
+        if (!url) { toast('Il manque l\'adresse du compte.'); return; }
+        sources.push({ plateforme: racine.querySelector('#src-plateforme').value, url });
+        racine.querySelector('#src-url').value = '';
+        rafraichir();
+      };
+
+      racine.querySelector('#liste-sources').addEventListener('click', e => {
+        const b = e.target.closest('[data-oter]');
+        if (!b) return;
+        sources.splice(+b.dataset.oter, 1);
+        rafraichir();
+      });
+
+      racine.querySelector('[data-ok]').onclick = () => {
+        if (!form.reportValidity()) return;
+        const d = Object.fromEntries(new FormData(form));
+        const liste = v => (v || '').split(',').map(x => x.trim()).filter(Boolean);
+        const club = {
+          ...d,
+          surfaces: liste(d.surfaces),
+          motsCles: liste(d.motsCles),
+          sources,
+        };
+        conclure(
+          existant ? modifierClub(existant.id, club) : ajouterClub(club),
+          existant ? 'Club modifié.' : 'Club ajouté.');
       };
     },
   });
