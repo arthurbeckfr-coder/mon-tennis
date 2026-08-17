@@ -18,6 +18,7 @@ import {
 } from './store.js';
 import { ICONES, CATEGORIES_COURSES, CAUSES_CORDAGE } from './materiel.js';
 import { analyser, EXEMPLE } from './import-fft.js';
+import { URL_TENUP } from './config.js';
 import { blocTerrain, brancherTerrain } from './terrain.js';
 import * as nuage from './nuage.js';
 
@@ -572,7 +573,9 @@ export function importFFTForm() {
     large: true,
     body: `<div class="form">
       <ol class="marche-a-suivre">
-        <li>Ouvre <strong>Ten'Up</strong> et connecte-toi.</li>
+        <li><a class="btn btn-ghost btn-tenup" href="${URL_TENUP}" target="_blank"
+               rel="noopener noreferrer">Ouvrir Ten'Up ↗</a>
+          et connecte-toi.</li>
         <li>Va dans <strong>Mon compte → Mon palmarès</strong> (ou « Mes matchs »).</li>
         <li>Sélectionne la liste des matchs, copie-la.</li>
         <li>Colle-la ci-dessous.</li>

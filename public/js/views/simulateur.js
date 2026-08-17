@@ -12,21 +12,57 @@
 import { h, puce, dateCourte } from '../util.js';
 import { store, reglagesCalcul, bonusVictoiresPour } from '../store.js';
 import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang,
-         projeter, echeance, rendementParEchelon } from '../classement.js';
+         projeter, echeance, rendementParEchelon, moisAVenir } from '../classement.js';
 import { profilForm, baremeForm } from '../forms.js';
+import { URL_TENUP } from '../config.js';
 import { courbe, tableauDouble } from '../graphes.js';
 
 let cibleChoisie = null;
+
+/* ─── L'horizon ────────────────────────────────────────────────────────
+
+   Le bilan glisse sur douze mois : sans jouer un seul match, il baisse à
+   mesure que les vieilles victoires sortent de la fenêtre. La courbe du
+   bas le montrait déjà, mais montrer n'est pas calculer — on voyait le
+   trait descendre sans savoir ce qu'il resterait à faire une fois en bas.
+
+   Se placer en septembre, en octobre ou en novembre refait tout le calcul
+   à cette date : le bilan, l'écart, les chemins possibles, et jusqu'à la
+   victoire qui lève la limitation de montée, laquelle expire comme les
+   autres.
+
+   Trois mois et pas douze : au-delà, l'hypothèse « je ne joue rien »
+   devient absurde pour quelqu'un qui joue. */
+let horizon = 0;
+
+const horizonsPossibles = () =>
+  [0, 1, 2, 3].map(n => (n === 0
+    ? { n, fin: null, mois: 'Aujourd\'hui', libelle: 'aujourd\'hui' }
+    : { n, ...moisAVenir(n) }));
 
 export function render() {
   const p = store.profil;
   const reglages = reglagesCalcul();
   const cible = cibleChoisie || echelonSuivant(p.echelon);
 
+  const horizons = horizonsPossibles();
+  const vise = horizons.find(x => x.n === horizon) || horizons[0];
+  const fin = vise.fin;
+
   const actuel = bilanA({ ...reglages, cible: p.echelon,
-                          bonusVictoires: bonusVictoiresPour(p.echelon) });
+                          bonusVictoires: bonusVictoiresPour(p.echelon), finISO: fin });
   const r = simuler({ ...reglages, echelon: p.echelon, cible,
-                      bonusVictoires: bonusVictoiresPour(cible) });
+                      bonusVictoires: bonusVictoiresPour(cible), finISO: fin });
+
+  /* Ce que la projection coûte, en points à retrouver. Le chiffre seul ne
+     dit rien : c'est l'écart avec aujourd'hui qui répond à « est-ce que
+     ça vaut le coup de m'y mettre maintenant ». */
+  const rMaintenant = horizon
+    ? simuler({ ...reglages, echelon: p.echelon, cible,
+                bonusVictoires: bonusVictoiresPour(cible) })
+    : null;
+  const surcout = rMaintenant && rMaintenant.manque != null && r.manque != null
+    ? r.manque - rMaintenant.manque : null;
 
   const i = rang(p.echelon);
   const cibles = [1, 2, 3].map(d => ECHELONS[i + d]).filter(Boolean);
@@ -43,7 +79,8 @@ export function render() {
         <span class="etiquette">Mon classement</span>
         <b class="echelon">${h(p.echelon)}</b>
         <span class="bilan">${actuel.bilan} points de bilan, calculés
-          sur ${actuel.nbMatchs} match${actuel.nbMatchs > 1 ? 's' : ''}</span>
+          sur ${actuel.nbMatchs} match${actuel.nbMatchs > 1 ? 's' : ''}${horizon
+            ? ` <em>— fin ${h(vise.libelle)}</em>` : ''}</span>
       </div>
       <button class="btn btn-ghost" data-profil>Régler</button>
     </section>
@@ -53,7 +90,7 @@ export function render() {
       Le bilan se calcule depuis l'historique : importe ton palmarès Ten'Up
       et tout le reste se remplit tout seul.</div>` : ''}
 
-    ${ecart !== null ? (ecart === 0
+    ${ecart !== null && !horizon ? (ecart === 0
       ? `<div class="avis"><strong>Calcul confirmé.</strong> Mon total tombe exactement
            sur les ${officiel} points affichés par Ten'Up.</div>`
       : `<div class="avis"><strong>${ecart > 0 ? '+' : ''}${ecart} points</strong>
@@ -75,6 +112,28 @@ export function render() {
       </div>
     </section>
 
+    <section class="choix-cible">
+      <span class="etiquette">À quelle date</span>
+      <div class="segments">
+        ${horizons.map(x => `<button data-horizon="${x.n}"
+          class="${x.n === horizon ? 'actif' : ''}">${h(x.mois)}</button>`).join('')}
+      </div>
+    </section>
+
+    ${horizon ? `<div class="avis">
+      <strong>Tout ce qui suit est calculé fin ${h(vise.libelle)}, sans un match de plus.</strong>
+      C'est une hypothèse, pas une prédiction : elle sert à voir ce que coûte l'attente.
+      ${surcout > 0
+        ? `D'ici là, des victoires sortent de la fenêtre des douze mois et cessent de
+           compter — il te manquera <strong>${surcout} points de plus</strong>
+           qu'aujourd'hui.`
+        : surcout === 0
+          ? `Rien de ce qui porte ton bilan n'expire d'ici là : attendre ne coûte
+             aucun point.`
+          : `L'écart se réduit tout seul : ce sont des victoires trop faibles pour
+             compter qui sortent, et de meilleures reprennent leur place.`}
+    </div>` : ''}
+
     ${(p.bonusVictoires > 0 && bonusVictoiresPour(cible) === 0) ? `
       <p class="tiny muted" style="margin:0 4px 10px">Ton bonus de ${p.bonusVictoires}
         victoire(s) n'est pas appliqué ici : la fédération en accorde un différent à chaque
@@ -85,7 +144,7 @@ export function render() {
 
     ${rendreCalendrier(reglages, cible, r)}
 
-    ${rendreRendement(reglages, cible, r)}
+    ${rendreRendement(reglages, cible, r, fin, vise)}
 
     ${rendreBanque(r)}
 
@@ -96,7 +155,14 @@ export function render() {
         au point près, à trois échelons différents. Une seule chose reste saisie à la
         main — le bonus de victoires accordé au ratio (le « +2 » de « 9+2 » sur Ten'Up),
         dont la formule n'est pas publiée. À zéro, le calcul est simplement pessimiste.</p>
-      <button class="btn btn-ghost" data-bareme>Voir et corriger le barème</button>
+      <div class="rangee-boutons">
+        <button class="btn btn-ghost" data-bareme>Voir et corriger le barème</button>
+        <a class="btn btn-ghost btn-tenup" href="${URL_TENUP}" target="_blank"
+           rel="noopener noreferrer">Vérifier sur Ten'Up ↗</a>
+      </div>
+      <p class="tiny muted">Le site de la fédération s'ouvre dans un autre onglet, sur ton
+        espace si tu y es déjà connecté. Ce carnet n'y a aucun accès et ne peut rien y
+        lire : c'est à toi d'aller voir.</p>
     </section>`;
 }
 
@@ -215,15 +281,19 @@ function rendreCalendrier(reglages, cible, r) {
    Le contre-intuitif du système : une fois le quota atteint, battre un
    joueur moins bien classé que ses propres victoires déjà comptées ne
    rapporte rien du tout. Zéro. Autant le dire avant de s'inscrire. */
-function rendreRendement(reglages, cible, r) {
+function rendreRendement(reglages, cible, r, finISO = null, vise = null) {
   if (!r.seuil || r.seuil.points == null) return '';
 
   const lignes = rendementParEchelon({ ...reglages, cible,
-                                       bonusVictoires: bonusVictoiresPour(cible) });
+                                       bonusVictoires: bonusVictoiresPour(cible), finISO });
   const inutiles = lignes.filter(l => l.gain === 0);
 
+  /* Le rendement se lit à la date choisie, et pas ailleurs : une victoire
+     qui ne rapporte rien aujourd'hui, parce qu'une meilleure occupe déjà
+     sa place, peut valoir plein tarif en novembre une fois celle-ci
+     expirée. C'est précisément ce que l'horizon sert à voir. */
   return `<section class="carte">
-    <h3>Ce que rapporterait une victoire, aujourd'hui</h3>
+    <h3>Ce que rapporterait une victoire, ${finISO ? `fin ${h(vise.libelle)}` : 'aujourd\'hui'}</h3>
     <table class="rendement">
       <thead><tr><th>Battre un…</th><th>Barème</th><th>Gain réel</th></tr></thead>
       <tbody>
@@ -296,6 +366,8 @@ export function wire(vue, rerendre) {
     if (e.target.closest('[data-profil]')) { profilForm(); return; }
     if (e.target.closest('[data-bareme]')) { baremeForm(); return; }
     const c = e.target.closest('[data-cible]');
-    if (c) { cibleChoisie = c.dataset.cible; rerendre(); }
+    if (c) { cibleChoisie = c.dataset.cible; rerendre(); return; }
+    const x = e.target.closest('[data-horizon]');
+    if (x) { horizon = Number(x.dataset.horizon); rerendre(); }
   });
 }

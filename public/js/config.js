@@ -13,3 +13,10 @@
 
 export const SUPABASE_URL = 'https://ewgbilytqliqzdezcczo.supabase.co';
 export const SUPABASE_CLE = 'sb_publishable_Yy0xYYEZFfpGenYL_lMM4Q_DRKNrZq5';
+
+/* Le site de la fédération, vers lequel ce carnet renvoie sans jamais
+   pouvoir y entrer : Ten'Up demande une connexion et n'ouvre aucun accès
+   aux applications extérieures. On envoie donc à la porte, et la session
+   du navigateur fait le reste — d'où l'adresse d'accueil plutôt qu'une
+   page interne, dont le chemin changerait sans prévenir. */
+export const URL_TENUP = 'https://tenup.fft.fr/';

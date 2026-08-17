@@ -28,9 +28,15 @@ import { h } from './util.js';
  * @param {Array<{nom:string}>} o.series  — deux au plus (slots 1 et 2)
  * @param {string} [o.unite]
  */
-export function barresGroupees({ groupes, series, unite = '' }) {
+export function barresGroupees({ groupes, series, unite = '', axe = '', ouvert = null }) {
   if (!groupes.length) return '';
   const max = Math.max(1, ...groupes.flatMap(g => g.valeurs));
+
+  /* Une colonne s'ouvre sur les matchs qu'elle compte, quand l'appelant
+     dit sur quel axe il range (`axe`) et donne une clé à chaque groupe.
+     Sans cela le graphique reste ce qu'il était : une image. Un chiffre
+     qu'on ne peut pas ouvrir se croit sur parole. */
+  const cliquable = !!axe;
 
   return `
     ${series.length > 1 ? `<div class="g-legende">
@@ -38,7 +44,12 @@ export function barresGroupees({ groupes, series, unite = '' }) {
         <span class="g-pastille s${i + 1}"></span>${h(s.nom)}</span>`).join('')}
     </div>` : ''}
     <div class="g-barres">
-      ${groupes.map(g => `<div class="g-groupe">
+      ${groupes.map(g => {
+        const cle = g.cle ?? g.label;
+        const actif = cliquable && ouvert === cle;
+        return `<div class="g-groupe ${cliquable ? 'g-cliquable' : ''} ${actif ? 'actif' : ''}"
+          ${cliquable ? `data-axe="${h(axe)}" data-cle="${h(cle)}" role="button" tabindex="0"
+            aria-pressed="${actif}" title="Voir ces matchs"` : ''}>
         <div class="g-piles">
           ${g.valeurs.map((v, i) => `<div class="g-pile">
             <span class="g-valeur">${v || ''}</span>
@@ -47,7 +58,8 @@ export function barresGroupees({ groupes, series, unite = '' }) {
           </div>`).join('')}
         </div>
         <span class="g-label">${h(g.label)}</span>
-      </div>`).join('')}
+      </div>`;
+      }).join('')}
     </div>`;
 }
 

@@ -6,18 +6,24 @@
    compteurs du haut sont là pour ça, et non pour décorer. */
 
 import { h, hMulti, dateCourte, puce, dansLesDouzeMois } from '../util.js';
-import { store, bilanMatchs } from '../store.js';
+import { store, bilanMatchs, surfaceDuMatch, estParEquipes, saisonEquipe } from '../store.js';
 import { pointsVictoire, rang, ECHELONS } from '../classement.js';
 import { matchForm, importFFTForm } from '../forms.js';
 import { barresGroupees, tableauDouble } from '../graphes.js';
 
-let filtre = { periode: '12', issue: 'tout', texte: '' };
+let filtre = { periode: '12', issue: 'tout', texte: '', exploit: false };
 let ongletVue = 'liste';
+
+/** Une victoire contre mieux classé que soi. Le seul compteur du haut qui
+ *  ne se lit pas directement dans la liste, et le plus parlant des quatre. */
+const estExploit = m =>
+  m.issue === 'V' && rang(m.echelonAdverse) > rang(store.profil.echelon);
 
 function filtrer() {
   return store.matchs
     .filter(m => filtre.periode === 'tout' || dansLesDouzeMois(m.date))
     .filter(m => filtre.issue === 'tout' || m.issue === filtre.issue)
+    .filter(m => !filtre.exploit || estExploit(m))
     .filter(m => {
       if (!filtre.texte) return true;
       const t = filtre.texte.toLowerCase();
@@ -25,6 +31,32 @@ function filtrer() {
         .some(v => (v || '').toLowerCase().includes(t));
     })
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+}
+
+/* ─── Les compteurs cliquables ─────────────────────────────────────────
+
+   Un chiffre qu'on ne peut pas ouvrir est une affirmation qu'il faut
+   croire. « 4 victoires contre plus fort » ne vaut que si l'on peut
+   demander lesquelles — et c'est d'ailleurs la première chose qu'on a
+   envie de faire en le lisant.
+
+   Chaque compteur emmène donc vers exactement les matchs qu'il a comptés,
+   fenêtre de douze mois comprise. Recliquer sur un compteur déjà ouvert
+   le referme : sans quoi on se retrouve prisonnier d'un filtre sans
+   savoir comment en sortir. */
+const FILTRES = {
+  tout:    { periode: '12', issue: 'tout', exploit: false },
+  V:       { periode: '12', issue: 'V',    exploit: false },
+  D:       { periode: '12', issue: 'D',    exploit: false },
+  exploit: { periode: '12', issue: 'V',    exploit: true  },
+};
+
+function filtreActif(cle) {
+  if (cle === 'exploit') return filtre.exploit;
+  if (filtre.exploit) return false;
+  return cle === 'tout'
+    ? filtre.periode === '12' && filtre.issue === 'tout'
+    : filtre.issue === cle;
 }
 
 /** Le détail qui manque partout ailleurs : ce que la victoire a rapporté. */
@@ -56,52 +88,129 @@ function ligneMatch(m) {
 
 /* ─── Les statistiques ─────────────────────────────────────────────────
 
-   Deux questions, deux graphiques. « Est-ce que je joue plus, et est-ce
-   que je gagne plus » se lit par année. « Contre qui je gagne vraiment »
-   se lit par classement d'adversaire — et c'est le plus utile des deux,
-   parce qu'il dit à quel niveau on tient réellement. */
+   Quatre questions, quatre graphiques, et aucun pour décorer.
+
+   « Est-ce que je joue plus, et est-ce que je gagne plus » se lit par
+   année. « À quel niveau je tiens vraiment » se lit par classement
+   d'adversaire — c'est le plus utile des quatre, parce qu'il dit à partir
+   d'où ça casse. « Où je me sens bien » se lit par surface. Et « est-ce
+   que je joue pareil pour mon club et pour moi » se lit par type
+   d'épreuve : un tournoi ne se joue pas comme une rencontre par équipes,
+   et le chiffre le dit assez brutalement.
+
+   Chaque colonne s'ouvre sur les matchs qu'elle compte. C'est la
+   différence entre une statistique et une affirmation : « 45 % par
+   équipes » ne veut rien dire tant qu'on ne peut pas demander lesquels. */
+
+/* L'axe cliqué, et la colonne ouverte. Un seul détail à la fois : deux
+   panneaux ouverts sur deux graphiques différents ne se comparent pas,
+   ils se gênent. */
+let detail = null;
+
+const AXES = {
+  annee: {
+    titre: c => `Mes matchs en ${c}`,
+    porte: (m, c) => (m.date || '').slice(0, 4) === c,
+  },
+  echelon: {
+    titre: c => `Mes matchs contre des ${c}`,
+    porte: (m, c) => m.echelonAdverse === c,
+  },
+  surface: {
+    titre: c => c === '?' ? 'Mes matchs à surface inconnue' : `Mes matchs sur ${c.toLowerCase()}`,
+    porte: (m, c) => (surfaceDuMatch(m).surface || '?') === c,
+  },
+  epreuve: {
+    titre: c => c === 'equipes'
+      ? 'Mes matchs par équipes' : 'Mes matchs en tournoi',
+    porte: (m, c) => estParEquipes(m) === (c === 'equipes'),
+  },
+  saison: {
+    titre: c => `Championnat ${c}`,
+    porte: (m, c) => estParEquipes(m) && saisonEquipe(m).libelle === c,
+  },
+};
+
+/** Le panneau qui s'ouvre sous une colonne : le bilan de la tranche, puis
+ *  ses matchs, cliquables comme partout ailleurs. */
+function rendreDetail(axe) {
+  if (!detail || detail.axe !== axe) return '';
+  const a = AXES[axe];
+  const liste = store.matchs
+    .filter(m => a.porte(m, detail.cle))
+    .sort((x, y) => (y.date || '').localeCompare(x.date || ''));
+  const b = bilanMatchs(liste);
+
+  return `<section class="detail-graphe">
+    <div class="detail-tete">
+      <strong>${h(a.titre(detail.cle))}</strong>
+      <button class="lien" data-fermer-detail>Fermer</button>
+    </div>
+    <p class="tiny muted">${b.total} match${b.total > 1 ? 's' : ''} —
+      ${b.v} victoire${b.v > 1 ? 's' : ''}, ${b.d} défaite${b.d > 1 ? 's' : ''},
+      ${b.ratio}% de réussite.</p>
+    ${liste.length ? `<ul class="matchs" style="margin-top:8px">
+      ${liste.map(ligneMatch).join('')}</ul>` : ''}
+  </section>`;
+}
+
+/** Un compte { cle: {v, d} } vers les groupes du graphique. */
+const versGroupes = (compte, cles, etiquette = c => c) =>
+  cles.map(c => ({ label: etiquette(c), cle: c, valeurs: [compte[c].v, compte[c].d] }));
+
+const versTableau = (compte, cles, etiquette = c => c) =>
+  cles.map(c => {
+    const t = compte[c].v + compte[c].d;
+    return [etiquette(c), String(compte[c].v), String(compte[c].d),
+            t ? Math.round((compte[c].v / t) * 100) + '%' : '—'];
+  });
+
+/** Range les matchs par une clé, en ignorant ceux qui n'en ont pas. */
+function grouper(matchs, cleDe) {
+  const n = {};
+  for (const m of matchs) {
+    const c = cleDe(m);
+    if (c == null || c === '') continue;
+    n[c] = n[c] || { v: 0, d: 0 };
+    if (m.issue === 'V') n[c].v++; else n[c].d++;
+  }
+  return n;
+}
+
 function vueStats() {
   if (!store.matchs.length) {
     return `<div class="vide"><span class="emoji">📊</span>
       Aucun match : rien à représenter pour l'instant.</div>`;
   }
 
-  const parAn = {};
-  for (const m of store.matchs) {
-    const an = (m.date || '').slice(0, 4);
-    if (!an) continue;
-    parAn[an] = parAn[an] || { v: 0, d: 0 };
-    if (m.issue === 'V') parAn[an].v++; else parAn[an].d++;
-  }
+  const series = [{ nom: 'Victoires' }, { nom: 'Défaites' }];
+
+  const parAn = grouper(store.matchs, m => (m.date || '').slice(0, 4));
   const annees = Object.keys(parAn).sort();
 
-  const parEchelon = {};
-  for (const m of store.matchs) {
-    const e = m.echelonAdverse;
-    if (!e) continue;
-    parEchelon[e] = parEchelon[e] || { v: 0, d: 0 };
-    if (m.issue === 'V') parEchelon[e].v++; else parEchelon[e].d++;
-  }
+  const parEchelon = grouper(store.matchs, m => m.echelonAdverse);
   /* Rangés du plus faible au plus fort, et non par nombre de matchs :
      c'est la progression du niveau qui fait sens ici. */
   const echelons = Object.keys(parEchelon).sort((a, b) => rang(a) - rang(b));
-
-  const series = [{ nom: 'Victoires' }, { nom: 'Défaites' }];
   const meilleur = [...echelons].reverse().find(e => parEchelon[e].v > 0);
+
+  const parSurface = grouper(store.matchs, m => surfaceDuMatch(m).surface || '?');
+  const surfaces = Object.keys(parSurface)
+    .sort((a, b) => (parSurface[b].v + parSurface[b].d) - (parSurface[a].v + parSurface[a].d));
+
+  const parEpreuve = grouper(store.matchs, m => estParEquipes(m) ? 'equipes' : 'tournoi');
+  const epreuves = Object.keys(parEpreuve);
 
   return `
     <section class="carte">
       <h3>Victoires et défaites, année par année</h3>
       ${barresGroupees({
-        groupes: annees.map(a => ({ label: a, valeurs: [parAn[a].v, parAn[a].d] })),
-        series,
+        groupes: versGroupes(parAn, annees), series, axe: 'annee',
+        ouvert: detail?.axe === 'annee' ? detail.cle : null,
       })}
-      ${tableauDouble(['Année', 'Victoires', 'Défaites', '%'],
-        annees.map(a => {
-          const t = parAn[a].v + parAn[a].d;
-          return [a, String(parAn[a].v), String(parAn[a].d),
-                  t ? Math.round((parAn[a].v / t) * 100) + '%' : '—'];
-        }))}
+      <p class="tiny muted">Touche une année pour voir les matchs qu'elle compte.</p>
+      ${rendreDetail('annee')}
+      ${tableauDouble(['Année', 'Victoires', 'Défaites', '%'], versTableau(parAn, annees))}
     </section>
 
     <section class="carte">
@@ -109,19 +218,145 @@ function vueStats() {
       ${meilleur ? `<p class="tiny muted">Ton meilleur scalp : un joueur classé
         <strong>${h(meilleur)}</strong>.</p>` : ''}
       ${barresGroupees({
-        groupes: echelons.map(e => ({ label: e, valeurs: [parEchelon[e].v, parEchelon[e].d] })),
-        series,
+        groupes: versGroupes(parEchelon, echelons), series, axe: 'echelon',
+        ouvert: detail?.axe === 'echelon' ? detail.cle : null,
       })}
       <p class="tiny muted">Chaque colonne est un classement d'adversaire, du plus faible au
         plus fort. C'est le graphique qui dit à quel niveau tu tiens vraiment — et à partir
         d'où ça casse.</p>
+      ${rendreDetail('echelon')}
       ${tableauDouble(['Classement', 'Victoires', 'Défaites', '%'],
-        echelons.map(e => {
-          const t = parEchelon[e].v + parEchelon[e].d;
-          return [e, String(parEchelon[e].v), String(parEchelon[e].d),
-                  t ? Math.round((parEchelon[e].v / t) * 100) + '%' : '—'];
-        }))}
-    </section>`;
+        versTableau(parEchelon, echelons))}
+    </section>
+
+    ${rendreSurfaces(parSurface, surfaces, series)}
+
+    ${rendreEpreuves(parEpreuve, epreuves, series)}
+
+    ${rendreEquipes(series)}`;
+}
+
+/* ─── La surface ───────────────────────────────────────────────────────
+
+   Elle n'est pas toujours saisie : quand elle manque, on la déduit du
+   club, et quand le club en a plusieurs, on ne tranche pas. La colonne
+   « inconnue » est donc une vraie réponse et non un trou — la masquer
+   ferait croire à une certitude qu'on n'a pas. */
+function rendreSurfaces(parSurface, surfaces, series) {
+  const connues = surfaces.filter(s => s !== '?');
+  if (connues.length < 2) return '';
+
+  const taux = s => {
+    const t = parSurface[s].v + parSurface[s].d;
+    return t ? parSurface[s].v / t : 0;
+  };
+  /* On ne compare que ce qui est comparable : trois matchs sur moquette
+     ne font pas une préférence pour la moquette. */
+  const assez = connues.filter(s => parSurface[s].v + parSurface[s].d >= 5);
+  const meilleure = [...assez].sort((a, b) => taux(b) - taux(a))[0];
+  const pire = [...assez].sort((a, b) => taux(a) - taux(b))[0];
+
+  return `<section class="carte">
+    <h3>Sur quelle surface</h3>
+    ${barresGroupees({
+      groupes: surfaces.map(s => ({ label: s === '?' ? 'inconnue' : s, cle: s,
+                                    valeurs: [parSurface[s].v, parSurface[s].d] })),
+      series, axe: 'surface',
+      ouvert: detail?.axe === 'surface' ? detail.cle : null,
+    })}
+    ${meilleure && pire && meilleure !== pire
+      ? `<p class="tiny muted">Tu gagnes ${Math.round(taux(meilleure) * 100)}% de tes matchs
+         sur <strong>${h(meilleure.toLowerCase())}</strong> contre
+         ${Math.round(taux(pire) * 100)}% sur <strong>${h(pire.toLowerCase())}</strong>
+         — sur les surfaces où tu as au moins cinq matchs.</p>`
+      : `<p class="tiny muted">Pas encore assez de matchs par surface pour en tirer
+         quoi que ce soit.</p>`}
+    ${surfaces.includes('?') ? `<p class="tiny muted">« inconnue » n'est pas un oubli : la
+      surface n'est ni saisie sur le match, ni déductible d'un club qui n'en a qu'une.</p>` : ''}
+    ${rendreDetail('surface')}
+    ${tableauDouble(['Surface', 'Victoires', 'Défaites', '%'],
+      versTableau(parSurface, surfaces, s => s === '?' ? 'inconnue' : s))}
+  </section>`;
+}
+
+/* ─── Tournoi ou championnat par équipes ───────────────────────────────
+
+   Deux compétitions qui n'ont de commun que la raquette. En tournoi on
+   choisit son tableau et l'on joue pour soi ; par équipes on joue le
+   numéro qu'on vous donne, souvent contre plus fort, et pour le club.
+   Les mélanger dans une moyenne unique efface justement ce qu'il y a à
+   comprendre. */
+function rendreEpreuves(parEpreuve, epreuves, series) {
+  if (epreuves.length < 2) return '';
+
+  const t = c => parEpreuve[c].v + parEpreuve[c].d;
+  const pc = c => Math.round((parEpreuve[c].v / t(c)) * 100);
+  const ecart = pc('tournoi') - pc('equipes');
+
+  return `<section class="carte">
+    <h3>Tournoi ou championnat par équipes</h3>
+    ${barresGroupees({
+      groupes: [
+        { label: 'Tournoi', cle: 'tournoi', valeurs: [parEpreuve.tournoi.v, parEpreuve.tournoi.d] },
+        { label: 'Par équipes', cle: 'equipes', valeurs: [parEpreuve.equipes.v, parEpreuve.equipes.d] },
+      ],
+      series, axe: 'epreuve',
+      ouvert: detail?.axe === 'epreuve' ? detail.cle : null,
+    })}
+    <p class="tiny muted">
+      ${pc('tournoi')}% de victoires en tournoi (${t('tournoi')} matchs),
+      ${pc('equipes')}% par équipes (${t('equipes')} matchs).
+      ${Math.abs(ecart) >= 8
+        ? ecart > 0
+          ? `Soit <strong>${ecart} points de moins</strong> par équipes : on n'y choisit pas
+             son adversaire, et le numéro qu'on porte décide du niveau d'en face.`
+          : `Soit <strong>${-ecart} points de mieux</strong> par équipes, ce qui n'est pas
+             banal : le format y est plus dur pour la plupart des joueurs.`
+        : `L'écart est trop faible pour signifier quoi que ce soit.`}</p>
+    ${rendreDetail('epreuve')}
+  </section>`;
+}
+
+/* ─── Le détail du championnat par équipes ─────────────────────────────
+
+   Une saison par ligne, parce que c'est ainsi qu'on s'en souvient : « la
+   saison où on est descendus », « celle où j'ai fait un sans-faute ». Le
+   libellé de la fédération porte l'année et la saison, ce qui suffit à
+   les reconstituer sans rien saisir. */
+function rendreEquipes(series) {
+  const matchs = store.matchs.filter(estParEquipes);
+  if (!matchs.length) return '';
+
+  const parSaison = grouper(matchs, m => saisonEquipe(m).libelle);
+  const saisons = Object.keys(parSaison).sort();
+  const b = bilanMatchs(matchs);
+
+  /* La meilleure saison ne se juge pas sur le nombre de victoires — une
+     saison de six rencontres en gagne mécaniquement plus qu'une de trois.
+     On demande donc au moins trois rencontres avant de couronner. */
+  const eligibles = saisons.filter(s => parSaison[s].v + parSaison[s].d >= 3);
+  const meilleure = [...eligibles].sort((x, y) => {
+    const tx = parSaison[x].v / (parSaison[x].v + parSaison[x].d);
+    const ty = parSaison[y].v / (parSaison[y].v + parSaison[y].d);
+    return ty - tx;
+  })[0];
+
+  return `<section class="carte">
+    <h3>Le championnat par équipes, saison par saison</h3>
+    <p class="tiny muted">${matchs.length} rencontres reconnues au libellé de l'épreuve
+      (« LIGUE-2023… », « 76-2024… ») : ${b.v} victoires, ${b.d} défaites, ${b.ratio}%.
+      Ces matchs n'appartiennent à aucun club — une journée se joue chez soi, la suivante
+      chez l'adversaire.</p>
+    ${barresGroupees({
+      groupes: versGroupes(parSaison, saisons), series, axe: 'saison',
+      ouvert: detail?.axe === 'saison' ? detail.cle : null,
+    })}
+    ${meilleure ? `<p class="tiny muted">Ta meilleure saison :
+      <strong>${h(meilleure)}</strong> (${parSaison[meilleure].v}V–${parSaison[meilleure].d}D),
+      parmi celles d'au moins trois rencontres.</p>` : ''}
+    ${rendreDetail('saison')}
+    ${tableauDouble(['Saison', 'Victoires', 'Défaites', '%'], versTableau(parSaison, saisons))}
+  </section>`;
 }
 
 const barreVue = () => `<div class="segments" style="width:100%;margin-bottom:14px">
@@ -139,16 +374,22 @@ export function render() {
   /* Les victoires contre plus fort que soi sont le vrai marqueur de
      progression : elles rapportent le plus, et ce sont celles dont on se
      souvient. Elles méritent leur compteur. */
-  const exploits = sur12.filter(m =>
-    m.issue === 'V' && rang(m.echelonAdverse) > rang(store.profil.echelon)).length;
+  const exploits = sur12.filter(estExploit).length;
 
   return `
     ${barreVue()}
     <section class="chiffres">
-      <div class="chiffre"><b>${b.total}</b><span>matchs sur 12 mois</span></div>
-      <div class="chiffre"><b>${b.v}<small>–${b.d}</small></b><span>victoires–défaites</span></div>
-      <div class="chiffre"><b>${b.ratio}%</b><span>de victoires</span></div>
-      <div class="chiffre"><b>${exploits}</b><span>contre plus fort</span></div>
+      <div class="chiffre ${filtreActif('tout') ? 'actif' : ''}" data-filtre="tout"
+        title="Voir ces matchs"><b>${b.total}</b><span>matchs sur 12 mois</span></div>
+      <div class="chiffre"><b><span class="moitie ${filtreActif('V') ? 'actif' : ''}"
+          data-filtre="V" title="Voir les victoires">${b.v}</span><small>–</small><span
+          class="moitie ${filtreActif('D') ? 'actif' : ''}"
+          data-filtre="D" title="Voir les défaites">${b.d}</span></b>
+        <span>victoires–défaites</span></div>
+      <div class="chiffre ${filtreActif('V') ? 'actif' : ''}" data-filtre="V"
+        title="Voir les victoires"><b>${b.ratio}%</b><span>de victoires</span></div>
+      <div class="chiffre ${filtreActif('exploit') ? 'actif' : ''}" data-filtre="exploit"
+        title="Voir ces victoires"><b>${exploits}</b><span>contre plus fort</span></div>
     </section>
 
     <section class="barre-filtres">
@@ -164,6 +405,10 @@ export function render() {
         <button data-i="D" class="${filtre.issue === 'D' ? 'actif' : ''}">Défaites</button>
       </div>
     </section>
+
+    ${filtre.exploit ? `<p class="tiny muted" style="margin:0 4px 10px">
+      🔥 Seulement les victoires contre mieux classé que toi.
+      <button class="lien" data-vider-exploit>Tout revoir</button></p>` : ''}
 
     ${liste.length ? `<ul class="matchs">${liste.map(ligneMatch).join('')}</ul>` : `
       <div class="vide">
@@ -191,15 +436,52 @@ export function wire(vue, rerendre) {
     if (liste) liste.innerHTML = trouves.map(ligneMatch).join('');
   });
 
+  /* Une colonne annoncée cliquable doit l'être au clavier aussi : elle
+     porte role="button", ce qui promet Entrée et Espace. */
+  vue.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const g = e.target.closest('[data-axe]');
+    if (!g) return;
+    e.preventDefault();
+    g.click();
+  });
+
   vue.addEventListener('click', e => {
     const v = e.target.closest('[data-vue]');
-    if (v) { ongletVue = v.dataset.vue; rerendre(); return; }
+    if (v) { ongletVue = v.dataset.vue; detail = null; rerendre(); return; }
+
+    if (e.target.closest('[data-fermer-detail]')) { detail = null; rerendre(); return; }
+
+    const g = e.target.closest('[data-axe]');
+    if (g) {
+      const { axe, cle } = g.dataset;
+      // Recliquer sur la colonne ouverte la referme.
+      detail = detail?.axe === axe && detail.cle === cle ? null : { axe, cle };
+      rerendre();
+      return;
+    }
 
     const p = e.target.closest('[data-p]');
     if (p) { filtre.periode = p.dataset.p; rerendre(); return; }
 
+    /* Choisir « Défaites » à la main annule le filtre des exploits : une
+       défaite contre plus fort n'est pas un exploit, et laisser les deux
+       actifs afficherait une liste vide sans dire pourquoi. */
     const i = e.target.closest('[data-i]');
-    if (i) { filtre.issue = i.dataset.i; rerendre(); return; }
+    if (i) { filtre.issue = i.dataset.i; filtre.exploit = false; rerendre(); return; }
+
+    if (e.target.closest('[data-vider-exploit]')) {
+      Object.assign(filtre, FILTRES.tout); rerendre(); return;
+    }
+
+    const f = e.target.closest('[data-filtre]');
+    if (f) {
+      const cle = f.dataset.filtre;
+      // Recliquer sur un compteur ouvert le referme.
+      Object.assign(filtre, filtreActif(cle) ? FILTRES.tout : FILTRES[cle]);
+      rerendre();
+      return;
+    }
 
     if (e.target.closest('[data-import]')) { importFFTForm(); return; }
     if (e.target.closest('[data-nouveau]')) { matchForm(); return; }

@@ -36,13 +36,13 @@ const ROUTES = [
   { match: /^\/clubs$/,       title: 'Mes clubs',    tab: '/clubs',
     render: () => clubs.render(),       wire: clubs.wire },
   { match: /^\/clubs\/(.+)$/, title: 'Club',         tab: '/clubs',
-    render: p => clubs.renderFiche(p),  wire: clubs.wireFiche },
+    render: p => clubs.renderFiche(p),  wire: clubs.wireFiche, retour: '#/clubs' },
   { match: /^\/matos$/,       title: 'Mon sac',      tab: '/matos',
     render: () => materiel.render(),    wire: materiel.wire },
   { match: /^\/joueurs$/,     title: 'Mes adversaires', tab: '/joueurs',
     render: () => joueurs.render(),     wire: joueurs.wire },
   { match: /^\/joueurs\/(.+)$/, title: 'Adversaire', tab: '/joueurs',
-    render: p => joueurs.renderFiche(p), wire: joueurs.wireFiche },
+    render: p => joueurs.renderFiche(p), wire: joueurs.wireFiche, retour: '#/joueurs' },
 ];
 
 function routeCourante() {
@@ -73,6 +73,14 @@ function afficher() {
   $('view').replaceWith(vue);
 
   $('page-title').textContent = route.title;
+
+  /* Une fiche est un cul-de-sac sans ceci : la barre du bas ramène aux
+     cinq écrans du quotidien, dont ni les clubs ni les adversaires ne
+     font partie. On sortait donc d'une fiche d'adversaire par le bouton
+     du navigateur, quand il y en a un. */
+  const retour = $('btn-retour');
+  retour.hidden = !route.retour;
+  retour.dataset.cible = route.retour || '';
 
   // Le mode court se passe de tout le décorum : il doit tenir en un écran.
   document.body.classList.toggle('mode-court', !!route.nu);
@@ -170,6 +178,11 @@ if (etat.neuf) {
 }
 
 afficher();
+
+$('btn-retour').addEventListener('click', () => {
+  const cible = $('btn-retour').dataset.cible;
+  if (cible) location.hash = cible;
+});
 
 window.addEventListener('hashchange', afficher);
 document.addEventListener('data-changed', () => {

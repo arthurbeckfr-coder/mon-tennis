@@ -264,18 +264,22 @@ function difficulte(cible, adversaire) {
  * @returns {{cible, bilan, manque, matchsManquants, atteint, scenarios}}
  */
 export function simuler({ matchs = [], echelon, cible, sexe = 'h',
-                          bareme = BAREME_DEFAUT, bonusVictoires = 0, bonusPoints = 0 }) {
+                          bareme = BAREME_DEFAUT, bonusVictoires = 0, bonusPoints = 0,
+                          finISO = null }) {
   const visee = cible || echelonSuivant(echelon);
   if (!visee) return { erreur: 'Pas d\'échelon au-dessus.' };
 
-  const base = bilanA({ matchs, cible: visee, sexe, bareme, bonusVictoires, bonusPoints });
+  const base = bilanA({ matchs, cible: visee, sexe, bareme, bonusVictoires, bonusPoints, finISO });
   if (!base.seuil || base.seuil.points == null) {
     return { erreur: `Aucun seuil publié pour ${visee}.`, cible: visee };
   }
 
   const manque = Math.max(0, base.seuil.points - base.bilan);
   const matchsManquants = Math.max(0, base.seuil.victoires - base.nbVictoires);
-  const montee = monteeAutorisee(matchs, visee);
+  /* La victoire qui lève la limitation de montée expire comme les autres :
+     se projeter en novembre sans la faire expirer aussi annoncerait une
+     montée déjà autorisée qui ne le sera plus. */
+  const montee = monteeAutorisee(matchs, visee, finISO);
 
   if (manque === 0) {
     return {
@@ -373,6 +377,27 @@ const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
               'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
 /**
+ * Le mois calendaire situé n mois devant, nommé et daté.
+ *
+ * On se projette toujours à la **fin** du mois, parce que c'est la
+ * question qu'on se pose : « où j'en serai en novembre », et non « où j'en
+ * serai le 3 novembre ». La fin du mois est aussi le pire cas — toutes les
+ * expirations du mois ont eu lieu — et il vaut mieux se tromper dans ce
+ * sens-là.
+ *
+ * @returns {{fin: string, mois: string, libelle: string}}
+ */
+export function moisAVenir(n) {
+  const fin = finDeMois(n);
+  const d = new Date(fin + 'T12:00:00');
+  return {
+    fin,
+    mois: MOIS[d.getMonth()],
+    libelle: `${MOIS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
+  };
+}
+
+/**
  * Ce que devient le bilan si l'on ne joue plus, mois par mois.
  * @returns {Array<{fin, libelle, bilan, manque, sortants}>}
  */
@@ -426,8 +451,9 @@ export function echeance(etapes) {
  *  **rien** : c'est contre-intuitif, et c'est la première chose à savoir
  *  avant de s'inscrire à un tournoi. */
 export function rendementParEchelon({ matchs = [], cible, sexe = 'h',
-                                      bareme = BAREME_DEFAUT, bonusVictoires = 0, bonusPoints = 0 }) {
-  const base = bilanA({ matchs, cible, sexe, bareme, bonusVictoires, bonusPoints });
+                                      bareme = BAREME_DEFAUT, bonusVictoires = 0,
+                                      bonusPoints = 0, finISO = null }) {
+  const base = bilanA({ matchs, cible, sexe, bareme, bonusVictoires, bonusPoints, finISO });
   return adversairesPlausibles(cible).map(adv => {
     const p = pointsVictoire(cible, adv, bareme);
     const avant = base.retenues.reduce((t, x) => t + x.points, 0);

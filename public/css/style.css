@@ -198,6 +198,9 @@ a { color: var(--accent); }
 .icon-btn:hover { background: var(--carte-2); }
 a.icon-btn { display: grid; place-items: center; text-decoration: none; }
 .icon-btn.active { background: var(--accent-doux); }
+/* La flèche de retour ouvre la barre : c'est le seul bouton qu'on cherche
+   du regard en arrivant, et il se lit mieux un peu plus gros. */
+#btn-retour { font-size: 22px; margin-left: -6px; }
 
 /* Une pastille discrète sur l'icône de sauvegarde : verte quand le carnet
    est relié à un compte, orange pendant l'envoi. Discrète parce qu'elle
@@ -397,6 +400,27 @@ body.mode-court .fab { display: none; }
   padding: 10px 6px;
   text-align: center;
 }
+/* Un compteur qui filtre la liste en dessous. Il ne devient cliquable que
+   là où il a un sens — ailleurs, la tuile reste une tuile, et on se garde
+   de promettre une action qui n'existe pas. */
+.chiffre[data-filtre] { cursor: pointer; }
+.chiffre[data-filtre]:hover { border-color: var(--accent); background: var(--carte-2); }
+.chiffre.actif { border-color: var(--accent); background: var(--accent-doux); }
+.chiffre.actif b { color: var(--accent); }
+
+/* Les deux moitiés d'un « 32–14 » se cliquent séparément : on veut voir
+   ses victoires, ou ses défaites, pas les deux d'un bloc. D'où le
+   rembourrage — un chiffre nu fait une cible de dix pixels. */
+.chiffre .moitie {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.chiffre .moitie:hover { background: var(--carte-2); outline: 1px solid var(--bord); }
+.chiffre .moitie.actif { background: var(--accent); color: var(--accent-txt); }
+.chiffre .moitie.actif small { color: inherit; }
+
 .chiffre b { display: block; font-size: 1.24rem; line-height: 1.2; }
 .chiffre b small { font-size: .82rem; color: var(--muet); font-weight: 600; }
 .chiffre span { font-size: .66rem; color: var(--muet); line-height: 1.25; display: block; }
@@ -777,6 +801,41 @@ body.mode-court .fab { display: none; }
   margin-top: 5px;
   white-space: nowrap;
 }
+
+/* Une colonne qu'on peut ouvrir doit le montrer avant qu'on essaie : la
+   zone de touche déborde volontiers sur l'étiquette, sans quoi il faudrait
+   viser une barre de quelques pixels de large sur un téléphone. */
+.g-cliquable {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 2px 2px 0;
+  transition: background .12s;
+}
+.g-cliquable:hover, .g-cliquable:focus-visible { background: var(--carte-2); outline: none; }
+.g-cliquable:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.g-cliquable.actif { background: var(--accent-doux); }
+.g-cliquable.actif .g-label { color: var(--accent); font-weight: 600; }
+
+/* Le panneau qui s'ouvre sous un graphique. Encadré et décalé, pour qu'on
+   voie d'un coup d'œil qu'il répond à la colonne au-dessus et non à la
+   carte entière. */
+.detail-graphe {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--carte-2);
+}
+.detail-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Le lien vers la fédération se distingue des boutons du carnet : il fait
+   sortir du site, et on doit le savoir avant de le toucher. */
+a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; }
 
 .g-courbe { width: 100%; height: 120px; display: block; overflow: visible; }
 .g-trace { fill: none; stroke: var(--serie-1); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }

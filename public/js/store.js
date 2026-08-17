@@ -287,6 +287,34 @@ export function surfaceDuMatch(m) {
   return { surface: '', origine: 'inconnue' };
 }
 
+/* ─── Le championnat par équipes ───────────────────────────────────────
+
+   Ce n'est pas un tournoi et il ne faut pas le compter comme tel. Une
+   rencontre par équipes se joue une journée chez soi, la suivante chez
+   l'adversaire : elle n'appartient à aucun club en particulier, et son
+   absence dans la liste des clubs n'est pas un oubli à réparer. La ranger
+   parmi les « épreuves à rattacher » revenait à signaler comme défaut ce
+   qui est la règle du jeu.
+
+   La reconnaissance se fait sur le libellé, seule chose que la fédération
+   conserve, et sur les deux formes observées dans un palmarès réel :
+   « LIGUE-2023 SENIORS MASCULIN PRINTEMPS » pour le championnat de ligue,
+   « 76-2024 35 MESSIEURS » pour celui du département. C'est une
+   heuristique, et il faut le dire : une troisième forme passerait à côté.
+   Elle a l'avantage de ne jamais se tromper dans l'autre sens — aucun
+   tournoi ne s'appelle ainsi. */
+export const estParEquipes = m => /^(LIGUE|\d{2})-\d{4}\b/i.test((m?.tournoi || '').trim());
+
+/** L'année et la saison d'une rencontre par équipes, telles qu'on les
+ *  nomme : « 2023 printemps ». L'année vient du libellé et non de la date,
+ *  parce qu'un championnat d'hiver déborde sur l'année suivante. */
+export function saisonEquipe(m) {
+  const t = (m.tournoi || '').toUpperCase();
+  const an = (t.match(/-(\d{4})/) || [])[1] || (m.date || '').slice(0, 4) || '?';
+  const saison = /HIVER/.test(t) ? 'hiver' : /PRINTEMPS/.test(t) ? 'printemps' : '';
+  return { an, saison, libelle: saison ? `${an} ${saison}` : an };
+}
+
 /** Les épreuves qu'aucun club ne réclame : de quoi compléter les
  *  mots-clés, ou rattacher à la main. */
 export function epreuvesOrphelines() {

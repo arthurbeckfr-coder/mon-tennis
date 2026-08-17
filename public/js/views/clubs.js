@@ -18,7 +18,7 @@
 import { h, dateCourte, puce, confirmer, toast } from '../util.js';
 import {
   store, matchsDuClub, epreuvesOrphelines, bilanMatchs,
-  supprimerClub, PLATEFORMES,
+  supprimerClub, estParEquipes, PLATEFORMES,
 } from '../store.js';
 import { clubForm, matchForm } from '../forms.js';
 
@@ -107,8 +107,19 @@ export function render() {
     // s'échangeraient de place d'un affichage à l'autre.
     .sort((a, b) => t.comparer(a, b) || a.club.nom.localeCompare(b.club.nom, 'fr'));
 
-  const orphelines = epreuvesOrphelines();
-  const sansClub = orphelines.reduce((t, [, n]) => t + n, 0);
+  /* Toutes les épreuves sans club ne sont pas des oublis. Une rencontre
+     par équipes se joue une journée chez soi et la suivante chez
+     l'adversaire : elle n'appartient à aucun club, et la ranger parmi les
+     choses à réparer faisait afficher un chantier permanent qu'aucun
+     mot-clé ne pouvait clore. On les sépare donc, et on ne compte comme
+     « à rattacher » que ce qui peut l'être. */
+  const orphelinesToutes = epreuvesOrphelines();
+  const orphelines = orphelinesToutes.filter(([nom]) => !estParEquipes({ tournoi: nom }));
+  const equipes = orphelinesToutes.filter(([nom]) => estParEquipes({ tournoi: nom }));
+
+  const sansClub = orphelinesToutes.reduce((t, [, n]) => t + n, 0);
+  const aRattacher = orphelines.reduce((t, [, n]) => t + n, 0);
+  const nEquipes = equipes.reduce((t, [, n]) => t + n, 0);
 
   if (!store.clubs.length) {
     return `<div class="vide">
@@ -125,8 +136,13 @@ export function render() {
       <div class="chiffre"><b>${store.clubs.length}</b><span>clubs</span></div>
       <div class="chiffre"><b>${store.matchs.length - sansClub}</b><span>matchs situés</span></div>
       <div class="chiffre"><b>${new Set(store.clubs.flatMap(c => c.surfaces || [])).size}</b><span>surfaces</span></div>
-      <div class="chiffre"><b>${sansClub}</b><span>à rattacher</span></div>
+      <div class="chiffre"><b>${aRattacher}</b><span>à rattacher</span></div>
     </section>
+
+    ${nEquipes ? `<p class="tiny muted" style="margin:0 4px 10px">Plus ${nEquipes} match(s)
+      de championnat par équipes, qui n'ont volontairement pas de club : une journée se
+      joue chez soi, la suivante chez l'adversaire. Leur bilan se lit dans les
+      <a href="#/">statistiques</a>.</p>` : ''}
 
     ${store.clubs.length > 1 ? barreTri() : ''}
 
@@ -152,11 +168,11 @@ export function render() {
     </div>
 
     ${orphelines.length ? `<section class="carte">
-      <h3>${sansClub} match(s) sans club</h3>
-      <p class="tiny muted">La fédération ne dit pas toujours où l'on a joué : un
-        championnat par équipes se déroule tantôt chez soi tantôt ailleurs, et
+      <h3>${aRattacher} match(s) sans club</h3>
+      <p class="tiny muted">La fédération ne dit pas toujours où l'on a joué :
         « TOURNOI SENIORS » ne nomme personne. Ajoute le mot manquant aux mots-clés
-        d'un club, ou rattache le match depuis sa fiche.</p>
+        d'un club, ou rattache le match depuis sa fiche. Les rencontres par équipes,
+        elles, ne figurent plus ici : elles n'ont pas de club à trouver.</p>
       <ul class="orphelines">
         ${orphelines.slice(0, 12).map(([nom, n]) =>
           `<li><span>${h(nom)}</span><b>${n}</b></li>`).join('')}
