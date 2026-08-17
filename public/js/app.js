@@ -78,9 +78,13 @@ function afficher() {
      cinq écrans du quotidien, dont ni les clubs ni les adversaires ne
      font partie. On sortait donc d'une fiche d'adversaire par le bouton
      du navigateur, quand il y en a un. */
+  /* `retourCible` et non `cible` : la page du classement utilise déjà
+     `data-cible` pour ses boutons d'objectif, et deux attributs de même
+     nom sur un même document finissent par se confondre dans un
+     sélecteur. */
   const retour = $('btn-retour');
   retour.hidden = !route.retour;
-  retour.dataset.cible = route.retour || '';
+  retour.dataset.retourCible = route.retour || '';
 
   // Le mode court se passe de tout le décorum : il doit tenir en un écran.
   document.body.classList.toggle('mode-court', !!route.nu);
@@ -180,7 +184,7 @@ if (etat.neuf) {
 afficher();
 
 $('btn-retour').addEventListener('click', () => {
-  const cible = $('btn-retour').dataset.cible;
+  const cible = $('btn-retour').dataset.retourCible;
   if (cible) location.hash = cible;
 });
 

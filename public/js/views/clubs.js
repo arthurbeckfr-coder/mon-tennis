@@ -17,10 +17,95 @@
 
 import { h, dateCourte, puce, confirmer, toast } from '../util.js';
 import {
-  store, matchsDuClub, epreuvesOrphelines, bilanMatchs,
-  supprimerClub, estParEquipes, PLATEFORMES,
+  store, matchsDuClub, epreuvesOrphelines, bilanMatchs, positionMot,
+  supprimerClub, ajouterClub, modifierClub, estParEquipes, PLATEFORMES,
 } from '../store.js';
+import { clubConnuPour, MOTS_EN_PLUS, LIENS_CONNUS, urlTenupClub } from '../clubs-connus.js';
 import { clubForm, matchForm } from '../forms.js';
+
+/* ─── Les rattachements proposés ───────────────────────────────────────
+
+   Une épreuve sans club n'est pas toujours une énigme : « TOURNOI OPEN
+   MSA TC » nomme son organisateur, encore faut-il savoir que MSA TC est
+   le club de Mont-Saint-Aignan. Le carnet le sait maintenant (voir
+   clubs-connus.js) et le propose, sans jamais l'appliquer tout seul.
+
+   Deux réparations possibles, et une seule s'affiche à la fois :
+   ajouter le mot-clé manquant à un club qu'on a déjà, ou créer le club
+   absent avec son adresse. Dans les deux cas les matchs se rattachent
+   ensuite d'eux-mêmes, par le mécanisme habituel des mots-clés — rien
+   n'est écrit dans les matchs, ce qui rend le geste réversible d'un
+   changement de mot-clé. */
+function propositions(orphelines) {
+  const dejaConnu = mot => store.clubs.some(c =>
+    (c.motsCles || []).some(x => x.toUpperCase() === mot.toUpperCase()));
+
+  const liste = [];
+
+  /* Une proposition par club, et non par mot-clé : Mont-Saint-Aignan
+     s'écrit « MSA TC » une année et « MSATC » la suivante, ce qui ferait
+     deux lignes proposant de créer deux fois le même club — dont la
+     seconde n'aurait plus de sens une fois la première appliquée. On
+     rassemble donc les graphies, et un seul geste les pose toutes. */
+  for (const [nom, n] of orphelines) {
+    const trouve = clubConnuPour(nom);
+    if (!trouve || dejaConnu(trouve.mot)) continue;
+
+    const cle = trouve.club.nom;
+    const deja = liste.find(x => x.cle === cle);
+    if (deja) {
+      deja.matchs += n;
+      if (!deja.mots.includes(trouve.mot)) deja.mots.push(trouve.mot);
+      if (!deja.epreuves.includes(nom)) deja.epreuves.push(nom);
+      continue;
+    }
+
+    const existant = store.clubs.find(c =>
+      c.nom.toUpperCase() === trouve.club.nom.toUpperCase());
+
+    liste.push({ cle, epreuves: [nom], matchs: n, mots: [trouve.mot],
+                 connu: trouve.club, existant: existant || null });
+  }
+
+  /* Les mots-clés à greffer sur un club déjà présent — « TOUT VA BIEN »
+     pour Dieppe : rien dans ces trois mots ne le laisse deviner. */
+  for (const { club, mots } of MOTS_EN_PLUS) {
+    const cible = store.clubs.find(c => (c.motsCles || [])
+      .some(x => x.toUpperCase() === club.toUpperCase()));
+    if (!cible) continue;
+    for (const mot of mots) {
+      if (dejaConnu(mot)) continue;
+      const touchees = orphelines.filter(([nom]) => positionMot(nom, mot) >= 0);
+      if (!touchees.length) continue;
+      liste.push({
+        cle: cible.nom + '|' + mot,
+        epreuves: touchees.map(([nom]) => nom),
+        matchs: touchees.reduce((t, [, n]) => t + n, 0),
+        mots: [mot], connu: null, existant: cible,
+      });
+    }
+  }
+
+  /* Les pages publiques qui manquent à un club qu'on a déjà. Un club sans
+     lien n'est pas un club incomplet par choix : c'est simplement que
+     l'import de la fédération ne donne aucune page, et que personne ne va
+     les chercher à la main. */
+  for (const { club, sources } of LIENS_CONNUS) {
+    const cible = store.clubs.find(c => c.nom.toUpperCase() === club.toUpperCase());
+    if (!cible) continue;
+    const dejaLa = new Set((cible.sources || []).map(s => (s.url || '').toLowerCase()));
+    const manquants = sources.filter(s => !dejaLa.has(s.url.toLowerCase()));
+    if (!manquants.length) continue;
+    liste.push({
+      cle: 'liens|' + cible.nom,
+      liens: manquants,
+      existant: cible,
+      epreuves: [], matchs: 0, mots: [], connu: null,
+    });
+  }
+
+  return liste;
+}
 
 const infoPlateforme = cle => PLATEFORMES.find(p => p.cle === cle) || { emoji: '🔗', nom: cle };
 
@@ -167,6 +252,46 @@ export function render() {
       <button class="btn" data-nouveau>Ajouter un club</button>
     </div>
 
+    ${(() => {
+      const props = propositions(orphelines);
+      if (!props.length) return '';
+      const total = props.reduce((t, p) => t + p.matchs, 0);
+      const nLiens = props.filter(p => p.liens).length;
+      return `<section class="carte carte-verte">
+        <h3>${total ? `${total} match(s) rattachables` : 'Des fiches à compléter'}${
+          total && nLiens ? ', et des fiches à compléter' : ''}</h3>
+        <p class="tiny muted">Ces épreuves nomment leur club, mais sous un sigle que ton
+          carnet ne connaît pas encore. Rien n'est appliqué avant que tu cliques, et tout
+          reste modifiable ensuite depuis la fiche du club.</p>
+        <ul class="propositions">
+          ${props.map(p => `<li>
+            <div>
+              <strong>${h(p.existant ? p.existant.nom : p.connu.nom)}</strong>
+              ${p.existant ? '' : '<span class="puce">à créer</span>'}
+              ${p.liens ? `<div class="tiny muted">Ajouter
+                ${p.liens.map(s => h(s.plateforme === 'facebook' ? 'sa page Facebook'
+                  : s.plateforme === 'instagram' ? 'son Instagram' : 'son site')).join(' et ')}
+                — trouvé${p.liens.length > 1 ? 's' : ''} sur une page publique au nom du
+                club.</div>` : `
+              <div class="tiny muted">${h(p.epreuves[0])}${p.epreuves.length > 1
+                ? ` et ${p.epreuves.length - 1} autre(s) épreuve(s)` : ''} —
+                ${p.matchs} match${p.matchs > 1 ? 's' : ''}, reconnu${p.mots.length > 1
+                  ? 's aux mots' : ' au mot'} ${p.mots.map(x => `« ${h(x)} »`).join(', ')}</div>
+              ${p.connu?.adresse ? `<div class="tiny muted">${h(p.connu.adresse)}</div>` : ''}
+              ${p.connu && !p.connu.adresse ? `<div class="tiny muted">Adresse inconnue :
+                aucune source publique fiable, à compléter toi-même plutôt que de
+                l'inventer.</div>` : ''}`}
+            </div>
+            <button class="btn btn-primary" data-rattacher="${h(p.cle)}">
+              ${p.liens ? 'Ajouter les liens' : p.existant ? 'Ajouter le mot' : 'Créer le club'}</button>
+          </li>`).join('')}
+        </ul>
+        <p class="tiny muted">Ces adresses viennent des pages publiques de chaque club, et
+          non de Ten'Up — le site de la fédération exige une connexion et n'ouvre aucun
+          accès aux applications extérieures.</p>
+      </section>`;
+    })()}
+
     ${orphelines.length ? `<section class="carte">
       <h3>${aRattacher} match(s) sans club</h3>
       <p class="tiny muted">La fédération ne dit pas toujours où l'on a joué :
@@ -225,15 +350,21 @@ export function renderFiche(params) {
         c'est à toi de l'ajouter une fois pour toutes.</p>` : ''}
     </section>
 
-    ${(club.sources || []).length ? `<section class="carte">
+    ${((club.sources || []).length || urlTenupClub(club)) ? `<section class="carte">
       <h3>Suivre ce club</h3>
       <ul class="comptes">
-        ${club.sources.map(s => {
+        ${(club.sources || []).map(s => {
           const p = infoPlateforme(s.plateforme);
           return `<li><a href="${h(s.url)}" target="_blank" rel="noopener noreferrer">
             <span class="gros-emoji">${p.emoji}</span>
             <span class="compte-nom">${h(p.nom)}</span></a></li>`;
         }).join('')}
+        ${/* La fiche officielle, déduite de l'identifiant posé par l'import.
+              Sans identifiant, aucun lien : on n'invente pas une adresse. */
+          urlTenupClub(club) ? `<li>
+          <a href="${h(urlTenupClub(club))}" target="_blank" rel="noopener noreferrer">
+            <span class="gros-emoji">🎾</span>
+            <span class="compte-nom">Ten'Up</span></a></li>` : ''}
       </ul>
     </section>` : ''}
 
@@ -278,6 +409,36 @@ export function wire(vue, rerendre) {
 
   vue.addEventListener('click', e => {
     if (e.target.closest('[data-nouveau]')) { clubForm(); return; }
+
+    const r = e.target.closest('[data-rattacher]');
+    if (r) {
+      const orphelines = epreuvesOrphelines()
+        .filter(([nom]) => !estParEquipes({ tournoi: nom }));
+      const p = propositions(orphelines).find(x => x.cle === r.dataset.rattacher);
+      if (!p) { rerendre(); return; }
+
+      if (p.liens) {
+        modifierClub(p.existant.id, {
+          sources: [...(p.existant.sources || []), ...p.liens],
+        });
+        toast(`${p.liens.length} lien(s) ajouté(s) à ${p.existant.nom}.`);
+      } else if (p.existant) {
+        modifierClub(p.existant.id, {
+          motsCles: [...(p.existant.motsCles || []), ...p.mots],
+        });
+        toast(`${p.mots.map(m => `« ${m} »`).join(', ')} ajouté à ${p.existant.nom}.`);
+      } else {
+        ajouterClub({ ...p.connu, surfaces: [],
+                      motsCles: [...p.connu.motsCles],
+                      sources: [...(p.connu.sources || [])] });
+        toast(`${p.connu.nom} créé — ${p.matchs} match(s) rattaché(s).`);
+      }
+      /* Pas de `rerendre()` : l'écriture émet « data-changed », qui
+         redessine déjà l'écran. Le faire deux fois ferait clignoter la
+         page pour rien. */
+      return;
+    }
+
     const l = e.target.closest('[data-club]');
     if (l) location.hash = `#/clubs/${l.dataset.club}`;
   });

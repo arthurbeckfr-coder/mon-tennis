@@ -56,12 +56,14 @@ export function repertoire() {
     /* Le classement retenu est le plus récent connu : c'est celui qui
        renseigne sur le niveau actuel, pas le meilleur jamais atteint. */
     const dernier = j.matchs.find(m => m.echelonAdverse);
+    const fiche = store.joueurs?.find(x => cleJoueur(x.nom) === j.cle) || null;
     return {
       ...j,
       ...b,
       echelon: dernier?.echelonAdverse || '',
       derniere: j.matchs[0]?.date || '',
-      fiche: store.joueurs?.find(x => cleJoueur(x.nom) === j.cle) || null,
+      fiche,
+      club: (fiche?.club || '').trim(),
     };
   }).sort((a, b) => b.total - a.total || a.nom.localeCompare(b.nom, 'fr'));
 }
@@ -81,6 +83,57 @@ export function repertoire() {
    Les victoires et les défaites se départagent par le nombre de matchs :
    à deux défaites chacun, celui qu'on a joué six fois est un adversaire
    installé, celui qu'on a joué deux fois est un accident. */
+/* ─── Les clubs adverses ───────────────────────────────────────────────
+
+   Ten'Up ne donne pas le club d'un adversaire : un nom, un classement, et
+   rien d'autre. Ce champ se saisit donc à la main, et le carnet ne fait
+   pas semblant du contraire — il ne montre ce tableau que quand il a de
+   quoi le remplir, et dit combien d'adversaires restent sans club.
+
+   Ce qu'on vient y chercher n'est pas une statistique de plus mais une
+   fierté précise : « combien de licenciés de ce club j'ai battus ». D'où
+   le classement par joueurs battus, et non par joueurs croisés. */
+function rendreClubsAdverses(tous) {
+  const avec = tous.filter(j => j.club);
+  if (!avec.length) return '';
+
+  const parClub = {};
+  for (const j of avec) {
+    const c = j.club;
+    parClub[c] = parClub[c] || { joueurs: 0, battus: 0, v: 0, d: 0 };
+    parClub[c].joueurs++;
+    if (j.v > 0) parClub[c].battus++;
+    parClub[c].v += j.v;
+    parClub[c].d += j.d;
+  }
+
+  const clubs = Object.keys(parClub)
+    .sort((a, b) => parClub[b].battus - parClub[a].battus ||
+                    parClub[b].v - parClub[a].v ||
+                    a.localeCompare(b, 'fr'));
+  const sansClub = tous.length - avec.length;
+
+  return `<section class="carte">
+    <h3>Les clubs de tes adversaires</h3>
+    <ul class="clubs-adverses">
+      ${clubs.map(c => `<li>
+        <div>
+          <strong>${h(c)}</strong>
+          <div class="tiny muted">${parClub[c].joueurs} joueur${parClub[c].joueurs > 1 ? 's' : ''}
+            croisé${parClub[c].joueurs > 1 ? 's' : ''}, ${parClub[c].v}V–${parClub[c].d}D</div>
+        </div>
+        <div class="club-score">
+          <b>${parClub[c].battus}</b>
+          <span class="tiny muted">battu${parClub[c].battus > 1 ? 's' : ''}</span>
+        </div>
+      </li>`).join('')}
+    </ul>
+    ${sansClub ? `<p class="tiny muted">${sansClub} adversaire(s) sans club renseigné : la
+      fédération ne le publie pas, il se saisit depuis leur fiche. Ce tableau ne compte
+      que ce que tu as noté.</p>` : ''}
+  </section>`;
+}
+
 const TRIS = [
   { cle: 'matchs',    nom: 'matchs joués',
     comparer: (a, b) => b.total - a.total },
@@ -96,6 +149,11 @@ const TRIS = [
      naturellement en fin de liste : on ne lui invente pas un niveau. */
   { cle: 'niveau',    nom: 'classement (le plus fort d\'abord)',
     comparer: (a, b) => rang(b.echelon) - rang(a.echelon) || b.total - a.total },
+  { cle: 'club',      nom: 'club (A→Z)',
+    /* Les adversaires sans club renseigné passent derrière : les mêler
+       aux autres ferait un premier groupe sans nom, qui n'apprend rien. */
+    comparer: (a, b) => (a.club ? 0 : 1) - (b.club ? 0 : 1) ||
+                        a.club.localeCompare(b.club, 'fr') || b.total - a.total },
   { cle: 'nom',       nom: 'nom (A→Z)',
     comparer: (a, b) => a.nom.localeCompare(b.nom, 'fr') },
 ];
@@ -147,12 +205,15 @@ export function render() {
       des joueurs « Anonyme » ne figurent pas ici : la fédération masque leur nom, et les
       regrouper ferait un adversaire fictif au bilan dénué de sens.</p>` : ''}
 
+    ${rendreClubsAdverses(tous)}
+
     ${liste.length ? `<ul class="joueurs">
       ${liste.map(j => `<li class="joueur-ligne" data-joueur="${h(j.cle)}">
         <div class="joueur-corps">
           <strong>${h(j.nom)}</strong>
           <div class="club-bas">
             ${j.echelon ? puce(j.echelon) : ''}
+            ${j.club ? `<span class="puce puce-club">${h(j.club)}</span>` : ''}
             <span>${j.total} match${j.total > 1 ? 's' : ''}</span>
             ${tri === 'ratio' ? `<span>${j.ratio}% pour toi</span>` : ''}
             ${j.derniere ? `<span class="muted">dernier ${h(dateCourte(j.derniere))}</span>` : ''}

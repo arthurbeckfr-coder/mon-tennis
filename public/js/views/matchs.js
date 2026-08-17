@@ -6,7 +6,8 @@
    compteurs du haut sont là pour ça, et non pour décorer. */
 
 import { h, hMulti, dateCourte, puce, dansLesDouzeMois } from '../util.js';
-import { store, bilanMatchs, surfaceDuMatch, estParEquipes, saisonEquipe } from '../store.js';
+import { store, bilanMatchs, surfaceDuMatch, estParEquipes, saisonEquipe,
+         tournoisRemportes } from '../store.js';
 import { pointsVictoire, rang, ECHELONS } from '../classement.js';
 import { matchForm, importFFTForm } from '../forms.js';
 import { barresGroupees, tableauDouble } from '../graphes.js';
@@ -59,6 +60,14 @@ function filtreActif(cle) {
     : filtre.issue === cle;
 }
 
+/** « 95 » se lit mal ; « 1 h 35 » se lit d'un coup. En dessous de l'heure
+ *  on garde les minutes, qui restent plus parlantes. */
+export const direDuree = min => {
+  const n = Number(min);
+  if (!n || n <= 0) return '';
+  return n < 60 ? `${n} min` : `${Math.floor(n / 60)} h ${String(n % 60).padStart(2, '0')}`;
+};
+
 /** Le détail qui manque partout ailleurs : ce que la victoire a rapporté. */
 function ligneMatch(m) {
   const pts = m.issue === 'V' && !m.wo
@@ -78,6 +87,7 @@ function ligneMatch(m) {
         <span>${h(dateCourte(m.date))}</span>
         ${m.score ? `<span>${h(m.score)}</span>` : ''}
         ${m.tournoi ? `<span class="muted">${h(m.tournoi)}</span>` : ''}
+        ${m.duree ? `<span class="muted">${direDuree(m.duree)}</span>` : ''}
         ${m.wo ? puce('non joué') : ''}
       </div>
       ${m.notes ? `<p class="match-note">${hMulti(m.notes)}</p>` : ''}
@@ -128,6 +138,12 @@ const AXES = {
   saison: {
     titre: c => `Championnat ${c}`,
     porte: (m, c) => estParEquipes(m) && saisonEquipe(m).libelle === c,
+  },
+  /* La clé est « libellé §année » : le même open revient chaque année, et
+     gagner celui de 2023 ne dit rien de celui de 2024. */
+  edition: {
+    titre: c => c.split(' §')[0],
+    porte: (m, c) => `${(m.tournoi || '').trim()} §${(m.date || '').slice(0, 4) || '?'}` === c,
   },
 };
 
@@ -229,11 +245,96 @@ function vueStats() {
         versTableau(parEchelon, echelons))}
     </section>
 
+    ${rendreDurees()}
+
+    ${rendreTitres()}
+
     ${rendreSurfaces(parSurface, surfaces, series)}
 
     ${rendreEpreuves(parEpreuve, epreuves, series)}
 
     ${rendreEquipes(series)}`;
+}
+
+/* ─── Le temps passé sur le court ──────────────────────────────────────
+
+   La durée ne vient d'aucune donnée fédérale : elle se note à la main,
+   quand on y pense. Cette carte n'apparaît donc qu'une fois quelques
+   matchs chronométrés, et elle dit toujours sur combien elle porte — une
+   moyenne sur trois matchs n'est pas une moyenne, et laisser croire le
+   contraire serait la seule vraie faute ici. */
+function rendreDurees() {
+  const avec = store.matchs.filter(m => Number(m.duree) > 0);
+  if (avec.length < 3) return '';
+
+  const total = avec.reduce((t, m) => t + Number(m.duree), 0);
+  const moyenne = Math.round(total / avec.length);
+  const plusLong = avec.reduce((a, b) => Number(b.duree) > Number(a.duree) ? b : a);
+
+  const moy = liste => liste.length
+    ? Math.round(liste.reduce((t, m) => t + Number(m.duree), 0) / liste.length) : 0;
+  const gagnes = avec.filter(m => m.issue === 'V');
+  const perdus = avec.filter(m => m.issue === 'D');
+
+  return `<section class="carte">
+    <h3>Le temps passé sur le court</h3>
+    <section class="chiffres">
+      <div class="chiffre"><b>${direDuree(moyenne)}</b><span>en moyenne</span></div>
+      <div class="chiffre"><b>${direDuree(total)}</b><span>au total</span></div>
+      <div class="chiffre"><b>${avec.length}</b><span>matchs chronométrés</span></div>
+      <div class="chiffre"><b>${direDuree(plusLong.duree)}</b><span>le plus long</span></div>
+    </section>
+    <p class="tiny muted">Sur ${avec.length} match${avec.length > 1 ? 's' : ''} chronométré${
+      avec.length > 1 ? 's' : ''} — les autres ne comptent pas dans ces moyennes.
+      Le plus long : ${h(plusLong.adversaire || 'un adversaire')},
+      ${h(dateCourte(plusLong.date))}${plusLong.score ? `, ${h(plusLong.score)}` : ''}.
+      ${gagnes.length >= 2 && perdus.length >= 2
+        ? `Tes victoires durent ${direDuree(moy(gagnes))} en moyenne, tes défaites
+           ${direDuree(moy(perdus))}.`
+        : 'Il faudra quelques matchs de plus pour comparer victoires et défaites.'}</p>
+  </section>`;
+}
+
+/* ─── Les tournois gagnés ──────────────────────────────────────────────
+
+   Le seul écran du carnet qui ne serve à rien d'autre qu'à faire plaisir,
+   et il a sa place : un palmarès de 273 matchs ne dit nulle part qu'on a
+   levé un trophée. La déduction est solide — un tournoi se perd en une
+   fois, donc une édition sans défaite est une édition gagnée — et sa
+   limite est affichée plutôt que masquée. */
+function rendreTitres() {
+  const { titres, incertains } = tournoisRemportes();
+  if (!titres.length && !incertains.length) return '';
+
+  const ligne = e => `<li class="titre-ligne ${detail?.axe === 'edition'
+      && detail.cle === e.cle ? 'actif' : ''}"
+      data-axe="edition" data-cle="${h(e.cle)}" role="button" tabindex="0"
+      title="Voir ces matchs">
+    <span class="titre-coupe">🏆</span>
+    <div>
+      <strong>${h(e.nom)}</strong>
+      <div class="tiny muted">${h(e.an)} — ${e.v} victoire${e.v > 1 ? 's' : ''},
+        aucune défaite</div>
+    </div>
+  </li>`;
+
+  return `<section class="carte">
+    <h3>${titres.length} tournoi${titres.length > 1 ? 's' : ''} gagné${titres.length > 1 ? 's' : ''}</h3>
+    <p class="tiny muted">Aucune trace de cela dans les données de la fédération : elle
+      donne des matchs, pas des trophées. Mais un tournoi se perd en une fois — dès la
+      première défaite on est sorti. Une édition sans aucune défaite est donc une édition
+      qu'on est allé gagner. Le championnat par équipes est exclu : on y joue toutes les
+      journées quoi qu'il arrive.</p>
+    ${titres.length ? `<ul class="titres">${titres.map(ligne).join('')}</ul>` : ''}
+    ${rendreDetail('edition')}
+    ${incertains.length ? `<details class="replis">
+      <summary>${incertains.length} édition(s) à confirmer</summary>
+      <p class="tiny muted">Une seule victoire et aucune défaite : ce peut être un petit
+        tableau gagné en une rencontre, mais aussi un tournoi dont la défaite manque à
+        l'historique, ou un forfait adverse. Le carnet ne tranche pas — toi seul sais.</p>
+      <ul class="titres">${incertains.map(ligne).join('')}</ul>
+    </details>` : ''}
+  </section>`;
 }
 
 /* ─── La surface ───────────────────────────────────────────────────────

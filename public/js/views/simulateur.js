@@ -64,8 +64,13 @@ export function render() {
   const surcout = rMaintenant && rMaintenant.manque != null && r.manque != null
     ? r.manque - rMaintenant.manque : null;
 
+  /* Son propre échelon fait partie des objectifs, et ce n'est pas une
+     coquetterie : « est-ce que je me maintiens » est une vraie question,
+     posée par tout joueur dont le bilan glisse. La sélectionner montre le
+     seuil de son propre échelon et ce qu'il reste dessous — là où les
+     trois suivantes montrent ce qu'il faut pour monter. */
   const i = rang(p.echelon);
-  const cibles = [1, 2, 3].map(d => ECHELONS[i + d]).filter(Boolean);
+  const cibles = [0, 1, 2, 3].map(d => ECHELONS[i + d]).filter(Boolean);
 
   /* L'écart avec le chiffre officiel, quand il est connu, est le meilleur
      contrôle qui soit : s'il n'est pas nul, ce sont des matchs qui
@@ -108,7 +113,9 @@ export function render() {
       <span class="etiquette">Objectif</span>
       <div class="segments">
         ${cibles.map(c => `<button data-cible="${h(c)}"
-          class="${c === cible ? 'actif' : ''}">${h(c)}</button>`).join('')}
+          class="${c === cible ? 'actif' : ''}"
+          title="${c === p.echelon ? 'Me maintenir à ' + h(c) : 'Passer ' + h(c)}"
+          >${h(c)}${c === p.echelon ? ' <small>actuel</small>' : ''}</button>`).join('')}
       </div>
     </section>
 
@@ -168,10 +175,15 @@ export function render() {
 
 function rendreResultat(r) {
   const manqueMatchs = r.matchsManquants > 0;
+  /* Viser son propre échelon n'est pas viser une montée : on ne « passe »
+     pas 15 quand on est 15, on s'y maintient. Le même calcul répond aux
+     deux questions, mais pas avec les mêmes mots — et la limitation de
+     montée, elle, ne s'applique pas du tout. */
+  const maintien = r.cible === store.profil.echelon;
 
   if (r.manque === 0) {
     return `<section class="carte carte-verte">
-      <h3>Les points y sont.</h3>
+      <h3>${maintien ? 'Ton échelon est tenu.' : 'Les points y sont.'}</h3>
       <p>Ton bilan à ${h(r.cible)} atteint ${r.bilan} points, pour ${r.seuil.points} demandés.</p>
       ${manqueMatchs
         ? `<p class="alerte">Il manque encore ${r.matchsManquants} victoire(s) :
@@ -185,17 +197,17 @@ function rendreResultat(r) {
     <section class="carte carte-objectif">
       <div class="ecart">
         <b>${r.manque}</b>
-        <span>points à trouver pour passer ${h(r.cible)}</span>
+        <span>points à trouver pour ${maintien ? `te maintenir à` : `passer`} ${h(r.cible)}</span>
       </div>
       <div class="jauge"><div class="jauge-pleine"
         style="width:${Math.min(100, Math.round((r.bilan / r.seuil.points) * 100))}%"></div></div>
       <p class="tiny muted">${r.bilan} / ${r.seuil.points} points
         ${manqueMatchs ? ` — et ${r.matchsManquants} victoire(s) à ajouter en plus des points`
                        : ' — le nombre de victoires exigé est déjà atteint'}.</p>
-      <p class="tiny muted">Attention au piège : à ${h(r.cible)}, tes victoires sont
+      ${maintien ? '' : `<p class="tiny muted">Attention au piège : à ${h(r.cible)}, tes victoires sont
         recomptées <em>depuis ${h(r.cible)}</em>. Une victoire qui te rapporte 120 points
         aujourd'hui n'en vaut plus que 90 une fois là-haut. C'est ce qui rend chaque
-        échelon plus dur que le précédent.</p>
+        échelon plus dur que le précédent.</p>`}
     </section>
 
     ${rendreMontee(r)}
@@ -319,6 +331,8 @@ function rendreRendement(reglages, cible, r, finISO = null, vise = null) {
 function rendreMontee(r) {
   const m = r.montee;
   if (!m || !m.requise) return '';
+  // On ne monte pas à l'échelon qu'on occupe déjà : la règle ne s'applique pas.
+  if (r.cible === store.profil.echelon) return '';
 
   if (!m.satisfaite) {
     return `<div class="avis">

@@ -837,6 +837,47 @@ body.mode-court .fab { display: none; }
    sortir du site, et on doit le savoir avant de le toucher. */
 a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; }
 
+/* Les rattachements proposés et les tournois gagnés : deux listes de
+   lignes qu'on parcourt et qu'on ouvre, même charpente. */
+.propositions, .titres { list-style: none; margin: 10px 0 0; padding: 0; }
+.propositions li, .titre-ligne {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--bord);
+  border-radius: 11px;
+  background: var(--carte);
+  margin-bottom: 8px;
+}
+.propositions li > div { flex: 1; min-width: 0; }
+.propositions li .btn { flex: 0 0 auto; }
+
+.titre-ligne { cursor: pointer; }
+.titre-ligne:hover, .titre-ligne:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.titre-ligne.actif { border-color: var(--accent); background: var(--accent-doux); }
+.titre-coupe { font-size: 20px; flex: 0 0 auto; }
+
+.clubs-adverses { list-style: none; margin: 10px 0 0; padding: 0; }
+.clubs-adverses li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--bord);
+  border-radius: 11px;
+  background: var(--carte);
+  margin-bottom: 8px;
+}
+.clubs-adverses li > div:first-child { flex: 1; min-width: 0; }
+
+/* Le club d'un adversaire se distingue de son classement : l'un est une
+   couleur qu'il porte, l'autre son niveau. */
+.puce-club { background: var(--carte-2); border-color: var(--bord); }
+
 .g-courbe { width: 100%; height: 120px; display: block; overflow: visible; }
 .g-trace { fill: none; stroke: var(--serie-1); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .g-trace-futur { stroke-dasharray: 4 4; opacity: .65; }

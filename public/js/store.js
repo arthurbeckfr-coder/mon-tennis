@@ -239,7 +239,7 @@ const sansAccent = s => (s || '').toUpperCase()
 /** Où commence ce mot dans le texte, en mot entier — ou -1.
  *  Le mot entier n'est pas un luxe : sans lui « VEULES » attraperait
  *  « VEULETTES », qui est un autre club à quinze kilomètres. */
-function positionMot(texte, mot) {
+export function positionMot(texte, mot) {
   const m = sansAccent(mot).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const r = new RegExp(`(^|[^A-Z])(${m})([^A-Z]|$)`);
   const t = sansAccent(texte);
@@ -313,6 +313,49 @@ export function saisonEquipe(m) {
   const an = (t.match(/-(\d{4})/) || [])[1] || (m.date || '').slice(0, 4) || '?';
   const saison = /HIVER/.test(t) ? 'hiver' : /PRINTEMPS/.test(t) ? 'printemps' : '';
   return { an, saison, libelle: saison ? `${an} ${saison}` : an };
+}
+
+/* ─── Les tournois gagnés ──────────────────────────────────────────────
+
+   La fédération ne dit nulle part qu'on a gagné un tournoi. Elle donne
+   des matchs, et c'est tout. Mais un tournoi se perd en une fois : dès
+   qu'on y a une défaite, on est sorti. Une édition sans aucune défaite
+   est donc une édition qu'on est allé au bout — c'est-à-dire gagnée.
+
+   Le championnat par équipes est exclu, et il le faut : on y joue toutes
+   les journées quoi qu'il arrive, si bien qu'une saison sans défaite ne
+   veut pas dire la même chose.
+
+   Une réserve, et elle est réelle : une seule victoire sans défaite ne
+   prouve rien. Ce peut être un petit tableau gagné en une rencontre, mais
+   aussi un tournoi dont la défaite manque à l'historique, ou un forfait
+   adverse au tour suivant. Ces cas-là sont donc rendus à part, sans être
+   cachés — c'est au joueur de savoir, pas au carnet de trancher.
+
+   L'édition, et non le tournoi : le même open revient chaque année, et
+   gagner celui de 2023 ne dit rien de celui de 2024. D'où l'année dans la
+   clé de regroupement. */
+export function tournoisRemportes() {
+  const editions = {};
+  for (const m of store.matchs) {
+    const nom = (m.tournoi || '').trim();
+    if (!nom || estParEquipes(m)) continue;
+    const an = (m.date || '').slice(0, 4) || '?';
+    const cle = `${nom} §${an}`;
+    editions[cle] = editions[cle] || { cle, nom, an, v: 0, d: 0, derniere: '' };
+    if (m.issue === 'V') editions[cle].v++; else editions[cle].d++;
+    if ((m.date || '') > editions[cle].derniere) editions[cle].derniere = m.date || '';
+  }
+
+  const parfaites = Object.values(editions)
+    .filter(e => e.d === 0 && e.v > 0)
+    .sort((a, b) => (b.derniere || '').localeCompare(a.derniere || ''));
+
+  return {
+    titres: parfaites.filter(e => e.v >= 2),
+    incertains: parfaites.filter(e => e.v === 1),
+    editions: Object.keys(editions).length,
+  };
 }
 
 /** Les épreuves qu'aucun club ne réclame : de quoi compléter les

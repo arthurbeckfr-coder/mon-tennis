@@ -66,6 +66,34 @@ function conclure(resultat, message) {
 // =====================================================================
 //  Un match
 // =====================================================================
+/* Les adversaires proposés dans le formulaire.
+ *
+ * La liste est la réunion de deux sources, et il faut les deux : les
+ * joueurs déjà rencontrés — que le répertoire déduit des matchs, import
+ * Ten'Up compris — et ceux dont une fiche existe sans qu'on les ait
+ * encore joués. Un menu bâti sur les seules fiches ferait disparaître
+ * deux cent soixante-treize adversaires importés, et **changerait
+ * silencieusement l'adversaire d'un match qu'on rouvre pour corriger son
+ * score**. C'est la raison pour laquelle le nom en cours est toujours
+ * inclus, même s'il ne vient de nulle part.
+ *
+ * « Anonyme » est écarté : la fédération l'affiche pour les joueurs qui
+ * refusent d'être nommés, et le proposer reviendrait à ranger vingt-quatre
+ * personnes différentes sous une même identité. */
+function adversairesConnus(courant = '') {
+  const noms = new Set();
+  for (const x of store.matchs) {
+    const n = (x.adversaire || '').trim();
+    if (n && !/^(anonyme|inconnu|n\.?c\.?)$/i.test(n)) noms.add(n);
+  }
+  for (const j of (store.joueurs || [])) {
+    const n = (j.nom || '').trim();
+    if (n) noms.add(n);
+  }
+  if (courant && courant.trim()) noms.add(courant.trim());
+  return [...noms].sort((a, b) => a.localeCompare(b, 'fr'));
+}
+
 export function matchForm(existant = null) {
   const m = existant || {
     date: aujourdhui(), issue: 'V', adversaire: '', echelonAdverse: store.profil.echelon,
@@ -96,7 +124,16 @@ export function matchForm(existant = null) {
         </label>
       </div>
       <label>Adversaire
-        <input name="adversaire" value="${h(m.adversaire)}" placeholder="Nom" required>
+        <select name="adversaire" id="choix-adversaire" required>
+          <option value="">— choisir —</option>
+          ${adversairesConnus(m.adversaire).map(n => `<option value="${h(n)}"
+            ${n === m.adversaire ? 'selected' : ''}>${h(n)}</option>`).join('')}
+          <option value="__nouveau">＋ Un adversaire que je n'ai jamais joué…</option>
+        </select>
+      </label>
+      <label id="ligne-nouvel-adversaire" hidden>Son nom
+        <input name="adversaireNouveau" placeholder="Prénom NOM"
+               autocomplete="off" autocapitalize="words">
       </label>
       <div class="duo">
         <label>Son classement
@@ -106,6 +143,14 @@ export function matchForm(existant = null) {
           <input name="score" value="${h(m.score)}" placeholder="6/4 6/3">
         </label>
       </div>
+      ${/* La durée ne vient d'aucune donnée fédérale : elle se note après
+            coup, quand on y pense. Le champ reste donc facultatif et sans
+            valeur par défaut — une durée inventée fausserait la moyenne
+            plus sûrement qu'une case vide. */''}
+      <label>Durée du match (minutes, facultatif)
+        <input type="number" name="duree" min="1" max="600" inputmode="numeric"
+               value="${h(m.duree ?? '')}" placeholder="par exemple 75">
+      </label>
       <details ${m.tournoi || m.surface || m.notes ? 'open' : ''}>
         <summary>Contexte et ressenti</summary>
         <label>Épreuve
@@ -143,10 +188,40 @@ export function matchForm(existant = null) {
       const racine = document.getElementById('modal-root');
       const form = racine.querySelector('#f-match');
 
+      /* Un adversaire qu'on n'a jamais joué ne peut pas figurer dans une
+         liste déduite des matchs. Plutôt que de renvoyer saisir sa fiche
+         ailleurs et revenir — ce qui se fait mal quand on note un match
+         debout au bord du court —, le champ apparaît sur place. Le joueur
+         entre bien au répertoire : c'est le même enregistrement. */
+      const choix = racine.querySelector('#choix-adversaire');
+      const ligneNeuf = racine.querySelector('#ligne-nouvel-adversaire');
+      const champNeuf = ligneNeuf.querySelector('input');
+
+      const basculer = () => {
+        const neuf = choix.value === '__nouveau';
+        ligneNeuf.hidden = !neuf;
+        champNeuf.required = neuf;
+        if (neuf) champNeuf.focus();
+      };
+      choix.addEventListener('change', basculer);
+      basculer();
+
       racine.querySelector('[data-ok]').onclick = () => {
         if (!form.reportValidity()) return;
         const d = Object.fromEntries(new FormData(form));
         d.wo = form.wo.checked;
+
+        /* Un champ numérique vide rend '' : le stocker ferait une durée
+           « présente mais nulle », que les moyennes compteraient. */
+        d.duree = d.duree === '' ? null : Number(d.duree);
+
+        if (d.adversaire === '__nouveau') {
+          const nom = (d.adversaireNouveau || '').trim();
+          if (!nom) { champNeuf.focus(); return; }
+          d.adversaire = nom;
+        }
+        delete d.adversaireNouveau;
+
         conclure(
           existant ? modifierMatch(existant.id, d) : ajouterMatch(d),
           existant ? 'Match modifié.' : 'Match ajouté.');
@@ -726,12 +801,31 @@ export function importFFTForm() {
    noter « chipeur » ici et chercher « chipeur » là-bas, c'est le même
    geste. Le vocabulaire commun est ce qui relie les deux écrans. */
 export function joueurForm(joueur) {
-  const f = joueur.fiche || { profils: [], note: '' };
+  const f = joueur.fiche || { profils: [], note: '', club: '' };
+
+  /* Le club d'un adversaire ne figure nulle part dans un palmarès Ten'Up :
+     la fédération donne un nom et un classement, pas une licence. Il faut
+     donc le saisir, et le champ propose ce qui a déjà été tapé — un même
+     club revient vite, et deux orthographes en feraient deux clubs. */
+  const clubsConnus = [...new Set([
+    ...(store.joueurs || []).map(j => j.club).filter(Boolean),
+    ...store.clubs.map(c => c.nom),
+  ])].sort((a, b) => a.localeCompare(b, 'fr'));
 
   openModal({
     title: h(joueur.nom),
     large: true,
     body: `<form id="f-joueur" class="form">
+      <label>Son club
+        <input name="club" list="clubs-adverses" value="${h(f.club || '')}"
+               placeholder="Le club dont il porte les couleurs">
+      </label>
+      <datalist id="clubs-adverses">
+        ${clubsConnus.map(c => `<option value="${h(c)}"></option>`).join('')}
+      </datalist>
+      <p class="tiny muted">Ten'Up ne le donne pas : c'est à toi de l'ajouter. Une fois
+        renseigné, la page des adversaires sait dire combien de joueurs d'un même club
+        tu as battus.</p>
       <fieldset>
         <legend>Sa façon de jouer</legend>
         <p class="tiny muted">Ces cases ramèneront les conseils de tes profs sur ce type
@@ -748,8 +842,11 @@ export function joueurForm(joueur) {
       document.getElementById('modal-root').querySelector('[data-ok]').onclick = () => {
         const form = document.getElementById('f-joueur');
         const d = Object.fromEntries(new FormData(form));
-        conclure(noterJoueur(joueur.nom, { note: d.note, profils: valeurs(form, 'profils') }),
-                 'Noté.');
+        conclure(noterJoueur(joueur.nom, {
+          note: d.note,
+          club: (d.club || '').trim(),
+          profils: valeurs(form, 'profils'),
+        }), 'Noté.');
       };
     },
   });
