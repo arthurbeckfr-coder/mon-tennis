@@ -149,6 +149,8 @@ export function render() {
 
     ${r.erreur ? `<div class="avis">${h(r.erreur)}</div>` : rendreResultat(r)}
 
+    ${rendreDescente(reglages, p)}
+
     ${rendreCalendrier(reglages, cible, r)}
 
     ${rendreRendement(reglages, cible, r, fin, vise)}
@@ -229,6 +231,83 @@ function rendreResultat(r) {
       </ul>`
       : `<div class="avis">Aucun scénario réaliste ne comble cet écart en huit victoires.
          Vise d'abord l'échelon juste au-dessus.</div>`}`;
+}
+
+/* ─── La descente ──────────────────────────────────────────────────────
+
+   Le simulateur ne répondait qu'à « comment monter ». Or la question qui
+   réveille, c'est l'autre : si je ne rejoue plus, quand est-ce que je
+   redescends ? Elle a une réponse exacte, parce que le bilan glisse sur
+   douze mois et qu'on sait à la journée près quelle victoire sort quand.
+
+   Deux honnêtetés, sans lesquelles ce serait une fausse promesse.
+
+   Le carnet connaît un seuil par échelon — celui qu'il faut atteindre.
+   Le prendre pour le plancher du maintien est la lecture naturelle du
+   modèle, mais c'est une lecture : la fédération peut traiter le maintien
+   autrement.
+
+   Et surtout la fédération ne déclasse pas le jour où le bilan passe
+   dessous : elle recalcule à ses propres dates. Ce qui est annoncé ici est
+   donc le mois où le maintien cesse d'être couvert, ce qui n'est pas la
+   date du déclassement — et on le dit plutôt que de laisser croire. */
+function rendreDescente(reglages, p) {
+  const etapes = projeter({ ...reglages, cible: p.echelon,
+                            bonusVictoires: bonusVictoiresPour(p.echelon),
+                            debut: 0, mois: 12 });
+  if (etapes.length < 2 || etapes[0].manque == null) return '';
+
+  const aujourdhui = etapes[0];
+  const bascule = etapes.find(e => e.manque > 0);
+  // Ce qu'on peut encore perdre avant de passer dessous.
+  const coussin = bascule ? aujourdhui.bilan - bascule.bilan : null;
+
+  if (aujourdhui.manque > 0) {
+    return `<section class="carte carte-objectif">
+      <h3>Ton maintien n'est déjà plus couvert</h3>
+      <p>À ${h(p.echelon)}, ton bilan est de <strong>${aujourdhui.bilan} points</strong>,
+        et il en faut ${aujourdhui.bilan + aujourdhui.manque}. Il manque
+        <strong>${aujourdhui.manque}</strong>.</p>
+      <p class="tiny muted">La fédération recalcule à ses propres dates : ce n'est pas un
+        déclassement acté, c'est un maintien qui n'est plus assuré à résultats constants.</p>
+    </section>`;
+  }
+
+  if (!bascule) {
+    return `<section class="carte carte-verte">
+      <h3>Ton échelon tient l'année</h3>
+      <p>Même sans rejouer un seul match, ton bilan à ${h(p.echelon)} reste au-dessus des
+        points demandés pendant les douze prochains mois.</p>
+    </section>`;
+  }
+
+  const victoiresPerdues = etapes
+    .slice(1, etapes.indexOf(bascule) + 1)
+    .flatMap(e => e.sortants.map(s => ({ mois: e.libelle, ...s })));
+
+  return `<section class="carte">
+    <h3>Si tu ne rejoues plus</h3>
+    <p>Ton bilan à ${h(p.echelon)} passe sous les points demandés
+      <strong>en ${h(bascule.libelle)}</strong> : il tombe à ${bascule.bilan}, et il en
+      faut ${bascule.bilan + bascule.manque}. Tu as donc
+      <strong>${coussin} points</strong> de marge à perdre d'ici là — c'est-à-dire
+      ${victoiresPerdues.length} victoire(s) qui sortent de la fenêtre des douze mois.</p>
+
+    ${victoiresPerdues.length ? `<ul class="fiche-infos" style="margin-top:10px">
+      ${victoiresPerdues.slice(0, 5).map(x => `<li>
+        <span class="fiche-emoji">📉</span><div>
+        <strong>${h(x.mois)}</strong> — ${h(x.match.adversaire || 'une victoire')}
+        (${h(x.match.echelonAdverse)}, ${h(dateCourte(x.match.date))}) cesse de compter,
+        ${x.points} points.</div></li>`).join('')}
+    </ul>` : ''}
+
+    <p class="tiny muted">Deux réserves, et elles comptent. Le carnet connaît un seuil par
+      échelon — celui qu'il faut atteindre — et le prend ici pour le plancher du maintien ;
+      c'est la lecture naturelle du modèle, pas une règle publiée. Et la fédération ne
+      déclasse pas le jour où le bilan passe dessous : elle recalcule à ses propres dates.
+      ${h(bascule.libelle)} est le mois où le maintien cesse d'être couvert, pas la date
+      d'un déclassement.</p>
+  </section>`;
 }
 
 /* ─── Le calendrier ────────────────────────────────────────────────────

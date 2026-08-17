@@ -23,6 +23,20 @@ import { joueurForm, matchForm } from '../forms.js';
 let recherche = '';
 let tri = 'matchs';
 
+/* Les compteurs du haut ne sont pas des affirmations à croire : chacun
+   ouvre exactement les adversaires qu'il a comptés. « 75 bilans négatifs »
+   ne sert à rien tant qu'on ne peut pas demander lesquels — c'est même la
+   première chose qu'on a envie de faire en le lisant. */
+let vueListe = 'tous';
+
+const VUES = {
+  tous:    { garde: () => true },
+  rejoues: { garde: j => j.total > 1,
+             titre: 'Seulement ceux que tu as joués plusieurs fois' },
+  negatif: { garde: j => j.d > j.v,
+             titre: 'Seulement ceux contre qui ton bilan est négatif' },
+};
+
 /** L'identité d'un joueur, c'est son nom débarrassé de sa casse et de ses
  *  accents : « Éliott TRAN » et « ELIOTT TRAN » sont le même adversaire. */
 export const cleJoueur = nom => (nom || '')
@@ -82,7 +96,11 @@ export function repertoire() {
 
    Les victoires et les défaites se départagent par le nombre de matchs :
    à deux défaites chacun, celui qu'on a joué six fois est un adversaire
-   installé, celui qu'on a joué deux fois est un accident. */
+   installé, celui qu'on a joué deux fois est un accident.
+
+   (La table des tris se trouve plus bas, après le tableau des clubs
+   adverses.) */
+
 /* ─── Les clubs adverses ───────────────────────────────────────────────
 
    Ten'Up ne donne pas le club d'un adversaire : un nom, un classement, et
@@ -170,7 +188,10 @@ export function render() {
   const tous = repertoire()
     .sort((a, b) => t.comparer(a, b) || a.nom.localeCompare(b.nom, 'fr'));
   const q = recherche.trim().toUpperCase();
-  const liste = q ? tous.filter(j => cleJoueur(j.nom).includes(cleJoueur(q))) : tous;
+  const garde = (VUES[vueListe] || VUES.tous).garde;
+  const liste = tous
+    .filter(garde)
+    .filter(j => !q || cleJoueur(j.nom).includes(cleJoueur(q)));
 
   if (!tous.length) {
     return `<div class="vide"><span class="emoji">👥</span>
@@ -184,10 +205,18 @@ export function render() {
 
   return `
     <section class="chiffres">
-      <div class="chiffre"><b>${tous.length}</b><span>adversaires</span></div>
-      <div class="chiffre"><b>${tous.filter(j => j.total > 1).length}</b><span>déjà rejoués</span></div>
-      <div class="chiffre"><b>${aBattre}</b><span>bilan négatif</span></div>
+      <div class="chiffre ${vueListe === 'tous' ? 'actif' : ''}" data-vue-j="tous"
+        title="Tous les adversaires"><b>${tous.length}</b><span>adversaires</span></div>
+      <div class="chiffre ${vueListe === 'rejoues' ? 'actif' : ''}" data-vue-j="rejoues"
+        title="Voir ceux-là"><b>${tous.filter(j => j.total > 1).length}</b>
+        <span>déjà rejoués</span></div>
+      <div class="chiffre ${vueListe === 'negatif' ? 'actif' : ''}" data-vue-j="negatif"
+        title="Voir ceux-là"><b>${aBattre}</b><span>bilan négatif</span></div>
     </section>
+
+    ${vueListe !== 'tous' ? `<p class="tiny muted" style="margin:0 4px 10px">
+      ${h(VUES[vueListe].titre)}.
+      <button class="lien" data-vue-j="tous">Tout revoir</button></p>` : ''}
 
     <section class="barre-filtres">
       <input id="q-joueur" class="recherche" placeholder="Chercher un adversaire…"
@@ -314,6 +343,15 @@ export function wire(vue, rerendre) {
   });
 
   vue.addEventListener('click', e => {
+    const v = e.target.closest('[data-vue-j]');
+    if (v) {
+      // Recliquer sur un compteur ouvert le referme.
+      const choisie = v.dataset.vueJ;
+      vueListe = choisie === vueListe ? 'tous' : choisie;
+      rerendre();
+      return;
+    }
+
     const l = e.target.closest('[data-joueur]');
     if (l) location.hash = `#/joueurs/${encodeURIComponent(l.dataset.joueur)}`;
   });

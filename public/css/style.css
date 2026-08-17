@@ -409,13 +409,24 @@ body.mode-court .fab { display: none; }
 .chiffre.actif b { color: var(--accent); }
 
 /* Les deux moitiés d'un « 32–14 » se cliquent séparément : on veut voir
-   ses victoires, ou ses défaites, pas les deux d'un bloc. D'où le
-   rembourrage — un chiffre nu fait une cible de dix pixels. */
+   ses victoires, ou ses défaites, pas les deux d'un bloc.
+   Le rembourrage donne de quoi viser au pouce, mais il volait de la place
+   au chiffre lui-même, qui se retrouvait plus petit que ses voisins alors
+   qu'il dit la chose la plus regardée de l'écran. Il garde donc sa taille
+   pleine, et c'est le tiret qui s'efface. */
 .chiffre .moitie {
   display: inline-block;
-  padding: 1px 6px;
+  padding: 1px 4px;
   border-radius: 7px;
   cursor: pointer;
+  font-size: 1.24rem;
+  line-height: 1.2;
+}
+.chiffre b .separateur {
+  font-size: .8rem;
+  color: var(--muet);
+  font-weight: 400;
+  margin: 0 -1px;
 }
 .chiffre .moitie:hover { background: var(--carte-2); outline: 1px solid var(--bord); }
 .chiffre .moitie.actif { background: var(--accent); color: var(--accent-txt); }
@@ -1156,6 +1167,32 @@ body.mode-court .view { padding-top: 6px; }
 }
 .orphelines li:first-child { border-top: 0; }
 .orphelines b { color: var(--muet); flex: 0 0 auto; }
+
+/* Une épreuve s'ouvre sur ses matchs. La ligne était serrée pour tenir une
+   longue liste ; devenue cliquable, elle doit offrir de quoi viser au
+   pouce — d'où le rembourrage et le retrait de la marge négative. */
+.orpheline {
+  cursor: pointer;
+  padding: 10px 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
+}
+.orpheline:hover, .orpheline:focus-visible {
+  background: var(--carte-2);
+  outline: none;
+}
+.orpheline:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.orpheline.actif { background: var(--accent-doux); }
+.orpheline.actif span { color: var(--accent); font-weight: 600; }
+
+/* Le détail est un <li> pour rester valide dans la liste, mais il ne se
+   comporte pas comme une ligne : il occupe toute la largeur, et sa bordure
+   du haut ferait doublon avec celle de l'épreuve au-dessus. */
+.orphelines-detail {
+  display: block;
+  border-top: 0;
+  padding: 4px 0 12px;
+}
 
 /* ===================================================================
    Adversaires

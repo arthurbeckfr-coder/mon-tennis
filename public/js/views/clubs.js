@@ -18,7 +18,8 @@
 import { h, dateCourte, puce, confirmer, toast } from '../util.js';
 import {
   store, matchsDuClub, epreuvesOrphelines, bilanMatchs, positionMot,
-  supprimerClub, ajouterClub, modifierClub, estParEquipes, PLATEFORMES,
+  supprimerClub, ajouterClub, modifierClub, modifierMatch, clubDuMatch,
+  estParEquipes, PLATEFORMES,
 } from '../store.js';
 import { clubConnuPour, MOTS_EN_PLUS, LIENS_CONNUS, urlTenupClub } from '../clubs-connus.js';
 import { clubForm, matchForm } from '../forms.js';
@@ -130,6 +131,11 @@ const carteMaps = adresse =>
    sur quatre depuis quatorze matchs. */
 let tri = 'matchs';
 
+/* L'épreuve orpheline dont on regarde les matchs. Une seule à la fois :
+   deux listes ouvertes se compareraient mal et rallongeraient l'écran
+   pour rien. */
+let epreuveOuverte = null;
+
 const pluriel = n => `${n} match${n > 1 ? 's' : ''}`;
 
 const TRIS = [
@@ -220,8 +226,12 @@ export function render() {
     <section class="chiffres">
       <div class="chiffre"><b>${store.clubs.length}</b><span>clubs</span></div>
       <div class="chiffre"><b>${store.matchs.length - sansClub}</b><span>matchs situés</span></div>
-      <div class="chiffre"><b>${new Set(store.clubs.flatMap(c => c.surfaces || [])).size}</b><span>surfaces</span></div>
-      <div class="chiffre"><b>${aRattacher}</b><span>à rattacher</span></div>
+      <div class="chiffre ${tri === 'surfaces' ? 'actif' : ''}" data-tri-vers="surfaces"
+        title="Ranger les clubs par nombre de surfaces"
+        ><b>${new Set(store.clubs.flatMap(c => c.surfaces || [])).size}</b>
+        <span>surfaces</span></div>
+      <div class="chiffre" data-aller="orphelines" title="Voir ces épreuves"
+        ><b>${aRattacher}</b><span>à rattacher</span></div>
     </section>
 
     ${nEquipes ? `<p class="tiny muted" style="margin:0 4px 10px">Plus ${nEquipes} match(s)
@@ -292,19 +302,80 @@ export function render() {
       </section>`;
     })()}
 
-    ${orphelines.length ? `<section class="carte">
+    ${orphelines.length ? `<section class="carte" id="orphelines">
       <h3>${aRattacher} match(s) sans club</h3>
       <p class="tiny muted">La fédération ne dit pas toujours où l'on a joué :
-        « TOURNOI SENIORS » ne nomme personne. Ajoute le mot manquant aux mots-clés
-        d'un club, ou rattache le match depuis sa fiche. Les rencontres par équipes,
-        elles, ne figurent plus ici : elles n'ont pas de club à trouver.</p>
+        « TOURNOI SENIORS » ne nomme personne, et aucune recherche n'y changera rien.
+        Mais la date et l'adversaire, eux, font souvent revenir le lieu — touche une
+        épreuve pour voir ses matchs. Les rencontres par équipes ne figurent pas ici :
+        elles n'ont pas de club à trouver.</p>
       <ul class="orphelines">
-        ${orphelines.slice(0, 12).map(([nom, n]) =>
-          `<li><span>${h(nom)}</span><b>${n}</b></li>`).join('')}
+        ${orphelines.map(([nom, n]) => `<li class="orpheline ${nom === epreuveOuverte
+            ? 'actif' : ''}" data-epreuve="${h(nom)}" role="button" tabindex="0"
+            title="Voir ces matchs">
+          <span>${h(nom)}</span><b>${n}</b>
+        </li>${nom === epreuveOuverte ? rendreMatchsOrphelins(nom) : ''}`).join('')}
       </ul>
-      ${orphelines.length > 12
-        ? `<p class="tiny muted">…et ${orphelines.length - 12} autre(s) épreuve(s).</p>` : ''}
     </section>` : ''}`;
+}
+
+/* ─── Les matchs d'une épreuve sans club ───────────────────────────────
+
+   Un libellé anonyme ne dit rien, mais « 14 juillet 2019, Théo MARTIN,
+   6/4 6/2 » fait revenir le lieu — on se souvient d'un adversaire et d'un
+   été bien mieux que d'un intitulé de tournoi. C'est donc au souvenir
+   qu'on s'adresse ici, faute de données.
+
+   Le rattachement en bloc n'est offert que si tous les matchs tombent la
+   même année. Un « TOURNOI SENIORS » qui traîne sur six saisons s'est
+   presque sûrement joué dans plusieurs clubs, et l'attribuer d'un coup
+   installerait sept erreurs en un clic — plus difficiles à défaire qu'à
+   commettre. Dans ce cas chaque match s'ouvre séparément. */
+function rendreMatchsOrphelins(nom) {
+  const liste = store.matchs
+    .filter(m => !clubDuMatch(m) && (m.tournoi || '(sans nom)').trim() === nom)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (!liste.length) return '';
+
+  const b = bilanMatchs(liste);
+  const annees = [...new Set(liste.map(m => (m.date || '').slice(0, 4)))].filter(Boolean);
+  const memeAnnee = annees.length === 1;
+
+  return `<li class="orphelines-detail">
+    <p class="tiny muted">${b.v} victoire(s), ${b.d} défaite(s) —
+      ${memeAnnee ? `tout en ${h(annees[0])}`
+                  : `réparti sur ${annees.length} années (${h(annees.join(', '))})`}.</p>
+    <ul class="matchs" style="margin-top:8px">
+      ${liste.map(m => `<li class="match ${m.issue === 'V' ? 'gagne' : 'perdu'}"
+          data-match="${h(m.id)}">
+        <div class="match-issue">${m.issue}</div>
+        <div class="match-corps">
+          <div class="match-tete">
+            <strong>${h(m.adversaire || '—')}</strong>${puce(m.echelonAdverse)}
+          </div>
+          <div class="match-bas">
+            <span>${h(dateCourte(m.date))}</span>
+            ${m.score ? `<span>${h(m.score)}</span>` : ''}
+            ${m.surface ? puce(m.surface) : ''}
+          </div>
+        </div>
+      </li>`).join('')}
+    </ul>
+    ${memeAnnee && store.clubs.length ? `<label class="tri" style="margin-top:10px">
+      <span>Tout rattacher à</span>
+      <select data-rattacher-tout="${h(nom)}">
+        <option value="">— choisir un club —</option>
+        ${[...store.clubs].sort((x, y) => x.nom.localeCompare(y.nom, 'fr'))
+          .map(c => `<option value="${h(c.id)}">${h(c.nom)}</option>`).join('')}
+      </select>
+    </label>
+    <p class="tiny muted">Ce rattachement se pose sur les matchs eux-mêmes, et non sur un
+      mot-clé : il ne vaut que pour ces ${liste.length} matchs, et se défait match par
+      match.</p>`
+    : `<p class="tiny muted">${memeAnnee ? '' : 'Ces matchs s\'étalant sur plusieurs années, '
+      }le rattachement en bloc n'est pas proposé : touche un match pour lui donner son
+      club, un par un.</p>`}
+  </li>`;
 }
 
 // =====================================================================
@@ -407,8 +478,45 @@ export function wire(vue, rerendre) {
     rerendre();
   });
 
+  /* Le rattachement en bloc pose `clubId` sur chaque match : c'est le
+     rattachement explicite, qui fait foi devant les mots-clés. On ne
+     touche donc à aucun autre match, et celui qui se trompe corrige
+     depuis la fiche du match. */
+  vue.addEventListener('change', e => {
+    const sel = e.target.closest('[data-rattacher-tout]');
+    if (!sel || !sel.value) return;
+    const nom = sel.dataset.rattacherTout;
+    const club = store.clubs.find(c => c.id === sel.value);
+    const vises = store.matchs
+      .filter(m => !clubDuMatch(m) && (m.tournoi || '(sans nom)').trim() === nom);
+    for (const m of vises) modifierMatch(m.id, { clubId: club.id });
+    epreuveOuverte = null;
+    toast(`${vises.length} match(s) rattaché(s) à ${club.nom}.`);
+  });
+
+  // Une épreuve annoncée cliquable doit s'ouvrir au clavier aussi.
+  vue.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const o = e.target.closest('[data-epreuve]');
+    if (!o) return;
+    e.preventDefault();
+    o.click();
+  });
+
   vue.addEventListener('click', e => {
     if (e.target.closest('[data-nouveau]')) { clubForm(); return; }
+
+    /* Deux compteurs mènent quelque part, les deux autres non : le nombre
+       de clubs et les matchs situés ne cachent rien qu'on ne voie déjà à
+       l'écran, et une tuile qui promet une action sans en avoir vaut moins
+       qu'une tuile muette. */
+    const tv = e.target.closest('[data-tri-vers]');
+    if (tv) { tri = tri === tv.dataset.triVers ? 'matchs' : tv.dataset.triVers; rerendre(); return; }
+
+    if (e.target.closest('[data-aller="orphelines"]')) {
+      vue.querySelector('#orphelines')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
 
     const r = e.target.closest('[data-rattacher]');
     if (r) {
@@ -436,6 +544,21 @@ export function wire(vue, rerendre) {
       /* Pas de `rerendre()` : l'écriture émet « data-changed », qui
          redessine déjà l'écran. Le faire deux fois ferait clignoter la
          page pour rien. */
+      return;
+    }
+
+    const mt = e.target.closest('[data-match]');
+    if (mt) {
+      const match = store.matchs.find(x => x.id === mt.dataset.match);
+      if (match) matchForm(match);
+      return;
+    }
+
+    const o = e.target.closest('[data-epreuve]');
+    if (o) {
+      // Retoucher l'épreuve ouverte la referme.
+      epreuveOuverte = epreuveOuverte === o.dataset.epreuve ? null : o.dataset.epreuve;
+      rerendre();
       return;
     }
 

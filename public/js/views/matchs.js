@@ -483,7 +483,8 @@ export function render() {
       <div class="chiffre ${filtreActif('tout') ? 'actif' : ''}" data-filtre="tout"
         title="Voir ces matchs"><b>${b.total}</b><span>matchs sur 12 mois</span></div>
       <div class="chiffre"><b><span class="moitie ${filtreActif('V') ? 'actif' : ''}"
-          data-filtre="V" title="Voir les victoires">${b.v}</span><small>–</small><span
+          data-filtre="V" title="Voir les victoires">${b.v}</span><span
+          class="separateur">–</span><span
           class="moitie ${filtreActif('D') ? 'actif' : ''}"
           data-filtre="D" title="Voir les défaites">${b.d}</span></b>
         <span>victoires–défaites</span></div>
