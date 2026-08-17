@@ -10,7 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎾</text></svg>">
 <!-- Le ?v= force le navigateur à retélécharger la feuille de style :
      à incrémenter quand un correctif CSS doit arriver partout. -->
-<link rel="stylesheet" href="css/style.css?v=7">
+<link rel="stylesheet" href="css/style.css?v=8">
 </head>
 <body>
 
@@ -24,6 +24,14 @@
   <header class="topbar">
     <div class="topbar-inner">
       <h1 id="page-title">Mes matchs</h1>
+      <!-- Les répertoires — adversaires et clubs — ne sont pas des écrans
+           du quotidien : on les ouvre quand on cherche quelque chose. Ils
+           tiennent donc ici plutôt que dans la barre du bas, qui doit
+           rester lisible au pouce. -->
+      <a id="btn-joueurs" class="icon-btn" href="#/joueurs"
+         title="Mes adversaires" aria-label="Adversaires">👤</a>
+      <a id="btn-clubs" class="icon-btn" href="#/clubs"
+         title="Mes clubs" aria-label="Clubs">🏟️</a>
       <button id="btn-donnees" class="icon-btn" title="Sauvegarde et transfert"
               aria-label="Sauvegarde et transfert">💾</button>
       <button id="btn-theme" class="icon-btn" title="Clair, sombre ou comme l'appareil"
@@ -35,14 +43,13 @@
 
   <button id="fab" class="fab" aria-label="Ajouter">+</button>
 
-  <!-- Six onglets tiennent tout juste sur un téléphone : les libellés sont
-       donc réduits à un mot. Le titre de la page, lui, reste explicite. -->
+  <!-- Cinq onglets pour les écrans du quotidien. Les deux répertoires
+       (adversaires, clubs) vivent dans la barre du haut. -->
   <nav class="tabbar">
     <a href="#/"           data-tab="/"><span>🎾</span>Matchs</a>
     <a href="#/classement" data-tab="/classement"><span>🏅</span>Classement</a>
     <a href="#/conseils"   data-tab="/conseils"><span>💡</span>Conseils</a>
     <a href="#/court"      data-tab="/court"><span>🎯</span>Court</a>
-    <a href="#/clubs"      data-tab="/clubs"><span>🏟️</span>Clubs</a>
     <a href="#/matos"      data-tab="/matos"><span>🎒</span>Sac</a>
   </nav>
 </div>

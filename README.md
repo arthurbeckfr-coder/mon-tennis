@@ -8,7 +8,7 @@ Publié automatiquement sur GitHub Pages à chaque push sur `main`.
 
 ---
 
-## Les cinq écrans
+## Les écrans
 
 | Écran | À quoi il sert |
 |---|---|
@@ -16,7 +16,9 @@ Publié automatiquement sur GitHub Pages à chaque push sur `main`.
 | **Classement** | « Combien de matchs pour monter ? », répondu en scénarios concrets plutôt qu'en points. |
 | **Conseils** | Ce que disent les profs, rangé par profil d'adversaire et par moment du match. |
 | **Sur le court** | Le même carnet, en gros caractères, filtrable en deux gestes. Conçu pour les 90 secondes du changement de côté. |
-| **Clubs** | Les clubs où l'on a joué, déduits de l'historique : adresse, juge-arbitre, surfaces, comptes à suivre, et le bilan des matchs joués là-bas. |
+| **Sac** | Liste de courses à icônes, raquettes, durée de vie des cordages, chaussures. |
+| **Clubs** (barre du haut) | Les clubs où l'on a joué, déduits de l'historique : adresse, juge-arbitre, surfaces, comptes à suivre, bilan des matchs joués là-bas. |
+| **Adversaires** (barre du haut) | Répertoire déduit des matchs : bilan de confrontation, historique commun, notes sur sa façon de jouer. |
 
 ---
 
@@ -303,7 +305,9 @@ public/
     terrain.js          le court cliquable, en SVG
     theme.js            clair / sombre / comme l'appareil
     util.js             échappement, fenêtres, dates, messages
-    views/              un fichier par écran (matchs, classement, coaching, clubs)
+    graphes.js          barres et courbes, en variables CSS
+    materiel.js         raquettes, cordages, courses
+    views/              un fichier par écran
 .github/workflows/      publication automatique
 ```
 

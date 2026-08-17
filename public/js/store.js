@@ -97,6 +97,9 @@ function vide() {
     cordages: [],
     chaussures: [],
     courses: [],
+    /* Les adversaires ne sont pas stockés : ils se déduisent des matchs.
+       Seul ce qu'on ajoute à leur sujet — leur façon de jouer — vit ici. */
+    joueurs: [],
   };
 }
 
@@ -211,6 +214,15 @@ export const rangerCourses = () => maj(s => {
 });
 
 export const raquetteDe = id => store.raquettes.find(r => r.id === id) || null;
+
+/** Enregistre ce qu'on a retenu d'un adversaire. La fiche est créée à la
+ *  première note : tant qu'on n'a rien à dire, il n'y a rien à stocker. */
+export const noterJoueur = (nom, donnees) => maj(s => {
+  const cle = (n) => (n || '').trim().toUpperCase();
+  const i = s.joueurs.findIndex(j => cle(j.nom) === cle(nom));
+  if (i >= 0) s.joueurs[i] = { ...s.joueurs[i], ...donnees, nom };
+  else s.joueurs.push({ id: uid(), nom, ...donnees });
+});
 
 // =====================================================================
 //  Rattacher un match à un club

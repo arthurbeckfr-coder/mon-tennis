@@ -11,6 +11,7 @@ import * as simulateur from './views/simulateur.js';
 import * as coaching   from './views/coaching.js';
 import * as clubs      from './views/clubs.js';
 import * as materiel   from './views/materiel.js';
+import * as joueurs    from './views/joueurs.js';
 
 const $ = id => document.getElementById(id);
 
@@ -36,6 +37,10 @@ const ROUTES = [
     render: p => clubs.renderFiche(p),  wire: clubs.wireFiche },
   { match: /^\/matos$/,       title: 'Mon sac',      tab: '/matos',
     render: () => materiel.render(),    wire: materiel.wire },
+  { match: /^\/joueurs$/,     title: 'Mes adversaires', tab: '/joueurs',
+    render: () => joueurs.render(),     wire: joueurs.wire },
+  { match: /^\/joueurs\/(.+)$/, title: 'Adversaire', tab: '/joueurs',
+    render: p => joueurs.renderFiche(p), wire: joueurs.wireFiche },
 ];
 
 function routeCourante() {
@@ -63,6 +68,10 @@ function afficher() {
 
   document.querySelectorAll('.tabbar a').forEach(a =>
     a.classList.toggle('active', a.dataset.tab === route.tab));
+  // Les deux répertoires de la barre du haut s'allument comme des onglets,
+  // sans en occuper un.
+  $('btn-joueurs').classList.toggle('active', route.tab === '/joueurs');
+  $('btn-clubs').classList.toggle('active', route.tab === '/clubs');
 
   try {
     vue.innerHTML = route.render(params);

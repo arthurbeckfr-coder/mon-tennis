@@ -13,7 +13,7 @@ import {
   ajouterConseil, modifierConseil, supprimerConseil,
   ajouterSource, ajouterClub, modifierClub, clubDuMatch, surfaceDuMatch,
   exporterJSON, importerJSON, toutEffacer,
-  raquettes, cordages, chaussures, courses,
+  raquettes, cordages, chaussures, courses, noterJoueur,
   PROFILS, MOMENTS, CATEGORIES, PLATEFORMES, SURFACES,
 } from './store.js';
 import { ICONES, CATEGORIES_COURSES, CAUSES_CORDAGE } from './materiel.js';
@@ -694,6 +694,42 @@ export function importFFTForm() {
           s.matchs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         });
         conclure(r, `${prises.length} match(s) importé(s).`);
+      };
+    },
+  });
+}
+
+// =====================================================================
+//  Ce qu'on retient d'un adversaire
+// =====================================================================
+/* Les mêmes profils que le carnet de conseils, et ce n'est pas un hasard :
+   noter « chipeur » ici et chercher « chipeur » là-bas, c'est le même
+   geste. Le vocabulaire commun est ce qui relie les deux écrans. */
+export function joueurForm(joueur) {
+  const f = joueur.fiche || { profils: [], note: '' };
+
+  openModal({
+    title: h(joueur.nom),
+    large: true,
+    body: `<form id="f-joueur" class="form">
+      <fieldset>
+        <legend>Sa façon de jouer</legend>
+        <p class="tiny muted">Ces cases ramèneront les conseils de tes profs sur ce type
+          de joueur, la veille du match.</p>
+        <div class="grille-cases">${cases(PROFILS, f.profils || [], 'profils')}</div>
+      </fieldset>
+      <label>Ce que j'en retiens
+        <textarea name="note" rows="5"
+          placeholder="Son service, son point faible, ce qui a marché la dernière fois…">${h(f.note || '')}</textarea>
+      </label>
+    </form>`,
+    footer: `<button class="btn btn-primary" data-ok>Enregistrer</button>`,
+    onMount: () => {
+      document.getElementById('modal-root').querySelector('[data-ok]').onclick = () => {
+        const form = document.getElementById('f-joueur');
+        const d = Object.fromEntries(new FormData(form));
+        conclure(noterJoueur(joueur.nom, { note: d.note, profils: valeurs(form, 'profils') }),
+                 'Noté.');
       };
     },
   });

@@ -187,6 +187,8 @@ a { color: var(--accent); }
   line-height: 1;
 }
 .icon-btn:hover { background: var(--carte-2); }
+a.icon-btn { display: grid; place-items: center; text-decoration: none; }
+.icon-btn.active { background: var(--accent-doux); }
 
 .view {
   max-width: 780px;
@@ -618,6 +620,85 @@ body.mode-court .fab { display: none; }
   white-space: nowrap;
 }
 
+/* ===================================================================
+   Graphiques
+   =================================================================== */
+/* Les deux teintes de série ont été validées : bleu et orange sont à 24,7
+   d'écart perceptuel en deutéranopie, là où le vert et le rouge de
+   « victoire / défaite » n'étaient qu'à 2,6 — indistinguables. Les couleurs
+   du reste du site gardent leur vert et leur rouge, où la lettre V ou D
+   porte déjà l'information. */
+:root {
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --serie-1: #3987e5; --serie-2: #d95926; }
+}
+:root[data-theme="dark"] { --serie-1: #3987e5; --serie-2: #d95926; }
+
+.g-legende {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 4px 0 10px;
+  font-size: .8rem;
+  color: var(--muet);
+}
+.g-cle { display: inline-flex; align-items: center; gap: 6px; }
+.g-pastille { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.g-pastille.s1, .g-barre.s1 { background: var(--serie-1); }
+.g-pastille.s2, .g-barre.s2 { background: var(--serie-2); }
+
+.g-barres {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.g-groupe { flex: 1 0 44px; display: flex; flex-direction: column; align-items: center; }
+.g-piles { display: flex; align-items: flex-end; gap: 2px; height: 108px; width: 100%; }
+.g-pile {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+.g-barre { width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; }
+.g-valeur {
+  font-size: .66rem;
+  color: var(--muet);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.g-label {
+  font-size: .68rem;
+  color: var(--muet);
+  margin-top: 5px;
+  white-space: nowrap;
+}
+
+.g-courbe { width: 100%; height: 120px; display: block; overflow: visible; }
+.g-trace { fill: none; stroke: var(--serie-1); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.g-trace-futur { stroke-dasharray: 4 4; opacity: .65; }
+.g-seuil { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.g-aujourdhui { stroke: var(--bord); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.g-point { fill: var(--serie-1); stroke: var(--carte); stroke-width: 1.5; }
+.g-point.futur { opacity: .5; }
+.g-axe {
+  display: flex;
+  justify-content: space-between;
+  font-size: .66rem;
+  color: var(--muet);
+  margin-top: 4px;
+}
+.g-marque { font-style: italic; }
+.g-tableau summary { cursor: pointer; color: var(--accent); font-size: .84rem; padding: 8px 0; }
+
 .rendement { width: 100%; border-collapse: collapse; font-size: .88rem; margin-top: 8px; }
 .rendement th {
   text-align: left;
@@ -879,6 +960,52 @@ body.mode-court .view { padding-top: 6px; }
 }
 .orphelines li:first-child { border-top: 0; }
 .orphelines b { color: var(--muet); flex: 0 0 auto; }
+
+/* ===================================================================
+   Adversaires
+   =================================================================== */
+.joueurs { list-style: none; margin: 8px 0 0; padding: 0; }
+.joueur-ligne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--carte);
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.joueur-ligne:hover { background: var(--carte-2); border-color: var(--accent); }
+.joueur-corps { flex: 1; min-width: 0; }
+.joueur-bilan {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muet);
+}
+.joueur-bilan span { font-weight: 400; opacity: .6; margin: 0 1px; }
+.joueur-bilan.positif { color: var(--victoire); }
+.joueur-bilan.negatif { color: var(--defaite); }
+
+/* Le bilan d'une confrontation : le chiffre qu'on vient chercher, donc le
+   plus gros de l'écran. */
+.confrontation {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--carte-2);
+}
+.confrontation b { font-size: 2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.confrontation span { font-size: 1.4rem; opacity: .5; }
+.confrontation em { flex: 1 0 100%; font-size: .8rem; color: var(--muet); font-style: normal; }
+.confrontation.positif b { color: var(--victoire); }
+.confrontation.negatif b { color: var(--defaite); }
 .comptes { list-style: none; margin: 6px 0 0; padding: 0; }
 .comptes li {
   display: flex;

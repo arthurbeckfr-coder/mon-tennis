@@ -14,6 +14,7 @@ import { store, reglagesCalcul, bonusVictoiresPour } from '../store.js';
 import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang,
          projeter, echeance, rendementParEchelon } from '../classement.js';
 import { profilForm, baremeForm } from '../forms.js';
+import { courbe, tableauDouble } from '../graphes.js';
 
 let cibleChoisie = null;
 
@@ -161,48 +162,44 @@ function rendreResultat(r) {
 function rendreCalendrier(reglages, cible, r) {
   if (!r.seuil || r.seuil.points == null) return '';
 
+  /* Deux ans en arrière, un an devant, sur une seule courbe : d'où l'on
+     vient éclaire où l'on va, et le trait « aujourd'hui » sépare ce qui est
+     mesuré de ce qui est projeté. */
   const etapes = projeter({ ...reglages, cible,
-                            bonusVictoires: bonusVictoiresPour(cible), mois: 12 });
+                            bonusVictoires: bonusVictoiresPour(cible),
+                            debut: -24, mois: 12 });
   if (etapes.length < 2) return '';
 
-  const ech = echeance(etapes);
-  /* Une marge en haut : sans elle le trait de seuil, qui est la plus
-     grande valeur, se colle au bord et se lit mal. */
-  const max = Math.max(r.seuil.points, ...etapes.map(e => e.bilan)) * 1.08;
-  const hauteur = v => Math.max(2, Math.round((v / max) * 100));
+  const aVenir = etapes.filter(e => e.futur);
+  const ech = echeance([etapes.find(e => !e.futur && e === etapes[24]) || etapes[24], ...aVenir]
+                       .filter(Boolean));
 
   /* Les victoires qui vont sortir, et ce qu'elles emportent. C'est le
      détail qui rend la baisse concrète plutôt que fatale. */
-  const pertes = etapes.flatMap(e =>
+  const pertes = aVenir.flatMap(e =>
     e.sortants.map(s => ({ mois: e.libelle, ...s }))).slice(0, 4);
 
   return `<section class="carte">
     <h3>Le temps joue contre toi</h3>
     ${ech
-      ? `<p>Tant que tu ne rejoues pas, il te manque <strong>${etapes[0].manque} points</strong>.
+      ? `<p>Tant que tu ne rejoues pas, il te manque <strong>${etapes[24].manque} points</strong>.
          À partir de <strong>${h(ech.apres.libelle)}</strong> il t'en manquera
          <strong>${ech.apres.manque}</strong> : des victoires sortent de la fenêtre des douze
          mois et cessent de compter. Agir avant coûte ${ech.surcout} points de moins.</p>`
       : `<p class="tiny muted">Aucune de tes victoires comptées ne sort de la fenêtre dans
          l'année qui vient : l'écart ne se creusera pas tout seul.</p>`}
 
-    <div class="frise" role="img"
-         aria-label="Bilan projeté sur douze mois, à résultats constants">
-      <div class="frise-zone">
-        ${etapes.map(e => `<div class="frise-col ${e.bilan < r.seuil.points ? '' : 'atteint'}"
-               title="${h(e.libelle)} — bilan ${e.bilan}${e.manque
-                 ? `, il manquerait ${e.manque} points` : ', seuil atteint'}">
-          <div class="frise-barre" style="height:${hauteur(e.bilan)}%"></div>
-        </div>`).join('')}
-        <div class="frise-seuil" style="bottom:${hauteur(r.seuil.points)}%"></div>
-      </div>
-      <div class="frise-legende">
-        ${etapes.map((e, i) => `<span class="frise-mois">
-          ${i % 2 === 0 ? h(e.libelle.split(' ')[0]) : ''}</span>`).join('')}
-      </div>
-    </div>
-    <p class="tiny muted">Bilan projeté à ${h(cible)} si tu ne joues plus, mois par mois.
-      Le trait marque les ${r.seuil.points} points demandés.</p>
+    ${courbe({
+      points: etapes.map(e => ({ label: e.libelle, valeur: e.bilan, futur: e.futur })),
+      seuil: r.seuil.points,
+      nomSeuil: `les ${r.seuil.points} points demandés à ${cible}`,
+    })}
+    <p class="tiny muted">Bilan à ${h(cible)} mois par mois : mesuré jusqu'à aujourd'hui,
+      puis projeté en pointillé si tu ne rejoues pas.</p>
+
+    ${tableauDouble(['Mois', 'Bilan', 'Écart'],
+      etapes.filter((_, i) => i % 3 === 0 || i === etapes.length - 1)
+        .map(e => [e.libelle, String(e.bilan), e.manque ? `−${e.manque}` : 'atteint']))}
 
     ${pertes.length ? `<ul class="fiche-infos" style="margin-top:10px">
       ${pertes.map(p => `<li><span class="fiche-emoji">📉</span><div>

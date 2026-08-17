@@ -7,10 +7,12 @@
 
 import { h, hMulti, dateCourte, puce, dansLesDouzeMois } from '../util.js';
 import { store, bilanMatchs } from '../store.js';
-import { pointsVictoire, rang } from '../classement.js';
+import { pointsVictoire, rang, ECHELONS } from '../classement.js';
 import { matchForm, importFFTForm } from '../forms.js';
+import { barresGroupees, tableauDouble } from '../graphes.js';
 
 let filtre = { periode: '12', issue: 'tout', texte: '' };
+let ongletVue = 'liste';
 
 function filtrer() {
   return store.matchs
@@ -52,7 +54,84 @@ function ligneMatch(m) {
   </li>`;
 }
 
+/* ─── Les statistiques ─────────────────────────────────────────────────
+
+   Deux questions, deux graphiques. « Est-ce que je joue plus, et est-ce
+   que je gagne plus » se lit par année. « Contre qui je gagne vraiment »
+   se lit par classement d'adversaire — et c'est le plus utile des deux,
+   parce qu'il dit à quel niveau on tient réellement. */
+function vueStats() {
+  if (!store.matchs.length) {
+    return `<div class="vide"><span class="emoji">📊</span>
+      Aucun match : rien à représenter pour l'instant.</div>`;
+  }
+
+  const parAn = {};
+  for (const m of store.matchs) {
+    const an = (m.date || '').slice(0, 4);
+    if (!an) continue;
+    parAn[an] = parAn[an] || { v: 0, d: 0 };
+    if (m.issue === 'V') parAn[an].v++; else parAn[an].d++;
+  }
+  const annees = Object.keys(parAn).sort();
+
+  const parEchelon = {};
+  for (const m of store.matchs) {
+    const e = m.echelonAdverse;
+    if (!e) continue;
+    parEchelon[e] = parEchelon[e] || { v: 0, d: 0 };
+    if (m.issue === 'V') parEchelon[e].v++; else parEchelon[e].d++;
+  }
+  /* Rangés du plus faible au plus fort, et non par nombre de matchs :
+     c'est la progression du niveau qui fait sens ici. */
+  const echelons = Object.keys(parEchelon).sort((a, b) => rang(a) - rang(b));
+
+  const series = [{ nom: 'Victoires' }, { nom: 'Défaites' }];
+  const meilleur = [...echelons].reverse().find(e => parEchelon[e].v > 0);
+
+  return `
+    <section class="carte">
+      <h3>Victoires et défaites, année par année</h3>
+      ${barresGroupees({
+        groupes: annees.map(a => ({ label: a, valeurs: [parAn[a].v, parAn[a].d] })),
+        series,
+      })}
+      ${tableauDouble(['Année', 'Victoires', 'Défaites', '%'],
+        annees.map(a => {
+          const t = parAn[a].v + parAn[a].d;
+          return [a, String(parAn[a].v), String(parAn[a].d),
+                  t ? Math.round((parAn[a].v / t) * 100) + '%' : '—'];
+        }))}
+    </section>
+
+    <section class="carte">
+      <h3>Face à quel classement</h3>
+      ${meilleur ? `<p class="tiny muted">Ton meilleur scalp : un joueur classé
+        <strong>${h(meilleur)}</strong>.</p>` : ''}
+      ${barresGroupees({
+        groupes: echelons.map(e => ({ label: e, valeurs: [parEchelon[e].v, parEchelon[e].d] })),
+        series,
+      })}
+      <p class="tiny muted">Chaque colonne est un classement d'adversaire, du plus faible au
+        plus fort. C'est le graphique qui dit à quel niveau tu tiens vraiment — et à partir
+        d'où ça casse.</p>
+      ${tableauDouble(['Classement', 'Victoires', 'Défaites', '%'],
+        echelons.map(e => {
+          const t = parEchelon[e].v + parEchelon[e].d;
+          return [e, String(parEchelon[e].v), String(parEchelon[e].d),
+                  t ? Math.round((parEchelon[e].v / t) * 100) + '%' : '—'];
+        }))}
+    </section>`;
+}
+
+const barreVue = () => `<div class="segments" style="width:100%;margin-bottom:14px">
+    <button data-vue="liste" class="${ongletVue === 'liste' ? 'actif' : ''}" style="flex:1">Liste</button>
+    <button data-vue="stats" class="${ongletVue === 'stats' ? 'actif' : ''}" style="flex:1">Statistiques</button>
+  </div>`;
+
 export function render() {
+  if (ongletVue === 'stats') return barreVue() + vueStats();
+
   const liste = filtrer();
   const sur12 = store.matchs.filter(m => dansLesDouzeMois(m.date));
   const b = bilanMatchs(sur12);
@@ -64,6 +143,7 @@ export function render() {
     m.issue === 'V' && rang(m.echelonAdverse) > rang(store.profil.echelon)).length;
 
   return `
+    ${barreVue()}
     <section class="chiffres">
       <div class="chiffre"><b>${b.total}</b><span>matchs sur 12 mois</span></div>
       <div class="chiffre"><b>${b.v}<small>–${b.d}</small></b><span>victoires–défaites</span></div>
@@ -112,6 +192,9 @@ export function wire(vue, rerendre) {
   });
 
   vue.addEventListener('click', e => {
+    const v = e.target.closest('[data-vue]');
+    if (v) { ongletVue = v.dataset.vue; rerendre(); return; }
+
     const p = e.target.closest('[data-p]');
     if (p) { filtre.periode = p.dataset.p; rerendre(); return; }
 

@@ -377,12 +377,12 @@ const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
  * @returns {Array<{fin, libelle, bilan, manque, sortants}>}
  */
 export function projeter({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAUT,
-                           bonusVictoires = 0, bonusPoints = 0, mois = 12 }) {
+                           bonusVictoires = 0, bonusPoints = 0, debut = 0, mois = 12 }) {
   const s = seuil(cible, sexe);
   const etapes = [];
   let precedentes = null;
 
-  for (let n = 0; n <= mois; n++) {
+  for (let n = debut; n <= mois; n++) {
     const fin = finDeMois(n);
     const b = bilanA({ matchs, cible, sexe, bareme, bonusVictoires, bonusPoints, finISO: fin });
 
@@ -401,6 +401,7 @@ export function projeter({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAU
       libelle: `${MOIS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
       bilan: b.bilan,
       manque: s?.points != null ? Math.max(0, s.points - b.bilan) : null,
+      futur: n > 0,
       sortants,
     });
   }
