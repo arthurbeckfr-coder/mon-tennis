@@ -54,8 +54,17 @@ function routeCourante() {
   return { route: ROUTES[0], params: [] };
 }
 
+/* L'écran affiché au rendu précédent. Il ne sert qu'à distinguer « on
+   change de page » de « on redessine la même » : les deux passent par
+   `afficher()`, mais l'une doit remonter en haut et l'autre surtout pas. */
+let ecranPrecedent = null;
+
 function afficher() {
   const { route, params } = routeCourante();
+  const ecran = location.hash || '#/';
+  const memeEcran = ecran === ecranPrecedent;
+  const hauteur = window.scrollY;
+  ecranPrecedent = ecran;
 
   /* Chaque vue pose ses écouteurs sur le conteneur. On repart d'un nœud
      vierge à chaque rendu, sinon ils s'empilent et un clic se déclenche
@@ -84,7 +93,14 @@ function afficher() {
     return;
   }
   route.wire?.(vue, afficher);
-  window.scrollTo({ top: 0 });
+
+  /* On ne remonte en haut qu'en arrivant sur un écran. Un redessin sur
+     place — une synchronisation qui rapporte un match, un tri qu'on
+     change — doit laisser le lecteur là où il était : rien n'est plus
+     désagréable qu'une page qui se dérobe pendant qu'on la lit. Le
+     conteneur ayant été remplacé, la position n'est pas conservée toute
+     seule et se repose à la main. */
+  window.scrollTo({ top: memeEcran ? hauteur : 0 });
 }
 
 // =====================================================================

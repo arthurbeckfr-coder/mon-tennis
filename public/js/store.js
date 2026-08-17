@@ -417,6 +417,17 @@ export function importerJSON(texte, mode = 'fusion') {
     }
   }
 
+  /* Une fusion qui n'apporte rien n'écrit rien, et surtout ne prévient
+     personne. Ce n'est pas une économie d'écriture : `sauver()` annonce un
+     changement, l'application se redessine et programme un envoi, l'envoi
+     refusionne le carnet distant — et l'on repart pour un tour. Toutes les
+     quatre secondes, sur une page qu'on essayait simplement de lire. Le
+     silence est ici la correction, pas la politesse. */
+  const apports = nm + nc + ns + nc2 + nMat;
+  if (!apports) {
+    return { ok: true, matchs: 0, conseils: 0, sources: 0, clubs: 0, materiel: 0, mode };
+  }
+
   store.matchs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const r = sauver();
   return r.ok ? { ok: true, matchs: nm, conseils: nc, sources: ns, clubs: nc2, materiel: nMat, mode }
@@ -448,7 +459,16 @@ export function fusionnerDistant(distant) {
   const r = importerJSON(JSON.stringify(distant), 'fusion');
   if (!r.ok) return { ok: false, erreur: r.erreur };
 
-  if (profilVierge && distant.profil) {
+  /* Reprendre un profil vierge sur un profil vierge n'est pas une reprise :
+     c'est une écriture qui n'apprend rien, annoncée comme un changement, à
+     chaque synchronisation — de quoi entretenir tout seul la boucle que la
+     fusion silencieuse vient de fermer. On exige donc que le profil d'en
+     face porte quelque chose. */
+  const profilUtile = !!distant.profil && (
+    distant.profil.prenom || distant.profil.bilanOfficiel ||
+    (distant.profil.echelon && distant.profil.echelon !== neuf.profil.echelon));
+
+  if (profilVierge && profilUtile) {
     maj(s => {
       s.profil = { ...neuf.profil, ...distant.profil };
       s.bareme = { ...BAREME_DEFAUT, ...(distant.bareme || {}) };
@@ -461,7 +481,7 @@ export function fusionnerDistant(distant) {
     conseils: store.conseils.length - avant.conseils,
     clubs: store.clubs.length - avant.clubs,
     joueurs: store.joueurs.length - avant.joueurs,
-    profilRepris: profilVierge && !!distant.profil,
+    profilRepris: profilVierge && profilUtile,
   };
 }
 

@@ -17,7 +17,14 @@
 /* ===================================================================
    Palette
    =================================================================== */
+/* `color-scheme` n'est pas une variable de plus : c'est la seule façon de
+   dire au navigateur que la page est sombre. Tout ce que le CSS ne dessine
+   pas lui-même — la liste déroulante d'un menu, le calendrier d'un champ
+   de date, les ascenseurs — est peint par le système, qui reste au clair
+   tant qu'on ne l'a pas prévenu. D'où ces menus blancs sur fond noir : ce
+   n'étaient pas des couleurs oubliées, c'était une déclaration manquante. */
 :root {
+  color-scheme: light;
   --fond:        #f4f6f4;
   --carte:       #ffffff;
   --carte-2:     #eef2ee;
@@ -44,6 +51,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --fond:        #0f1411;
     --carte:       #18201b;
     --carte-2:     #212b24;
@@ -62,6 +70,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --fond:        #0f1411;
   --carte:       #18201b;
   --carte-2:     #212b24;
@@ -447,6 +456,15 @@ body.mode-court .fab { display: none; }
   cursor: pointer;
 }
 .tri select:focus { outline: none; }
+
+/* `color-scheme` suffit aux navigateurs récents pour peindre la liste
+   ouverte. Ceci rattrape les autres, et le cas particulier du menu de tri,
+   dont le fond transparent laisserait le système choisir du blanc. */
+.tri select option,
+.form select option {
+  background: var(--carte);
+  color: var(--texte);
+}
 
 .segments {
   display: inline-flex;
