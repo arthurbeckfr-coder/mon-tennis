@@ -890,27 +890,90 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
 .carte-clubs svg { display: block; width: 100%; height: 340px; cursor: grab; }
 .carte-clubs svg:active { cursor: grabbing; }
 
-.carte-halo { fill: var(--accent); opacity: .1; }
+/* La terre, et donc la mer autour : c'est ce contraste qui fait qu'on
+   reconnaît la côte cauchoise et qu'on se repère. Le fond de la carte
+   joue la mer, le remplissage joue la terre. */
+/* Les deux fonds du carnet sont trop proches l'un de l'autre pour que le
+   seul remplissage distingue la terre de la mer — sur un thème sombre, on
+   ne voyait rien. C'est donc le trait qui porte la côte, en épaisseur
+   constante à l'écran quel que soit le zoom. */
+.carte-terre {
+  fill: var(--carte);
+  stroke: var(--muet);
+  stroke-width: 1.4;
+  stroke-opacity: .55;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+
+.carte-halo { fill: var(--accent); opacity: .12; }
 .carte-point { fill: var(--muet); stroke: var(--carte); stroke-width: .0006; }
 .carte-club.gagnant .carte-point { fill: var(--victoire); }
 .carte-club.gagnant .carte-halo { fill: var(--victoire); }
 .carte-club { cursor: pointer; }
-.carte-club:hover .carte-halo, .carte-club:focus-visible .carte-halo { opacity: .32; }
+.carte-club:hover .carte-halo, .carte-club:focus-visible .carte-halo { opacity: .34; }
 .carte-club:focus-visible { outline: none; }
 .carte-club:focus-visible .carte-point { stroke: var(--accent); stroke-width: .0018; }
+.carte-club.choisi .carte-halo { opacity: .45; }
+.carte-club.choisi .carte-point { stroke: var(--accent); stroke-width: .0022; }
 
-/* Le nom reste lisible à tous les zooms parce qu'il grandit avec la carte :
-   c'est le viewBox qu'on manipule, pas une mise à l'échelle CSS. */
-.carte-nom {
-  fill: var(--texte);
-  text-anchor: middle;
-  font-family: inherit;
-  font-weight: 600;
-  paint-order: stroke;
-  stroke: var(--carte-2);
-  stroke-width: .0022;
-  stroke-linejoin: round;
+/* La bulle est en HTML par-dessus le SVG : sa taille de texte ne dépend
+   donc pas du zoom, et reste lisible aussi bien de loin que de près. Elle
+   est ancrée sur le club et remonte au-dessus de lui, comme une infobulle
+   de carte. */
+.carte-bulle {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 14px));
+  z-index: 2;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 9px 30px 9px 11px;
+  border: 1px solid var(--accent);
+  border-radius: 11px;
+  background: var(--carte);
+  box-shadow: var(--ombre);
+  text-align: left;
 }
+/* La pointe qui désigne le club : sans elle, la bulle flotte sans dire
+   de quel disque elle parle quand deux clubs sont voisins. */
+.carte-bulle::after {
+  content: '';
+  position: absolute;
+  /* La pointe se décale quand la bulle a été retenue au bord : elle doit
+     continuer de désigner le club, pas le centre de la bulle. */
+  left: var(--pointe, 50%);
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--carte);
+  border-right: 1px solid var(--accent);
+  border-bottom: 1px solid var(--accent);
+  transform: rotate(45deg);
+}
+.carte-bulle-nom { display: block; font-size: .92rem; line-height: 1.25; }
+.carte-bulle-detail { display: block; margin-top: 2px; }
+.carte-bulle .carte-bulle-voir {
+  margin-top: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: .82rem;
+}
+.carte-bulle-fermer {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muet);
+  font-size: 13px;
+  cursor: pointer;
+}
+.carte-bulle-fermer:hover { background: var(--carte-2); }
 
 .carte-outils {
   position: absolute;

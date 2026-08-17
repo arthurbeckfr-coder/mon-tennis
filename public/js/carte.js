@@ -29,6 +29,7 @@
    placé au hasard — il est dit absent, et compté. */
 
 import { h } from './util.js';
+import { CONTOURS } from './contours.js';
 
 /* Le centre officiel de chaque commune où l'on a joué, en [longitude,
    latitude]. Auffay a fusionné dans Val-de-Scie et Belleville-sur-Mer
@@ -128,11 +129,25 @@ export function carteClubs(clubs) {
      doit rester touchable. */
   const rayon = n => (1.4 + 1.8 * Math.sqrt(n / maxMatchs)) * etendue / 62;
 
+  /* Le fond passe par la même projection que les clubs : sans cela, les
+     points flotteraient à côté de leur pays au lieu d'être dedans. */
+  const chemin = anneau => anneau
+    .map((c, i) => {
+      const [x, y] = projete(c);
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(4)} ${y.toFixed(4)}`;
+    }).join('') + 'Z';
+
+  const fond = Object.values(CONTOURS)
+    .flat()
+    .map(anneau => `<path class="carte-terre" d="${chemin(anneau)}"/>`)
+    .join('');
+
   return `<div class="carte-clubs" data-carte
        data-boite="${boite.x} ${boite.y} ${boite.w} ${boite.h}">
     <svg viewBox="${boite.x} ${boite.y} ${boite.w} ${boite.h}"
          preserveAspectRatio="xMidYMid meet" role="img"
          aria-label="Carte des clubs où j'ai joué">
+      ${fond}
       ${pts.map(p => {
         const [x, y] = p.xy;
         const r = rayon(p.matchs.length);
@@ -141,19 +156,33 @@ export function carteClubs(clubs) {
            utilise déjà `data-club`, et son gestionnaire attraperait le
            clic avant celui de la carte — court-circuitant le garde-fou
            qui distingue un glissement d'un appui. */
+        /* Aucun nom écrit sur la carte, et c'est délibéré : quatorze
+           étiquettes sur un écran de téléphone se chevauchent, et l'on
+           finit par ne plus rien lire. Le nom vient au clic, dans une
+           bulle en HTML — laquelle garde sa taille de lecture à tous les
+           zooms, là où un texte SVG grossirait avec la carte. */
         return `<g class="carte-club ${gagne ? 'gagnant' : ''}"
-             data-club-carte="${h(p.club.id)}" role="button" tabindex="0">
+             data-club-carte="${h(p.club.id)}" role="button" tabindex="0"
+             data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}"
+             data-nom="${h(p.club.nom)}"
+             data-detail="${p.matchs.length} match${p.matchs.length > 1 ? 's' : ''} — ${p.bilan.v}V–${p.bilan.d}D${
+               p.club.ville ? ' — ' + h(p.club.ville) : ''}">
           <title>${h(p.club.nom)} — ${p.matchs.length} match(s), ${p.bilan.v}V–${p.bilan.d}D</title>
           <circle class="carte-halo" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
                   r="${(r * 1.9).toFixed(4)}"/>
           <circle class="carte-point" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
                   r="${r.toFixed(4)}"/>
-          <text class="carte-nom" x="${x.toFixed(4)}"
-                y="${(y - r - etendue * 0.016).toFixed(4)}"
-                font-size="${(etendue * 0.038).toFixed(4)}">${h(p.club.nom)}</text>
         </g>`;
       }).join('')}
     </svg>
+
+    <div class="carte-bulle" hidden>
+      <button class="carte-bulle-fermer" aria-label="Fermer">✕</button>
+      <strong class="carte-bulle-nom"></strong>
+      <span class="carte-bulle-detail tiny muted"></span>
+      <button class="btn btn-primary carte-bulle-voir">Voir la fiche</button>
+    </div>
+
     <div class="carte-outils">
       <button class="icon-btn" data-zoom="0.7" aria-label="Zoomer">＋</button>
       <button class="icon-btn" data-zoom="1.43" aria-label="Dézoomer">−</button>
@@ -161,8 +190,8 @@ export function carteClubs(clubs) {
     </div>
   </div>
   <p class="tiny muted">Chaque disque est un club, sa taille dit le nombre de matchs joués,
-    sa couleur si ton bilan y est positif. Touche un club pour ouvrir sa fiche ; glisse
-    pour te déplacer, pince ou molette pour zoomer.
+    sa couleur si ton bilan y est positif. Touche un club pour voir son nom, puis « Voir la
+    fiche » pour l'ouvrir ; glisse pour te déplacer, pince ou molette pour zoomer.
     ${absents ? `${absents} club(s) ne figurent pas ici : leur ville n'est pas dans la
       table des communes, et les placer au hasard vaudrait moins que de le dire.` : ''}</p>`;
 }
@@ -181,8 +210,82 @@ export function brancherCarte(racine, ouvrirClub) {
   const svg = bloc.querySelector('svg');
   const depart = bloc.dataset.boite.split(' ').map(Number);
 
+  /* La bulle vit en HTML par-dessus le SVG, et non dedans. C'est ce qui
+     lui garde une taille de lecture constante : un texte tracé dans le
+     SVG grossirait avec la carte, et il faudrait choisir entre illisible
+     de loin et démesuré de près. En contrepartie il faut la replacer à
+     chaque déplacement — d'où son recalcul dans `poser`. */
+  const bulle = bloc.querySelector('.carte-bulle');
+  let choisi = null;
+
+  const placerBulle = () => {
+    if (!choisi) return;
+    const r = svg.getBoundingClientRect();
+    /* Le viewBox est ajusté en « meet » : l'échelle est la même sur les
+       deux axes, et le dessin est centré dans la boîte. Sans refaire ce
+       calcul, la bulle dériverait dès que la carte n'est pas carrée. */
+    const ech = Math.min(r.width / vue[2], r.height / vue[3]);
+    const gx = (r.width - vue[2] * ech) / 2;
+    const gy = (r.height - vue[3] * ech) / 2;
+    const x = gx + (choisi.x - vue[0]) * ech;
+    const y = gy + (choisi.y - vue[1]) * ech;
+
+    // Hors cadre, la bulle n'a plus de sens : elle s'efface avec son club.
+    bulle.hidden = x < -40 || y < -40 || x > r.width + 40 || y > r.height + 40;
+    if (bulle.hidden) return;
+
+    /* Un club près du bord ferait sortir la bulle de la carte, et son nom
+       serait coupé.
+
+       On la pose d'abord sur le club, puis on mesure ce qui dépasse et on
+       corrige. Calculer la retenue à l'avance demandait la largeur de la
+       bulle *avant* que le navigateur n'ait remis son texte en page — on
+       obtenait celle du club précédent, et un nom long débordait quand
+       même. Mesurer après, c'est se passer de deviner. */
+    bulle.style.left = `${x}px`;
+    bulle.style.top = `${y}px`;
+    bulle.style.setProperty('--pointe', '50%');
+
+    const cadre = bloc.getBoundingClientRect();
+    const p = bulle.getBoundingClientRect();
+    const marge = 8;
+    const trop = Math.max(0, (cadre.left + marge) - p.left)
+               - Math.max(0, p.right - (cadre.right - marge));
+
+    if (trop) {
+      bulle.style.left = `${x + trop}px`;
+      // La pointe, elle, reste sur le club : sinon on ne sait plus de qui
+      // la bulle parle quand deux clubs sont voisins.
+      bulle.style.setProperty('--pointe', `${50 - (trop / p.width) * 100}%`);
+    }
+  };
+
   let vue = [...depart];
-  const poser = () => svg.setAttribute('viewBox', vue.join(' '));
+  const poser = () => { svg.setAttribute('viewBox', vue.join(' ')); placerBulle(); };
+
+  const ouvrirBulle = g => {
+    choisi = { x: Number(g.dataset.x), y: Number(g.dataset.y), id: g.dataset.clubCarte };
+    bulle.querySelector('.carte-bulle-nom').textContent = g.dataset.nom;
+    bulle.querySelector('.carte-bulle-detail').textContent = g.dataset.detail;
+    bulle.hidden = false;
+    bloc.querySelectorAll('.carte-club').forEach(x => x.classList.toggle('choisi', x === g));
+    placerBulle();
+  };
+
+  const fermerBulle = () => {
+    choisi = null;
+    bulle.hidden = true;
+    bloc.querySelectorAll('.carte-club.choisi').forEach(x => x.classList.remove('choisi'));
+  };
+
+  bulle.querySelector('.carte-bulle-fermer').addEventListener('click', e => {
+    e.stopPropagation();
+    fermerBulle();
+  });
+  bulle.querySelector('.carte-bulle-voir').addEventListener('click', e => {
+    e.stopPropagation();
+    if (choisi) ouvrirClub(choisi.id);
+  });
 
   /* Les limites du zoom sont relatives à la boîte de départ : on ne
      s'éloigne pas au point de perdre les clubs, et on ne s'approche pas
@@ -279,18 +382,21 @@ export function brancherCarte(racine, ouvrirClub) {
   svg.addEventListener('pointercancel', lacher);
 
   bloc.addEventListener('click', e => {
-    // Un glissement n'est pas un clic : on ne veut pas ouvrir une fiche
+    // Un glissement n'est pas un clic : on ne veut pas ouvrir une bulle
     // parce qu'on a déplacé la carte en partant d'un club.
     if (bouge) { bouge = false; return; }
     const g = e.target.closest('[data-club-carte]');
-    if (g) ouvrirClub(g.dataset.clubCarte);
+    if (g) ouvrirBulle(g);
+    // Toucher le vide referme : c'est le geste qu'on essaie d'abord.
+    else if (!e.target.closest('.carte-bulle, .carte-outils')) fermerBulle();
   });
 
   bloc.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { fermerBulle(); return; }
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const g = e.target.closest('[data-club-carte]');
     if (!g) return;
     e.preventDefault();
-    ouvrirClub(g.dataset.clubCarte);
+    ouvrirBulle(g);
   });
 }
