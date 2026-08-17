@@ -1068,6 +1068,95 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
    couleur qu'il porte, l'autre son niveau. */
 .puce-club { background: var(--carte-2); border-color: var(--bord); }
 
+/* ===================================================================
+   La courbe du bilan, parcourable
+   =================================================================== */
+.courbe-bloc {
+  position: relative;
+  margin-top: 10px;
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  background: var(--carte-2);
+  overflow: hidden;
+  /* Le geste vertical est rendu au graphique : sans cela un glissement
+     ferait défiler la page au lieu de parcourir le temps. */
+  touch-action: none;
+}
+.courbe-bloc svg { display: block; width: 100%; height: 240px; cursor: grab; }
+.courbe-bloc svg:active { cursor: grabbing; }
+
+/* Un palier, c'est ce qu'il faut pour tenir un échelon. La courbe qui
+   passe dessous, c'est le classement qui se perd — on veut le voir sans
+   avoir à lire un chiffre. */
+.courbe-palier line {
+  stroke: var(--bord);
+  stroke-width: 1;
+  stroke-dasharray: 6 5;
+  vector-effect: non-scaling-stroke;
+}
+.courbe-palier-nom {
+  fill: var(--muet);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--carte-2);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.courbe-point {
+  fill: var(--serie-1);
+  stroke: var(--carte-2);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.courbe-point.futur { fill: var(--carte-2); stroke: var(--serie-1); }
+.courbe-point.choisi { fill: var(--accent); stroke: var(--carte); stroke-width: 3; }
+
+.courbe-bulle {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 12px));
+  z-index: 2;
+  min-width: 140px;
+  max-width: 230px;
+  padding: 8px 28px 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--carte);
+  box-shadow: var(--ombre);
+  text-align: left;
+}
+.courbe-bulle::after {
+  content: '';
+  position: absolute;
+  left: var(--pointe, 50%);
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--carte);
+  border-right: 1px solid var(--accent);
+  border-bottom: 1px solid var(--accent);
+  transform: rotate(45deg);
+}
+.courbe-bulle-nom { display: block; font-size: .9rem; line-height: 1.25; }
+.courbe-bulle-detail { display: block; margin-top: 2px; }
+.courbe-bulle-fermer {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muet);
+  font-size: 12px;
+  cursor: pointer;
+}
+.courbe-bulle-fermer:hover { background: var(--carte-2); }
+
 .g-courbe { width: 100%; height: 120px; display: block; overflow: visible; }
 .g-trace { fill: none; stroke: var(--serie-1); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .g-trace-futur { stroke-dasharray: 4 4; opacity: .65; }

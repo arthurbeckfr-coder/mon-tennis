@@ -401,8 +401,46 @@ export function moisAVenir(n) {
  * Ce que devient le bilan si l'on ne joue plus, mois par mois.
  * @returns {Array<{fin, libelle, bilan, manque, sortants}>}
  */
+/**
+ * L'échelon qu'on tiendrait à une date donnée, et non celui qu'on porte.
+ *
+ * Il ne se lit pas sur un seul bilan : les points d'une victoire dépendent
+ * de l'échelon visé, si bien qu'il faut recalculer le bilan à chaque
+ * échelon candidat et prendre le plus haut qui passe. C'est exactement ce
+ * que fait la fédération, et c'est ce qui rend une descente lisible —
+ * perdre soixante points peut ne rien coûter, ou coûter deux échelons.
+ *
+ * On ne balaie pas toute l'échelle : cinq crans sous l'échelon de départ
+ * et trois au-dessus suffisent, et évitent vingt-quatre calculs de bilan
+ * par mois projeté.
+ *
+ * @returns {{echelon: string, bilan: number}|null}
+ */
+export function echelonTenu({ matchs = [], depuis, sexe = 'h', bareme = BAREME_DEFAUT,
+                              bonusPoints = 0, finISO = null }) {
+  const i = rang(depuis);
+  if (i < 0) return null;
+  const haut = Math.min(ECHELONS.length - 1, i + 3);
+  const bas = Math.max(0, i - 8);
+
+  for (let n = haut; n >= bas; n--) {
+    const e = ECHELONS[n];
+    const s = seuil(e, sexe);
+    if (!s || s.points == null) continue;
+    const b = bilanA({ matchs, cible: e, sexe, bareme, bonusPoints, finISO });
+    if (b.bilan >= s.points && b.nbVictoires >= s.victoires) {
+      return { echelon: e, bilan: b.bilan };
+    }
+  }
+  /* Sous le plus bas seuil examiné. Rendre l'échelon plancher laisserait
+     croire qu'on le tient encore : on rend null, et l'appelant dit
+     « au-dessous » plutôt que d'inventer un chiffre. */
+  return null;
+}
+
 export function projeter({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAUT,
-                           bonusVictoires = 0, bonusPoints = 0, debut = 0, mois = 12 }) {
+                           bonusVictoires = 0, bonusPoints = 0, debut = 0, mois = 12,
+                           depuis = null }) {
   const s = seuil(cible, sexe);
   const etapes = [];
   let precedentes = null;
@@ -421,6 +459,12 @@ export function projeter({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAU
     precedentes = b.retenues;
 
     const d = new Date(fin + 'T12:00:00');
+    /* L'échelon tenu ne se calcule que si l'appelant dit d'où l'on part :
+       c'est neuf calculs de bilan par mois, qu'on ne fait pas pour rien. */
+    const tenu = depuis
+      ? echelonTenu({ matchs, depuis, sexe, bareme, bonusPoints, finISO: fin })
+      : null;
+
     etapes.push({
       fin,
       libelle: `${MOIS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
@@ -428,6 +472,8 @@ export function projeter({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAU
       manque: s?.points != null ? Math.max(0, s.points - b.bilan) : null,
       futur: n > 0,
       sortants,
+      echelon: tenu?.echelon || null,
+      nbVictoires: b.nbVictoires,
     });
   }
   return etapes;

@@ -11,11 +11,11 @@
 
 import { h, puce, dateCourte } from '../util.js';
 import { store, reglagesCalcul, bonusVictoiresPour } from '../store.js';
-import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang,
+import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang, seuil,
          projeter, echeance, rendementParEchelon, moisAVenir } from '../classement.js';
 import { profilForm, baremeForm } from '../forms.js';
 import { URL_TENUP } from '../config.js';
-import { courbe, tableauDouble } from '../graphes.js';
+import { courbeBilan, brancherCourbe, tableauDouble } from '../graphes.js';
 
 let cibleChoisie = null;
 
@@ -319,17 +319,22 @@ function rendreDescente(reglages, p) {
 function rendreCalendrier(reglages, cible, r) {
   if (!r.seuil || r.seuil.points == null) return '';
 
-  /* Deux ans en arrière, un an devant, sur une seule courbe : d'où l'on
-     vient éclaire où l'on va, et le trait « aujourd'hui » sépare ce qui est
-     mesuré de ce qui est projeté. */
+  /* Trois ans en arrière, deux devant : d'où l'on vient éclaire où l'on
+     va, et il faut aller assez loin pour voir une descente s'enchaîner.
+     Sur un an, on ne voyait qu'un premier palier franchi ; sur deux, on
+     voit les suivants. */
   const etapes = projeter({ ...reglages, cible,
                             bonusVictoires: bonusVictoiresPour(cible),
-                            debut: -24, mois: 12 });
+                            debut: -36, mois: 24, depuis: store.profil.echelon });
   if (etapes.length < 2) return '';
 
+  /* Le mois d'aujourd'hui se trouve, il ne se compte pas : son rang dans
+     la liste dépend de la profondeur du passé qu'on a demandée, et un
+     indice écrit en dur devient faux dès qu'on l'allonge. */
+  const passe = etapes.filter(e => !e.futur);
+  const maintenant = passe[passe.length - 1];
   const aVenir = etapes.filter(e => e.futur);
-  const ech = echeance([etapes.find(e => !e.futur && e === etapes[24]) || etapes[24], ...aVenir]
-                       .filter(Boolean));
+  const ech = echeance([maintenant, ...aVenir].filter(Boolean));
 
   /* Les victoires qui vont sortir, et ce qu'elles emportent. C'est le
      détail qui rend la baisse concrète plutôt que fatale. */
@@ -339,20 +344,57 @@ function rendreCalendrier(reglages, cible, r) {
   return `<section class="carte">
     <h3>Le temps joue contre toi</h3>
     ${ech
-      ? `<p>Tant que tu ne rejoues pas, il te manque <strong>${etapes[24].manque} points</strong>.
+      ? `<p>Tant que tu ne rejoues pas, il te manque <strong>${maintenant.manque} points</strong>.
          À partir de <strong>${h(ech.apres.libelle)}</strong> il t'en manquera
          <strong>${ech.apres.manque}</strong> : des victoires sortent de la fenêtre des douze
          mois et cessent de compter. Agir avant coûte ${ech.surcout} points de moins.</p>`
       : `<p class="tiny muted">Aucune de tes victoires comptées ne sort de la fenêtre dans
          l'année qui vient : l'écart ne se creusera pas tout seul.</p>`}
 
-    ${courbe({
-      points: etapes.map(e => ({ label: e.libelle, valeur: e.bilan, futur: e.futur })),
-      seuil: r.seuil.points,
-      nomSeuil: `les ${r.seuil.points} points demandés à ${cible}`,
-    })}
-    <p class="tiny muted">Bilan à ${h(cible)} mois par mois : mesuré jusqu'à aujourd'hui,
-      puis projeté en pointillé si tu ne rejoues pas.</p>
+    ${(() => {
+      /* Les paliers affichés : les échelons que la courbe traverse
+         réellement, plus celui qu'on vise. En montrer vingt ferait un
+         peigne illisible où l'on ne verrait plus la courbe. */
+      const traverses = [...new Set(etapes.map(e => e.echelon).filter(Boolean))];
+      const utiles = [...new Set([...traverses, cible, store.profil.echelon])];
+      const paliers = utiles
+        .map(e => ({ echelon: e, points: seuil(e, store.profil.sexe)?.points }))
+        .filter(p => p.points != null)
+        .sort((a, b) => a.points - b.points);
+
+      const changements = [];
+      etapes.forEach((e, i) => {
+        if (i && e.echelon && e.echelon !== etapes[i - 1].echelon) changements.push(e);
+      });
+      const descentes = changements.filter(e => e.futur);
+
+      return `${courbeBilan({
+        points: etapes.map(e => ({
+          label: e.libelle, valeur: e.bilan, futur: e.futur, echelon: e.echelon,
+          detail: [
+            e.echelon ? `échelon tenu : ${e.echelon}` : 'sous le plus bas seuil examiné',
+            `${e.nbVictoires} victoire(s) dans la fenêtre`,
+            e.futur ? 'projeté, sans un match de plus' : 'mesuré',
+          ].join(' · '),
+        })),
+        paliers,
+      })}
+      <p class="tiny muted">Bilan mois par mois : mesuré jusqu'à aujourd'hui, puis projeté
+        en pointillé si tu ne rejoues pas. Les traits horizontaux sont les points demandés
+        à chaque échelon — voir la courbe passer dessous, c'est voir le classement se
+        perdre. Touche un point pour le détail du mois ; glisse et pince pour parcourir le
+        temps.</p>
+      ${descentes.length ? `<p class="tiny muted">Sans rejouer, tu passerais
+        ${descentes.map(e => `<strong>${h(e.echelon)}</strong> en ${h(e.libelle)}`)
+          .join(', puis ')}.
+        <em>À prendre comme un ordre de grandeur.</em> Ce carnet connaît les règles de
+        <em>montée</em> — les points et le nombre de victoires exigés à chaque échelon —
+        et les applique ici à l'envers. Or ce qui fait plonger cette projection est
+        surtout le nombre de victoires restant dans la fenêtre, qui tombe vite quand on
+        ne joue plus ; la fédération, elle, applique des règles de descente propres que
+        ce carnet ne connaît pas, et qui sont plus douces. La date du premier palier est
+        solide, la profondeur de la chute l'est beaucoup moins.</p>` : ''}`;
+    })()}
 
     ${tableauDouble(['Mois', 'Bilan', 'Écart'],
       etapes.filter((_, i) => i % 3 === 0 || i === etapes.length - 1)
@@ -455,6 +497,8 @@ function rendreBanque(r) {
 }
 
 export function wire(vue, rerendre) {
+  brancherCourbe(vue);
+
   vue.addEventListener('click', e => {
     if (e.target.closest('[data-profil]')) { profilForm(); return; }
     if (e.target.closest('[data-bareme]')) { baremeForm(); return; }
