@@ -35,14 +35,29 @@ let onglet = 'moi';
    année ? ». */
 let saisonRoute = 'tout';
 
+/* Quatre onglets, et non six. Raquettes, cordages et chaussures parlaient
+   de la même chose — ce qu'on emporte au court — et leurs trois entrées
+   débordaient de la barre : on faisait défiler un menu pour trouver ce
+   qui tenait dans un seul mot. Elles sont maintenant trois rayons d'un
+   onglet « Matériel », choisis au-dessous.
+
+   Le rayon retenu vit à part de l'onglet : revenir au matériel après un
+   détour par l'argent doit rouvrir la page où on l'avait laissée, pas la
+   première des trois. */
 const ONGLETS = [
-  { cle: 'moi',        emoji: '🪪', nom: 'Moi' },
-  { cle: 'courses',    emoji: '🛒', nom: 'Courses' },
-  { cle: 'argent',     emoji: '💶', nom: 'Argent' },
+  { cle: 'moi',      emoji: '🪪', nom: 'Moi' },
+  { cle: 'courses',  emoji: '🛒', nom: 'Courses' },
+  { cle: 'argent',   emoji: '💶', nom: 'Argent' },
+  { cle: 'materiel', emoji: '🎒', nom: 'Matériel' },
+];
+
+const RAYONS = [
   { cle: 'raquettes',  emoji: '🎾', nom: 'Raquettes' },
   { cle: 'cordages',   emoji: '🪢', nom: 'Cordages' },
   { cle: 'chaussures', emoji: '👟', nom: 'Chaussures' },
 ];
+
+let rayon = 'raquettes';
 
 export function render() {
   const barre = `<div class="segments segments-defile">
@@ -50,9 +65,17 @@ export function render() {
       class="${onglet === o.cle ? 'actif' : ''}">${o.emoji} ${h(o.nom)}</button>`).join('')}
   </div>`;
 
-  const corps = { moi: vueMoi, courses: vueCourses, argent: vueArgent, raquettes: vueRaquettes,
-                  cordages: vueCordages, chaussures: vueChaussures }[onglet]();
+  if (onglet === 'materiel') {
+    const sous = `<div class="segments" style="margin-top:10px">
+      ${RAYONS.map(o => `<button data-rayon="${o.cle}" style="flex:1"
+        class="${rayon === o.cle ? 'actif' : ''}">${o.emoji} ${h(o.nom)}</button>`).join('')}
+    </div>`;
+    const dedans = { raquettes: vueRaquettes, cordages: vueCordages,
+                     chaussures: vueChaussures }[rayon]();
+    return barre + sous + dedans;
+  }
 
+  const corps = { moi: vueMoi, courses: vueCourses, argent: vueArgent }[onglet]();
   return barre + corps;
 }
 
@@ -761,6 +784,9 @@ function vueChaussures() {
 // =====================================================================
 export function wire(vue, rerendre) {
   vue.addEventListener('click', async e => {
+    const ry = e.target.closest('[data-rayon]');
+    if (ry) { rayon = ry.dataset.rayon; rerendre(); return; }
+
     const o = e.target.closest('[data-onglet]');
     if (o) { onglet = o.dataset.onglet; rerendre(); return; }
 
