@@ -208,8 +208,11 @@ function rendreResultat(r) {
 
     ${rendreMontee(r)}
 
-    ${r.scenarios.length ? `
-      <h3 class="titre-section">Les chemins possibles</h3>
+    ${/* Les chemins tenaient sur un titre nu, posé dans la page plutôt
+          que dans une carte. Ils y gagnent la leur — c'est ce qui leur
+          donne le pli, comme aux autres. */''}
+    ${r.scenarios.length ? `<section class="carte">
+      <h3>Les chemins possibles</h3>
       <ul class="scenarios">
         ${r.scenarios.map((sc, n) => `<li class="scenario ${n === 0 ? 'meilleur' : ''}">
           <div class="scenario-tete">
@@ -222,7 +225,8 @@ function rendreResultat(r) {
             ${sc.parts.map(x => `<span class="muted">${x.n}×${h(x.echelon)} = ${x.points} pts</span>`).join('')}
           </div>
         </li>`).join('')}
-      </ul>`
+      </ul>
+    </section>`
       : `<div class="avis">Aucun scénario réaliste ne comble cet écart en huit victoires.
          Vise d'abord l'échelon juste au-dessus.</div>`}`;
 }
@@ -521,7 +525,56 @@ function rendreBanque(r) {
     </section>`;
 }
 
+/* ─── Replier les sections ─────────────────────────────────────────────
+
+   Cet écran est une suite de développements : ce qu'il faut pour monter,
+   ce qu'on perd en attendant, le rendement d'une victoire, les victoires
+   qui comptent, d'où viennent les chiffres. On les lit une fois, et
+   ensuite on veut pouvoir les passer — sur un téléphone, la page fait
+   quatre écrans de haut.
+
+   Le pli se pose après coup, sur le rendu, plutôt que dans chaque gabarit :
+   il suffit qu'une section porte un titre pour qu'elle se replie, et les
+   sections à venir en hériteront sans qu'on y pense. Le contenu passe dans
+   une boîte qu'on montre ou qu'on cache ; le titre devient la poignée.
+
+   Deux exceptions. Le graphique ne se replie pas : c'est ce qu'on vient
+   regarder, et le cacher derrière son titre reviendrait à cacher l'écran.
+   Et ce qu'on a ouvert reste ouvert d'un redessin à l'autre — changer
+   d'objectif redessine la page, et une section qui se referme au moment
+   où l'on veut la lire est pire que pas de pli du tout. */
+const ouverts = new Set();
+
+function replier(vue) {
+  for (const sec of vue.querySelectorAll('section')) {
+    const titre = sec.querySelector(':scope > h3');
+    if (!titre || sec.querySelector('[data-courbe]')) continue;
+
+    const cle = titre.textContent.trim();
+    const corps = document.createElement('div');
+    corps.className = 'pli-corps';
+    while (titre.nextSibling) corps.appendChild(titre.nextSibling);
+    sec.appendChild(corps);
+
+    sec.classList.add('pli-section');
+    titre.setAttribute('role', 'button');
+    titre.setAttribute('tabindex', '0');
+    if (ouverts.has(cle)) sec.classList.add('ouvert');
+    titre.setAttribute('aria-expanded', String(sec.classList.contains('ouvert')));
+
+    const basculer = () => {
+      const ouvert = sec.classList.toggle('ouvert');
+      titre.setAttribute('aria-expanded', String(ouvert));
+      if (ouvert) ouverts.add(cle); else ouverts.delete(cle);
+    };
+    titre.addEventListener('click', basculer);
+    titre.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); basculer(); }
+    });
+  }
+}
 export function wire(vue, rerendre) {
+  replier(vue);
   brancherCourbe(vue);
 
   vue.addEventListener('click', e => {

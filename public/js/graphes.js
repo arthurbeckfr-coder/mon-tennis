@@ -100,18 +100,16 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
   const x = i => (i / (points.length - 1)) * L;
   const y = v => marge.haut + zoneH - (v / max) * zoneH;
 
-  /* Les frontières d'année, en abscisses du dessin. Un point porte son
-     libellé « mois an » ; c'est le changement de millésime qui marque la
-     coupure. */
-  const annees = [];
-  points.forEach((p, i) => {
-    const an = (p.fin || '').slice(0, 4) || String(p.label).slice(-2);
-    const derniere = annees[annees.length - 1];
-    if (!derniere || derniere.an !== an) {
-      if (derniere) derniere.x1 = x(i);
-      annees.push({ an, x0: x(i), x1: L });
-    }
-  });
+  /* Les bandes, un mois chacune. Elles étaient annuelles : sur deux ans
+     de projection cela faisait trois teintes en tout, et l'on ne pouvait
+     pas dire si une chute avait pris deux mois ou huit. Un point vaut un
+     mois — la bande est donc l'intervalle qui sépare deux points, et
+     l'alternance des teintes fait une règle graduée.
+
+     Le millésime n'est plus écrit dessus : l'axe du bas le porte déjà
+     dans « oct. 25 », et douze étiquettes par an sur le dessin
+     répéteraient ce qui est écrit dessous. */
+  const bandes = points.slice(0, -1).map((p, i) => ({ x0: x(i), x1: x(i + 1) }));
 
   const passe = points.filter(p => !p.futur);
   const iCoupe = Math.max(0, passe.length - 1);
@@ -124,23 +122,18 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
   return `<div class="courbe-bloc" data-courbe data-boite="0 0 ${L} ${H}">
     <svg viewBox="0 0 ${L} ${H}" preserveAspectRatio="none" role="img"
          aria-label="Bilan mois par mois, avec les paliers de classement">
-      ${/* ─── Les années, en bandes alternées ────────────────────────
+      ${/* ─── Les mois, en bandes alternées ──────────────────────────
 
-            Un axe qui ne dit que « août 23 » à gauche et « août 31 » à
-            droite laisse deviner huit ans entre les deux. On ne sait pas
-            où tombe 2027, ni si la chute qu'on regarde dure six mois ou
-            trois ans.
+            Un axe qui ne dit que « août 23 » à gauche et « août 28 » à
+            droite laisse deviner cinq ans entre les deux. On ne sait pas
+            où tombe telle chute, ni si elle dure deux mois ou huit.
 
-            Des bandes alternées répondent sans rien ajouter à lire : une
-            année sur deux est très légèrement teintée, et la frontière
-            entre deux teintes est le 1er janvier. C'est le procédé des
-            diagrammes de Gantt, et il se lit sans légende.
-
-            L'année elle-même s'écrit en HTML par-dessus, comme les
-            paliers : dans le dessin, elle subirait l'étirement. */''}
-      ${annees.map((a, i) => `<rect class="courbe-annee${i % 2 ? ' paire' : ''}"
-          x="${a.x0.toFixed(1)}" y="0" width="${(a.x1 - a.x0).toFixed(1)}" height="${H}"/>`).join('')}
-
+            Des bandes alternées répondent sans rien ajouter à lire : un
+            mois sur deux est très légèrement teinté, et l'on compte les
+            bandes comme on compte les graduations d'une règle. C'est le
+            procédé des diagrammes de Gantt, et il se lit sans légende. */''}
+      ${bandes.map((b, i) => `<rect class="courbe-mois${i % 2 ? ' paire' : ''}"
+          x="${b.x0.toFixed(1)}" y="0" width="${(b.x1 - b.x0).toFixed(1)}" height="${H}"/>`).join('')}
       ${/* Les paliers ensuite : ils sont le fond sur lequel on lit. */''}
       ${/* Les lignes restent dans le dessin : horizontales, elles ne
             souffrent pas de l'étirement. Les noms, eux, en sortent — voir
@@ -180,13 +173,6 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
           Ils gardent leur taille de lecture à tous les zooms, ne se
           déforment pas, et restent au bord gauche sans qu'on ait à les y
           recoller à la main. */''}
-    ${/* Les années, écrites au bas du cadre. Comme les paliers, elles
-          vivent hors du dessin pour garder leur taille. */''}
-    <div class="courbe-annees">
-      ${annees.map(a => `<span class="courbe-annee-nom" data-x0="${a.x0.toFixed(1)}"
-          data-x1="${a.x1.toFixed(1)}">${h(a.an)}</span>`).join('')}
-    </div>
-
     ${/* Le nom, et le nombre de points qu'il demande. Les deux tenaient
           mal quand il y avait six lignes — une colonne de texte au bord
           gauche, plus large que ce qu'elle annotait. À trois, la place
@@ -373,36 +359,6 @@ export function brancherCourbe(racine) {
     const y0 = Math.min(Math.max(haut, total[1]), total[1] + total[3] - hh);
     return [total[0], y0, total[2], hh];
   };
-  /* Les années, posées sous leur bande. Une bande trop étroite renonce à
-     son millésime plutôt que de le laisser déborder sur la voisine. */
-  const anneesDom = [...bloc.querySelectorAll('.courbe-annee-nom')];
-  const placerAnnees = () => {
-    const r = svg.getBoundingClientRect();
-    if (!r.width) return;
-    for (const el of anneesDom) {
-      const x0 = Number(el.dataset.x0), x1 = Number(el.dataset.x1);
-      const g = ((x0 - vue[0]) / vue[2]) * r.width;
-      const d = ((x1 - vue[0]) / vue[2]) * r.width;
-      const largeur = d - g;
-      el.hidden = largeur < el.offsetWidth + 10 || d < 0 || g > r.width;
-      if (!el.hidden) el.style.left = `${Math.max(2, g + largeur / 2 - el.offsetWidth / 2)}px`;
-    }
-  };
-
-  const placerPaliers = () => {
-    const r = svg.getBoundingClientRect();
-    if (!r.height) return;
-    let derniere = -Infinity;
-    for (const el of etiquettes) {
-      const ySvg = Number(el.dataset.y);
-      const px = ((ySvg - vue[1]) / vue[3]) * r.height;
-      const pose = Math.max(px - el.offsetHeight / 2, derniere + 2);
-      derniere = pose + el.offsetHeight;
-      el.style.top = `${pose}px`;
-      el.hidden = px < -20 || px > r.height + 20;
-    }
-  };
-
   /* Les dates, sous le cadre. Toutes sont écrites dans la page ; c'est
      ici qu'on décide lesquelles se voient — la première, puis une tous
      les tant de repères, l'écart choisi pour qu'aucune n'en touche une
@@ -447,7 +403,6 @@ export function brancherCourbe(racine) {
   const poser = () => {
     svg.setAttribute('viewBox', vue.join(' '));
     placerPaliers();
-    placerAnnees();
     placerDates();
     placerBulle();
   };

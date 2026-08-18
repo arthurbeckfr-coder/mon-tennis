@@ -1555,6 +1555,28 @@ body.mode-court .view { padding-top: 6px; }
 /* Le titre est la poignée : on touche, le texte se déplie. Le chevron le
    dit, à la place du triangle natif qui ne se met pas en forme pareil
    d'un navigateur à l'autre. */
+/* Une section repliée sur son titre : le corps est masqué, le titre porte
+   le chevron. Le pli est posé par le code sur le rendu, pas écrit dans
+   chaque gabarit — voir `replier` dans la vue du classement. */
+.pli-section > h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-bottom: 0;
+}
+.pli-section > h3::after {
+  content: '⌄';
+  margin-left: auto;
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--muet);
+  transition: transform .15s;
+}
+.pli-section.ouvert > h3::after { transform: rotate(180deg); }
+.pli-section > .pli-corps { display: none; }
+.pli-section.ouvert > .pli-corps { display: block; margin-top: 10px; }
+
 /* Un bloc replié sur son titre. Même geste que la carte d'un conseil, et
    même chevron : ce qui se touche pour ouvrir doit se ressembler partout. */
 .pli > summary {
@@ -2549,25 +2571,12 @@ body.mode-court .terrain-diapo .terrain {
   .terrain-profil { max-width: 760px; }
 }
 
-/* Les bandes d'année : une sur deux très légèrement teintée. La frontière
-   entre deux teintes est le 1er janvier, et cela se lit sans légende —
+/* Les bandes de mois : une sur deux très légèrement teintée. On les
+   compte comme les graduations d'une règle, et cela se lit sans légende —
    c'est le procédé des diagrammes de Gantt. Assez pâle pour ne jamais
-   concurrencer la courbe. */
-.courbe-annee { fill: transparent; }
-.courbe-annee.paire { fill: var(--texte); fill-opacity: .035; }
+   concurrencer la courbe : à cette échelle, une bande sur deux marquée
+   trop franchement ferait un code-barres. */
+.courbe-mois { fill: transparent; }
+.courbe-mois.paire { fill: var(--texte); fill-opacity: .05; }
 
-.courbe-annees {
-  position: absolute;
-  left: 0; right: 0; bottom: 2px;
-  height: 1.1rem;
-  pointer-events: none;
-}
-.courbe-annee-nom {
-  position: absolute;
-  bottom: 0;
-  font-size: .68rem;
-  font-weight: 600;
-  color: var(--muet);
-  opacity: .8;
-  white-space: nowrap;
-}
+
