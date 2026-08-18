@@ -128,11 +128,6 @@ function vueMoi() {
       <ul class="fiche-infos">
         <li><span class="fiche-emoji">🏅</span><div>
           <span class="tiny muted">Échelon</span><br>${h(p.echelon)}</div></li>
-        ${p.bilanOfficiel != null ? `<li><span class="fiche-emoji">📊</span><div>
-          <span class="tiny muted">Bilan officiel Ten'Up</span><br>${p.bilanOfficiel} points</div></li>` : ''}
-        <li><span class="fiche-emoji">➕</span><div>
-          <span class="tiny muted">Bonus</span><br>${p.bonusVictoires || 0} victoire(s),
-          ${p.bonusPoints || 0} point(s)</div></li>
       </ul>
       <p class="tiny muted">Le détail du calcul et les projections se lisent dans l'onglet
         Classement, en bas.</p>

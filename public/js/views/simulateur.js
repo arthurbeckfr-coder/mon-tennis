@@ -10,7 +10,7 @@
    n'est donc plus saisi à la main, il est calculé depuis l'historique. */
 
 import { h, puce, dateCourte } from '../util.js';
-import { store, reglagesCalcul, bonusVictoiresPour } from '../store.js';
+import { store, reglagesCalcul } from '../store.js';
 import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang, seuil,
          projeter, echeance, rendementParEchelon, moisAVenir } from '../classement.js';
 import { profilForm, baremeForm } from '../forms.js';
@@ -49,17 +49,14 @@ export function render() {
   const vise = horizons.find(x => x.n === horizon) || horizons[0];
   const fin = vise.fin;
 
-  const actuel = bilanA({ ...reglages, cible: p.echelon,
-                          bonusVictoires: bonusVictoiresPour(p.echelon), finISO: fin });
-  const r = simuler({ ...reglages, echelon: p.echelon, cible,
-                      bonusVictoires: bonusVictoiresPour(cible), finISO: fin });
+  const actuel = bilanA({ ...reglages, cible: p.echelon, finISO: fin });
+  const r = simuler({ ...reglages, echelon: p.echelon, cible, finISO: fin });
 
   /* Ce que la projection coûte, en points à retrouver. Le chiffre seul ne
      dit rien : c'est l'écart avec aujourd'hui qui répond à « est-ce que
      ça vaut le coup de m'y mettre maintenant ». */
   const rMaintenant = horizon
-    ? simuler({ ...reglages, echelon: p.echelon, cible,
-                bonusVictoires: bonusVictoiresPour(cible) })
+    ? simuler({ ...reglages, echelon: p.echelon, cible, })
     : null;
   const surcout = rMaintenant && rMaintenant.manque != null && r.manque != null
     ? r.manque - rMaintenant.manque : null;
@@ -72,11 +69,6 @@ export function render() {
   const i = rang(p.echelon);
   const cibles = [0, 1, 2, 3].map(d => ECHELONS[i + d]).filter(Boolean);
 
-  /* L'écart avec le chiffre officiel, quand il est connu, est le meilleur
-     contrôle qui soit : s'il n'est pas nul, ce sont des matchs qui
-     manquent à l'historique, pas le calcul qui se trompe. */
-  const officiel = p.bilanOfficiel;
-  const ecart = officiel != null ? actuel.bilan - officiel : null;
 
   return `
     <section class="carte-classement">
@@ -95,19 +87,6 @@ export function render() {
       Le bilan se calcule depuis l'historique : importe ton palmarès Ten'Up
       et tout le reste se remplit tout seul.</div>` : ''}
 
-    ${ecart !== null && !horizon ? (ecart === 0
-      ? `<div class="avis"><strong>Calcul confirmé.</strong> Mon total tombe exactement
-           sur les ${officiel} points affichés par Ten'Up.</div>`
-      : `<div class="avis"><strong>${ecart > 0 ? '+' : ''}${ecart} points</strong>
-           par rapport aux ${officiel} de Ten'Up — et c'est normal.
-           ${ecart > 0
-             ? `Ce chiffre-ci compte les matchs jusqu'à aujourd'hui, alors que le bilan
-                officiel s'arrête au dernier calcul de la fédération : tes derniers matchs
-                n'y sont pas encore. C'est donc le bilan que tu auras au prochain
-                traitement, à résultats constants.`
-             : `Le bilan officiel inclut des matchs plus anciens que ma fenêtre de douze
-                mois, ou un bonus non renseigné.`}
-           <button class="lien" data-profil>Voir les réglages</button></div>`) : ''}
 
     <section class="choix-cible">
       <span class="etiquette">Objectif</span>
@@ -140,12 +119,6 @@ export function render() {
           : `L'écart se réduit tout seul : ce sont des victoires trop faibles pour
              compter qui sortent, et de meilleures reprennent leur place.`}
     </div>` : ''}
-
-    ${(p.bonusVictoires > 0 && bonusVictoiresPour(cible) === 0) ? `
-      <p class="tiny muted" style="margin:0 4px 10px">Ton bonus de ${p.bonusVictoires}
-        victoire(s) n'est pas appliqué ici : la fédération en accorde un différent à chaque
-        échelon visé, et il diminue à mesure qu'on monte. L'objectif affiché est donc
-        légèrement plus loin que la réalité, jamais plus près.</p>` : ''}
 
     ${r.erreur ? `<div class="avis">${h(r.erreur)}</div>` : rendreResultat(r)}
 
@@ -253,7 +226,6 @@ function rendreResultat(r) {
    date du déclassement — et on le dit plutôt que de laisser croire. */
 function rendreDescente(reglages, p) {
   const etapes = projeter({ ...reglages, cible: p.echelon,
-                            bonusVictoires: bonusVictoiresPour(p.echelon),
                             debut: 0, mois: 12 });
   if (etapes.length < 2 || etapes[0].manque == null) return '';
 
@@ -325,7 +297,6 @@ function rendreCalendrier(reglages, cible, r) {
      Sur deux ans on n'en voyait que le début, et le graphique laissait
      croire que tout s'arrêtait là. */
   const etapes = projeter({ ...reglages, cible,
-                            bonusVictoires: bonusVictoiresPour(cible),
                             debut: -36, mois: 60, depuis: store.profil.echelon });
   if (etapes.length < 2) return '';
 
@@ -421,8 +392,7 @@ function rendreCalendrier(reglages, cible, r) {
 function rendreRendement(reglages, cible, r, finISO = null, vise = null) {
   if (!r.seuil || r.seuil.points == null) return '';
 
-  const lignes = rendementParEchelon({ ...reglages, cible,
-                                       bonusVictoires: bonusVictoiresPour(cible), finISO });
+  const lignes = rendementParEchelon({ ...reglages, cible, finISO });
   const inutiles = lignes.filter(l => l.gain === 0);
 
   /* Le rendement se lit à la date choisie, et pas ailleurs : une victoire
@@ -496,7 +466,6 @@ function rendreBanque(r) {
         en dessous de ça, une nouvelle victoire ne changera rien à ton bilan.</p>` : ''}
       ${r.ecartees.length ? `<p class="tiny muted">${r.ecartees.length} autre(s) victoire(s)
         hors quota, sans effet sur ce bilan.</p>` : ''}
-      ${r.bonusPoints ? `<p class="tiny muted">Plus ${r.bonusPoints} points de bonus.</p>` : ''}
     </section>`;
 }
 

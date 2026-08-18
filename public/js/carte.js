@@ -559,6 +559,43 @@ export function brancherCarte(racine, ouvrirClub) {
     bulle.hidden = false;
     bloc.querySelectorAll('.carte-club').forEach(x => x.classList.toggle('choisi', x === g));
     placerBulle();
+    degagerLaBulle();
+  };
+
+  /** Déplace la carte du strict nécessaire pour que la bulle tienne
+   *  entière dans le cadre.
+   *
+   *  Un club près du bord ouvrait une bulle coupée : le décalage
+   *  horizontal de `placerBulle` la ramène dans le cadre, mais rien ne
+   *  la sauvait en haut — elle se dessine au-dessus du disque — ni quand
+   *  elle est plus haute que la place restante.
+   *
+   *  On déplace la carte, sans jamais zoomer : le niveau de zoom est un
+   *  choix du lecteur, et le lui reprendre parce qu'il a touché un club
+   *  serait le punir de sa curiosité. Un glissement, en revanche, se
+   *  refait d'un doigt.
+   */
+  const degagerLaBulle = () => {
+    if (bulle.hidden) return;
+    const cadre = bloc.getBoundingClientRect();
+    const p = bulle.getBoundingClientRect();
+    const marge = 10;
+
+    /* Ce qui dépasse d'un côté, en pixels. Un seul des deux termes est
+       non nul dans le cas courant ; s'ils le sont tous les deux, la bulle
+       est plus grande que la carte et aucun déplacement n'y changerait
+       rien — la somme s'annule et l'on ne bouge pas. */
+    const dx = Math.max(0, (cadre.left + marge) - p.left)
+             - Math.max(0, p.right - (cadre.right - marge));
+    const dy = Math.max(0, (cadre.top + marge) - p.top)
+             - Math.max(0, p.bottom - (cadre.bottom - marge));
+    if (!dx && !dy) return;
+
+    /* Des pixels d'écran vers des unités de carte. Déplacer la vue vers
+       la droite fait glisser le dessin vers la gauche : d'où le signe. */
+    const ech = echelle();
+    vue = [vue[0] - dx / ech, vue[1] - dy / ech, vue[2], vue[3]];
+    poser();
   };
 
   const fermerBulle = () => {

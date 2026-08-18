@@ -81,12 +81,12 @@ export const nomCategorie = c => CATEGORIES.find(x => x.cle === c)?.nom || c;
 function vide() {
   return {
     version: VERSION,
-    /* Le bilan ne se saisit plus : il se calcule depuis l'historique.
-       `bilanOfficiel` ne sert qu'à comparer avec le chiffre de Ten'Up —
-       un écart signale des matchs manquants, pas une erreur de calcul. */
+    /* Rien de calculable ne se saisit : le bilan, les victoires
+       comptabilisées et les points de bonus se déduisent de l'historique.
+       Ils bougent à chaque match — les recopier à la main, c'était
+       entretenir un chiffre faux entre deux mises à jour. */
     profil: {
       prenom: '', nom: '', sexe: 'h', echelon: '15', gaucher: false,
-      bilanOfficiel: null, bonusVictoires: 0, bonusPoints: 0,
       /* L'identité et les coordonnées ne servent à aucun calcul : elles
          servent à retrouver son numéro de licence au moment de s'inscrire
          à un tournoi, debout au club, sans fouiller ses mails. C'est la
@@ -430,15 +430,7 @@ export function reglagesCalcul() {
     matchs: store.matchs,
     sexe: store.profil.sexe,
     bareme: store.bareme,
-    bonusPoints: Number(store.profil.bonusPoints) || 0,
   };
-}
-
-/** Le bonus de victoires ne s'applique qu'à l'échelon où il a été lu.
- *  Ailleurs on retient zéro : mieux vaut annoncer un objectif un peu plus
- *  loin qu'il ne l'est que l'inverse. */
-export function bonusVictoiresPour(cible) {
-  return cible === store.profil.echelon ? (Number(store.profil.bonusVictoires) || 0) : 0;
 }
 
 /** Statistiques d'ensemble, telles qu'on aime les lire après coup. */
@@ -559,7 +551,7 @@ export function fusionnerDistant(distant) {
   const neuf = vide();
   const profilVierge = !store.profil.prenom
     && store.profil.echelon === neuf.profil.echelon
-    && !store.profil.bilanOfficiel;
+    && !store.profil.licence;
 
   const avant = {
     matchs: store.matchs.length, conseils: store.conseils.length,
@@ -575,7 +567,7 @@ export function fusionnerDistant(distant) {
      fusion silencieuse vient de fermer. On exige donc que le profil d'en
      face porte quelque chose. */
   const profilUtile = !!distant.profil && (
-    distant.profil.prenom || distant.profil.bilanOfficiel ||
+    distant.profil.prenom || distant.profil.licence ||
     (distant.profil.echelon && distant.profil.echelon !== neuf.profil.echelon));
 
   if (profilVierge && profilUtile) {
