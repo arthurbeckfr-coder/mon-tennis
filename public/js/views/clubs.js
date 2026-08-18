@@ -23,7 +23,7 @@ import {
 } from '../store.js';
 import { clubConnuPour, MOTS_EN_PLUS, LIENS_CONNUS, urlTenupClub } from '../clubs-connus.js';
 import { carteClubs, brancherCarte, pointDuClub } from '../carte.js';
-import { distanceKm, direDistance, lienItineraire } from '../geocodage.js';
+import { distanceKm, direDistance, lienItineraire, adresseDuClub } from '../geocodage.js';
 import { clubForm, matchForm } from '../forms.js';
 
 /* ─── Les rattachements proposés ───────────────────────────────────────
@@ -421,7 +421,7 @@ export function renderFiche(params) {
       const d = distanceKm(chez, ici);
       if (d == null) return null;
       return ['🚗', `${h(direDistance(d))} de chez toi —
-        <a href="${h(lienItineraire(chez, ici))}" target="_blank"
+        <a href="${h(lienItineraire(chez, ici, adresseDuClub(club)))}" target="_blank"
            rel="noopener noreferrer">voir l'itinéraire ↗</a>`];
     })(),
     club.telephone ? ['📞', `<a href="tel:${h(club.telephone.replace(/\s/g, ''))}">${h(club.telephone)}</a>`] : null,

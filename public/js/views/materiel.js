@@ -11,19 +11,25 @@
    courses et un historique de cordages n'ont rien à se dire, les empiler
    ne ferait que rallonger le défilement. */
 
-import { h, dateCourte, dateLongue, puce, confirmer, toast } from '../util.js';
+import { h, dateCourte, dateLongue, puce, confirmer, toast, openModal } from '../util.js';
 import { store, basculerAchat, rangerCourses, courses as coursesCRUD, raquetteDe,
          clubDuMatch, CATEGORIES_DEPENSE, nomCategorieDepense, maj } from '../store.js';
 import { pointDuClub } from '../carte.js';
+import { saisonDe } from './matchs.js';
 import { distanceKm, situer } from '../geocodage.js';
 import {
   CATEGORIES_COURSES, TROUSSE_TYPE, nomCause,
   statsCordages, ageCordage, dureesDeVie,
 } from '../materiel.js';
 import { courseForm, raquetteForm, cordageForm, chaussureForm, depenseForm,
-         identiteForm, profilForm } from '../forms.js';
+         identiteForm, profilForm, baremeForm } from '../forms.js';
 
 let onglet = 'moi';
+
+/* La saison retenue pour l'estimation de la route. « Tout » par défaut :
+   le total de ce qu'on a roulé depuis toujours est le premier chiffre
+   qu'on veut, et la saison répond ensuite à « et cette année ? ». */
+let saisonRoute = 'tout';
 
 const ONGLETS = [
   { cle: 'moi',        emoji: '🪪', nom: 'Moi' },
@@ -128,9 +134,16 @@ function vueMoi() {
       <ul class="fiche-infos">
         <li><span class="fiche-emoji">🏅</span><div>
           <span class="tiny muted">Échelon</span><br>${h(p.echelon)}</div></li>
+        <li><span class="fiche-emoji">✋</span><div>
+          <span class="tiny muted">Ma main</span><br>${p.gaucher ? 'Gaucher' : 'Droitier'}</div></li>
       </ul>
       <p class="tiny muted">Le détail du calcul et les projections se lisent dans l'onglet
-        Classement, en bas.</p>
+        Classement, en bas — qui ne fait que lire : tout ce qui se règle se règle ici.</p>
+      ${/* Le barème vient du profil et non de la page qui l'utilise : on
+            va régler ce qui est à soi là où l'on va se relire. */''}
+      <div class="rangee-boutons">
+        <button class="btn btn-ghost" data-bareme>Voir et corriger le barème</button>
+      </div>
     </section>`;
 }
 
@@ -152,13 +165,19 @@ function vueMoi() {
    dépense constatée. Ils restent donc côte à côte, jamais confondus. */
 const euros = n => `${n.toLocaleString('fr-FR', { maximumFractionDigits: n < 100 ? 2 : 0 })} €`;
 
-/** Les kilomètres parcourus pour aller jouer, club par club. */
-function deplacements() {
+/** Les kilomètres parcourus pour aller jouer, club par club.
+ *
+ *  `saison` vaut « tout » ou l'année de début d'une saison sportive —
+ *  celle-ci court de septembre à août, et c'est ainsi qu'on s'en
+ *  souvient : les frais d'une année de tennis ne se comptent pas du 1er
+ *  janvier au 31 décembre. */
+function deplacements(saison = 'tout') {
   const chez = store.profil?.domicile?.point;
   if (!chez) return null;
 
   const parClub = new Map();
   for (const m of store.matchs) {
+    if (saison !== 'tout' && saisonDe(m.date) !== Number(saison)) continue;
     const club = clubDuMatch(m);
     if (!club) continue;
     const p = pointDuClub(club);
@@ -176,6 +195,172 @@ function deplacements() {
   return { lignes, kmTotal: lignes.reduce((t, x) => t + x.kmTotal, 0) };
 }
 
+/** Ce qu'un club coûte en route, et ce que cela fait par match.
+ *
+ *  Le total au kilomètre ne dit pas ce qu'un déplacement vaut : deux
+ *  heures de route pour un tour perdu et trois matchs dans la même
+ *  journée à vingt minutes de chez soi donnent le même total et n'ont
+ *  rien à voir. On détaille donc par saison et par épreuve, et l'on
+ *  ramène le prix au match — c'est le chiffre qu'on compare.
+ */
+function detailRoute(clubId) {
+  const chez = store.profil?.domicile?.point;
+  const club = store.clubs.find(c => c.id === clubId);
+  if (!club || !chez) return;
+
+  const km = distanceKm(chez, pointDuClub(club));
+  const matchs = store.matchs.filter(x => clubDuMatch(x)?.id === clubId);
+  const tarif = Number(store.profil?.coutKm) || 0;
+
+  /* Un aller-retour par match : c'est l'hypothèse la plus simple, et la
+     seule tenable sans savoir quels matchs se sont joués le même jour.
+     Deux matchs dans la journée comptent donc deux trajets, et le chiffre
+     est majoré — on donne les deux bornes plutôt que de trancher. */
+  const jours = new Set(matchs.map(x => x.date).filter(Boolean));
+  const kmTotal = km * 2 * matchs.length;
+  const kmJours = km * 2 * (jours.size || matchs.length);
+  const dist = km < 10 ? km.toFixed(1) : Math.round(km);
+
+  const parSaison = {};
+  const parEpreuve = {};
+  for (const x of matchs) {
+    const s = saisonDe(x.date);
+    if (s != null) parSaison[s] = (parSaison[s] || 0) + 1;
+    const e = (x.tournoi || 'Sans épreuve').trim();
+    parEpreuve[e] = (parEpreuve[e] || 0) + 1;
+  }
+
+  const ligne = (cle, valeur) => `<li><div><strong>${h(cle)}</strong></div>
+    <div class="club-score"><b>${h(valeur)}</b></div></li>`;
+
+  openModal({
+    title: club.nom,
+    body: `
+      <section class="chiffres">
+        <div class="chiffre"><b>${dist}</b><span>km à l'aller</span></div>
+        <div class="chiffre"><b>${matchs.length}</b><span>match(s)</span></div>
+        <div class="chiffre"><b>${jours.size}</b><span>jour(s) sur place</span></div>
+        <div class="chiffre"><b>${Math.round(kmTotal)}</b><span>km au total</span></div>
+      </section>
+
+      <p class="tiny muted">Un aller-retour par match : ${matchs.length} × ${dist} km
+        × 2 = ${Math.round(kmTotal)} km. En comptant un seul aller-retour par journée de
+        jeu — ${jours.size} au lieu de ${matchs.length} — cela ferait
+        ${Math.round(kmJours)} km. La vérité est entre les deux, et la distance est à vol
+        d'oiseau : la route fait toujours plus.</p>
+
+      ${tarif ? `<section class="chiffres">
+        <div class="chiffre"><b>${euros(kmTotal * tarif)}</b><span>de route</span></div>
+        <div class="chiffre"><b>${euros(matchs.length ? kmTotal * tarif / matchs.length : 0)}</b>
+          <span>par match</span></div>
+        <div class="chiffre"><b>${euros(kmJours * tarif)}</b>
+          <span>à un trajet par jour</span></div>
+      </section>` : `<p class="tiny muted">Aucun tarif kilométrique réglé : le carnet
+        compte les kilomètres et n'invente pas un prix. Il se règle dans ton profil.</p>`}
+
+      <span class="etiquette">Par saison</span>
+      <ul class="clubs-adverses">
+        ${Object.keys(parSaison).sort((a, b) => b - a).map(s =>
+          ligne(`${s}-${String(Number(s) + 1).slice(2)}`, `${parSaison[s]} match(s)`)).join('')}
+      </ul>
+
+      <span class="etiquette">Par épreuve</span>
+      <ul class="clubs-adverses">
+        ${Object.entries(parEpreuve).sort((a, b) => b[1] - a[1])
+          .map(([e, n]) => ligne(e, `${n} match(s)`)).join('')}
+      </ul>`,
+  });
+}
+
+/** Le détail derrière un des quatre chiffres du haut : un total
+ *  n'apprend rien tant qu'on ne sait pas de quoi il est fait. */
+function detailArgent(quoi) {
+  const saisies = [...(store.depenses || [])]
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const total = saisies.reduce((t, d) => t + (Number(d.montant) || 0), 0);
+  const route = deplacements(saisonRoute);
+  const tarif = Number(store.profil?.coutKm) || 0;
+
+  const parAn = {};
+  const parCat = {};
+  for (const d of saisies) {
+    const a = (d.date || '').slice(0, 4) || '?';
+    parAn[a] = (parAn[a] || 0) + (Number(d.montant) || 0);
+    parCat[d.categorie] = (parCat[d.categorie] || 0) + (Number(d.montant) || 0);
+  }
+
+  const ligne = (cle, valeur) => `<li><div><strong>${h(cle)}</strong></div>
+    <div class="club-score"><b>${h(valeur)}</b></div></li>`;
+
+  const vues = {
+    total: {
+      titre: 'Ce que le tennis a coûté',
+      corps: `<p class="tiny muted">${euros(total)} notés en ${saisies.length} ligne(s).
+          Ce sont des dépenses saisies et non une estimation : rien ne se déduit d'un
+          palmarès — la fédération enregistre des résultats, pas des factures.</p>
+        <span class="etiquette">Par catégorie</span>
+        <ul class="clubs-adverses">${CATEGORIES_DEPENSE.filter(c => parCat[c.cle])
+          .sort((a, b) => parCat[b.cle] - parCat[a.cle])
+          .map(c => ligne(`${c.emoji} ${c.nom}`, euros(parCat[c.cle]))).join('')}</ul>
+        <span class="etiquette">Par année</span>
+        <ul class="clubs-adverses">${Object.keys(parAn).sort((a, b) => b.localeCompare(a))
+          .map(a => ligne(a, euros(parAn[a]))).join('')}</ul>`,
+    },
+    lignes: {
+      titre: 'Les dépenses notées',
+      corps: saisies.length
+        ? `<ul class="clubs-adverses">${saisies.map(d => `<li>
+            <div><strong>${h(d.libelle)}</strong>
+              <div class="tiny muted">${h(dateCourte(d.date))} —
+                ${h(nomCategorieDepense(d.categorie))}</div></div>
+            <div class="club-score"><b>${euros(Number(d.montant) || 0)}</b></div>
+          </li>`).join('')}</ul>`
+        : `<p class="tiny muted">Rien de noté pour l'instant.</p>`,
+    },
+  };
+
+  if ((quoi === 'km' || quoi === 'route') && route) {
+    const n = route.lignes.reduce((t, x) => t + x.trajets, 0);
+    vues[quoi] = {
+      titre: quoi === 'km' ? 'Les kilomètres, estimés' : 'Ce que la route coûterait',
+      corps: `
+        <section class="chiffres">
+          <div class="chiffre"><b>${Math.round(route.kmTotal)}</b><span>km</span></div>
+          <div class="chiffre"><b>${n}</b><span>match(s) situés</span></div>
+          <div class="chiffre"><b>${n ? Math.round(route.kmTotal / n) : 0}</b>
+            <span>km par match</span></div>
+          ${tarif ? `<div class="chiffre"><b>${euros(n ? route.kmTotal * tarif / n : 0)}</b>
+            <span>par match</span></div>` : ''}
+        </section>
+        <p class="tiny muted"><strong>C'est un ordre de grandeur.</strong> La distance est
+          à vol d'oiseau et la route fait toujours plus ; on ignore le covoiturage, les
+          allers pour rien et les matchs dont on ne connaît pas le club.</p>
+        <span class="etiquette">Club par club</span>
+        <ul class="clubs-adverses">${route.lignes.map(x => `<li>
+          <div><strong>${h(x.club.nom)}</strong>
+            <div class="tiny muted">${x.trajets} trajet(s) —
+              ${x.km < 10 ? x.km.toFixed(1) : Math.round(x.km)} km à l'aller</div></div>
+          <div class="club-score"><b>${tarif ? euros(x.kmTotal * tarif)
+            : Math.round(x.kmTotal) + ' km'}</b></div>
+        </li>`).join('')}</ul>`,
+    };
+  }
+
+  const v = vues[quoi];
+  if (v) openModal({ title: v.titre, body: v.corps });
+}
+/** Les saisons où l'on a joué dans un club situé : celles qui ont
+ *  quelque chose à filtrer. */
+function saisonsDeRoute() {
+  const vues = new Set();
+  for (const m of store.matchs) {
+    if (!clubDuMatch(m)) continue;
+    const s = saisonDe(m.date);
+    if (s != null) vues.add(s);
+  }
+  return [...vues].sort((a, b) => b - a);
+}
+
 function vueArgent() {
   const saisies = [...(store.depenses || [])]
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -186,17 +371,22 @@ function vueArgent() {
     parCat[d.categorie] = (parCat[d.categorie] || 0) + (Number(d.montant) || 0);
   }
 
-  const route = deplacements();
+  const route = deplacements(saisonRoute);
   const tarif = Number(store.profil?.coutKm) || 0;
+  const saisons = saisonsDeRoute();
 
   return `
+    ${/* Les quatre chiffres s'ouvrent : un total n'apprend rien tant
+          qu'on ne sait pas de quoi il est fait. */''}
     <section class="chiffres">
-      <div class="chiffre"><b>${euros(total)}</b><span>dépenses notées</span></div>
-      <div class="chiffre"><b>${saisies.length}</b><span>lignes</span></div>
-      ${route ? `<div class="chiffre"><b>${Math.round(route.kmTotal)}</b>
-        <span>km estimés</span></div>` : ''}
-      ${route && tarif ? `<div class="chiffre"><b>${euros(route.kmTotal * tarif)}</b>
-        <span>de route estimés</span></div>` : ''}
+      <div class="chiffre" data-argent="total" title="Voir le détail"
+        ><b>${euros(total)}</b><span>dépenses notées</span></div>
+      <div class="chiffre" data-argent="lignes" title="Voir le détail"
+        ><b>${saisies.length}</b><span>lignes</span></div>
+      ${route ? `<div class="chiffre" data-argent="km" title="Voir le détail"
+        ><b>${Math.round(route.kmTotal)}</b><span>km estimés</span></div>` : ''}
+      ${route && tarif ? `<div class="chiffre" data-argent="route" title="Voir le détail"
+        ><b>${euros(route.kmTotal * tarif)}</b><span>de route estimés</span></div>` : ''}
     </section>
 
     <div class="rangee-boutons" style="justify-content:center">
@@ -231,8 +421,19 @@ function vueArgent() {
 
     ${route ? `<section class="carte">
       <h3>La route, estimée</h3>
+      ${/* Une saison sportive va de septembre à août : c'est la maille
+            dans laquelle on pense ses frais de tennis, et l'année civile
+            couperait un championnat d'hiver en deux. */''}
+      ${saisons.length > 1 ? `<div class="segments" style="margin-bottom:10px">
+        <button data-saison-route="tout"
+          class="${saisonRoute === 'tout' ? 'actif' : ''}">Tout</button>
+        ${saisons.slice(0, 5).map(s => `<button data-saison-route="${s}"
+          class="${String(saisonRoute) === String(s) ? 'actif' : ''}"
+          >${s}-${String(s + 1).slice(2)}</button>`).join('')}
+      </div>` : ''}
       <p class="tiny muted">${Math.round(route.kmTotal)} km pour aller jouer, tous clubs
-        confondus : la distance de chez toi à chaque club, comptée aller-retour et
+        confondus${saisonRoute === 'tout' ? '' : `, sur la saison ${saisonRoute}-${
+          String(Number(saisonRoute) + 1).slice(2)}`} : la distance de chez toi à chaque club, comptée aller-retour et
         multipliée par le nombre de matchs qui s'y sont joués.
         <strong>C'est un ordre de grandeur.</strong> La distance est à vol d'oiseau et la
         route fait toujours plus ; on ignore le covoiturage, les allers pour rien et les
@@ -243,7 +444,12 @@ function vueArgent() {
         : `<p class="tiny muted">Aucun tarif kilométrique réglé : le carnet ne compte donc
            que les kilomètres, et n'invente pas un prix. Il se règle dans ton profil.</p>`}
       <ul class="clubs-adverses">
-        ${route.lignes.slice(0, 8).map(x => `<li>
+        ${/* Chaque club s'ouvre : le total au kilomètre ne dit pas ce
+              qu'un match coûte là-bas, et c'est pourtant la question —
+              deux heures de route pour un tour perdu, ou trois matchs
+              dans la même journée à vingt minutes de chez soi. */''}
+        ${route.lignes.slice(0, 8).map(x => `<li data-route="${h(x.club.id)}"
+            style="cursor:pointer">
           <div>
             <strong>${h(x.club.nom)}</strong>
             <div class="tiny muted">${x.trajets} trajet(s) —
@@ -503,6 +709,7 @@ export function wire(vue, rerendre) {
 
     if (e.target.closest('[data-identite]')) { identiteForm(); return; }
     if (e.target.closest('[data-profil]')) { profilForm(); return; }
+    if (e.target.closest('[data-bareme]')) { baremeForm(); return; }
 
     if (e.target.closest('[data-situer-lieux]')) {
       const b = e.target.closest('[data-situer-lieux]');
@@ -526,6 +733,15 @@ export function wire(vue, rerendre) {
       return;
     }
     if (e.target.closest('[data-depense]')) { depenseForm(); return; }
+
+    const sr = e.target.closest('[data-saison-route]');
+    if (sr) { saisonRoute = sr.dataset.saisonRoute; rerendre(); return; }
+
+    const rt = e.target.closest('[data-route]');
+    if (rt) { detailRoute(rt.dataset.route); return; }
+
+    const ar = e.target.closest('[data-argent]');
+    if (ar) { detailArgent(ar.dataset.argent); return; }
 
     const dep = e.target.closest('[data-depense-id]');
     if (dep) {

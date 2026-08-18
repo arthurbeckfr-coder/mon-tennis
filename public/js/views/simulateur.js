@@ -13,7 +13,7 @@ import { h, puce, dateCourte } from '../util.js';
 import { store, reglagesCalcul } from '../store.js';
 import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang, seuil,
          projeter, echeance, rendementParEchelon, moisAVenir } from '../classement.js';
-import { profilForm, baremeForm } from '../forms.js';
+
 import { URL_TENUP } from '../config.js';
 import { courbeBilan, brancherCourbe, tableauDouble } from '../graphes.js';
 
@@ -79,7 +79,6 @@ export function render() {
           sur ${actuel.nbMatchs} match${actuel.nbMatchs > 1 ? 's' : ''}${horizon
             ? ` <em>— fin ${h(vise.libelle)}</em>` : ''}</span>
       </div>
-      <button class="btn btn-ghost" data-profil>Régler</button>
     </section>
 
     ${!store.matchs.length ? `<div class="avis">
@@ -156,8 +155,11 @@ export function render() {
         se reconnaît quand même — c'est celle où tu n'as pas perdu — mais un finaliste
         ne se distingue pas d'un demi-finaliste, et rien ne lui est compté. L'erreur va
         donc toujours dans le même sens : jamais un classement annoncé qu'on n'a pas.</p>
+      ${/* Aucun réglage ici : cet écran lit, il ne paramètre pas. Le
+            classement de départ, la main, le barème et les adresses se
+            règlent au même endroit, dans le profil — c'est là qu'on va
+            quand on veut changer quelque chose sur soi. */''}
       <div class="rangee-boutons">
-        <button class="btn btn-ghost" data-bareme>Voir et corriger le barème</button>
         <a class="btn btn-ghost btn-tenup" href="${URL_TENUP}" target="_blank"
            rel="noopener noreferrer">Vérifier sur Ten'Up ↗</a>
       </div>
@@ -502,8 +504,7 @@ export function wire(vue, rerendre) {
   brancherCourbe(vue);
 
   vue.addEventListener('click', e => {
-    if (e.target.closest('[data-profil]')) { profilForm(); return; }
-    if (e.target.closest('[data-bareme]')) { baremeForm(); return; }
+
     const c = e.target.closest('[data-cible]');
     if (c) { cibleChoisie = c.dataset.cible; rerendre(); return; }
     const x = e.target.closest('[data-horizon]');

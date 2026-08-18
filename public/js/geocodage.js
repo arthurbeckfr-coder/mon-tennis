@@ -96,11 +96,42 @@ export const direDistance = km =>
   : `${km < 10 ? km.toFixed(1) : Math.round(km)} km à vol d'oiseau`;
 
 /** Le lien qui ouvre l'itinéraire dans l'application de cartes du
- *  téléphone — seule à connaître les routes, les travaux et l'heure. */
-export function lienItineraire(depart, arrivee) {
-  if (!depart || !arrivee) return '';
+ *  téléphone — seule à connaître les routes, les travaux et l'heure.
+ *
+ *  ─── Pourquoi une adresse plutôt qu'un point ──────────────────────
+ *
+ *  Un club sans coordonnées propres est placé au centre de sa commune :
+ *  c'est assez bon pour un disque sur une carte à l'échelle du
+ *  département, et c'est faux pour un itinéraire — on se retrouvait
+ *  guidé vers la mairie, à un kilomètre des courts. Quand l'adresse
+ *  postale est connue, elle part donc telle quelle : le service de
+ *  cartes sait la résoudre, et il la résout mieux qu'un centroïde.
+ *
+ *  Les coordonnées restent le recours, et elles valent pour le départ :
+ *  le domicile, lui, a été situé à son adresse exacte.
+ *
+ *  @param {number[]} depart   [lon, lat]
+ *  @param {number[]} arrivee  [lon, lat] — le recours
+ *  @param {string} [adresse]  l'adresse postale d'arrivée, si on la sait
+ */
+export function lienItineraire(depart, arrivee, adresse = '') {
   const p = ([lon, lat]) => `${lat},${lon}`;
+  const but = (adresse || '').trim() || (arrivee ? p(arrivee) : '');
+  if (!depart || !but) return '';
   return 'https://www.google.com/maps/dir/?api=1'
     + `&origin=${encodeURIComponent(p(depart))}`
-    + `&destination=${encodeURIComponent(p(arrivee))}`;
+    + `&destination=${encodeURIComponent(but)}`;
+}
+
+/** L'adresse d'un club telle qu'on la donnerait à un chauffeur : la rue,
+ *  la commune, et rien qui vienne d'ailleurs. Vide si le club n'a que sa
+ *  ville — auquel cas le point fera l'affaire. */
+export function adresseDuClub(club) {
+  const rue = (club?.adresse || '').trim();
+  if (!rue) return '';
+  const ville = (club?.ville || '').trim();
+  /* La ville est souvent déjà dans l'adresse saisie : on ne la répète
+     pas, un « Dieppe, DIEPPE » brouille la recherche au lieu de l'aider. */
+  const sans = t => t.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return ville && !sans(rue).includes(sans(ville)) ? `${rue}, ${ville}` : rue;
 }

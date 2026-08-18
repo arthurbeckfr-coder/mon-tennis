@@ -30,7 +30,7 @@
 
 import { h } from './util.js';
 import { store } from './store.js';
-import { distanceKm, direDistance, lienItineraire } from './geocodage.js';
+import { distanceKm, direDistance, lienItineraire, adresseDuClub } from './geocodage.js';
 import { CONTOURS } from './contours.js';
 import { FRANCE, VILLES_FRANCE } from './france.js';
 import { ROUTES, VILLES, COMMUNES_TRACE } from './reperes.js';
@@ -296,7 +296,8 @@ export function carteClubs(clubs) {
                  const d = distanceKm(store?.profil?.domicile?.point, p.point);
                  return d == null ? '' : ' — ' + h(direDistance(d));
                })()}"
-             data-lon="${p.point[0]}" data-lat="${p.point[1]}">
+             data-lon="${p.point[0]}" data-lat="${p.point[1]}"
+             data-adresse="${h(adresseDuClub(p.club))}">
           <title>${h(p.club.nom)} — ${p.matchs.length} match(s), ${p.bilan.v}V–${p.bilan.d}D</title>
           <circle class="carte-halo" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
                   r="${(r * 1.9).toFixed(4)}"/>
@@ -554,7 +555,7 @@ export function brancherCarte(racine, ouvrirClub) {
     const depuis = store?.profil?.domicile?.point;
     const vers = [Number(g.dataset.lon), Number(g.dataset.lat)];
     route.hidden = !depuis;
-    if (depuis) route.href = lienItineraire(depuis, vers);
+    if (depuis) route.href = lienItineraire(depuis, vers, g.dataset.adresse || '');
 
     bulle.hidden = false;
     bloc.querySelectorAll('.carte-club').forEach(x => x.classList.toggle('choisi', x === g));
