@@ -181,7 +181,7 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
     <div class="courbe-paliers">
       ${paliers.map(p => `<span class="courbe-palier-nom${p.echelon === actuel ? ' courant' : ''}"
           title="${h(p.echelon)} — ${p.points} points"
-          data-y="${y(p.points).toFixed(2)}">${h(p.echelon)} · ${p.points} pts</span>`).join('')}
+          data-y="${y(p.points).toFixed(2)}">${h(p.texte || `${p.echelon} · ${p.points} pts`)}</span>`).join('')}
     </div>
 
     ${/* La pastille du point choisi vit en HTML, comme la bulle. Dans le

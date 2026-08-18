@@ -371,24 +371,43 @@ function rendreCalendrier(reglages) {
       seul : l'objectif choisi plus haut ne le change pas.</p>
 
     ${(() => {
-      /* ─── Deux traits, pas davantage ──────────────────────────────
+      /* ─── Deux traits, et pourquoi ils ne se lisent pas de la même
+             façon ────────────────────────────────────────────────────
 
-         On montrait tous les échelons traversés : jusqu'à sept traits
-         serrés dans la hauteur d'un pouce, leurs noms empilés au bord
-         gauche, et la courbe perdue au milieu. Trois ont mieux valu,
-         deux valent mieux encore : le sien, qu'on garde ou qu'on perd,
-         et celui du dessus, qu'on vise. La courbe se lit entre les deux,
-         et c'est tout ce qu'on lui demande ici.
+         Le trait du bas est le seuil de son propre échelon : passer
+         dessous, c'est le perdre. Il se compare directement à la courbe,
+         puisque celle-ci est calculée à cet échelon-là.
 
-         Celui du dessous n'apportait rien qu'un troisième trait à
-         écarter : ce qu'on devient en tombant se lit en toutes lettres
-         sous le graphique, échelon par échelon et date par date — plus
-         précis qu'une ligne de plus. */
+         Le trait du haut ne peut pas être le seuil de l'échelon suivant.
+         Un bilan n'existe pas dans l'absolu : il se recalcule pour chaque
+         échelon visé, et les mêmes victoires y rapportent moins — c'est
+         tout le piège que la page explique plus haut. Comparer une courbe
+         calculée à 15 au seuil publié pour 5/6 revenait à comparer des
+         francs à des euros : quinze points d'écart affichés, là où il en
+         faut bien davantage.
+
+         Le trait du haut est donc posé là où la courbe devrait monter
+         pour que l'échelon suivant soit acquis : le bilan d'aujourd'hui
+         plus ce qu'il manque pour l'obtenir, ce manque étant calculé, lui,
+         dans l'échelle du haut. Les deux traits parlent alors la même
+         langue que la courbe. */
       const i = rang(mien);
-      const paliers = [ECHELONS[i + 1], mien]
-        .filter(Boolean)
-        .map(e => ({ echelon: e, points: seuil(e, store.profil.sexe)?.points }))
-        .filter(p => p.points != null)
+      const suivant = ECHELONS[i + 1];
+      const manqueHaut = suivant
+        ? simuler({ ...reglages, echelon: mien, cible: suivant }).manque
+        : null;
+
+      const paliers = [
+        { echelon: mien, points: seuil(mien, store.profil.sexe)?.points },
+        manqueHaut != null
+          ? { echelon: suivant, points: maintenant.bilan + manqueHaut,
+              /* « +195 pts » plutôt que « 675 pts » : le chiffre absolu
+                 n'est celui d'aucun barème publié — c'est une hauteur sur
+                 cette courbe-ci. Ce qui se retient, c'est ce qu'il reste
+                 à trouver. */
+              texte: manqueHaut ? `${suivant} · +${manqueHaut} pts` : `${suivant} · acquis` }
+          : null,
+      ].filter(p => p && p.points != null)
         .sort((a, b) => a.points - b.points);
 
       const changements = [];
