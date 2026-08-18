@@ -328,7 +328,12 @@ export function blocTerrain({ selection = [], gaucher = false, compte = {} } = {
      sélection — toucher « amortie » en bas allume le même filtre que
      toucher une zone en haut — parce que ce sont les mêmes conseils
      qu'on cherche. */
-  return `<div class="terrain-bloc">
+  /* Dès qu'un coup est retenu, le bloc entier le sait : le reste
+     s'estompe pour que le trait choisi se détache. Sept trajectoires qui
+     se croisent, toutes de la même couleur, ne se distinguent que par
+     l'extinction des autres — surligner la bonne ne suffit pas quand elle
+     passe derrière trois voisines. */
+  return `<div class="terrain-bloc${selection.length ? ' a-choix' : ''}">
     ${dessinerTerrain({ selection, gaucher, compte })}
     <p class="tiny muted terrain-aide">Vue de dessus : où la balle tombe.</p>
     ${dessinerProfil({ selection, compte })}

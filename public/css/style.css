@@ -2012,3 +2012,25 @@ body.mode-court .view { padding-top: 6px; }
 /* Les lignes de service, marquées au sol : le service doit tomber entre
    elles et le filet, ce qu'aucun texte ne dirait aussi vite. */
 .p-service { stroke: var(--muet); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+
+/* ===================================================================
+   Un coup choisi éteint les autres
+   =================================================================== */
+/* Surligner le trait retenu ne suffit pas : sept trajectoires de même
+   couleur se croisent, et la bonne passe derrière trois voisines. C'est
+   l'extinction du reste qui la fait ressortir — le procédé de toute carte
+   qui met un itinéraire en avant. */
+.terrain-bloc.a-choix .p-trajet:not(.actif) { opacity: .18; }
+.terrain-bloc.a-choix .t-fleche:not(.actif) { opacity: .16; }
+/* Les zones portent la structure du court : on les atténue sans les
+   effacer, sinon le terrain lui-même disparaîtrait. */
+.terrain-bloc.a-choix .t-zone:not(.actif) { opacity: .42; }
+.terrain-bloc.a-choix .p-trajet,
+.terrain-bloc.a-choix .t-fleche,
+.terrain-bloc.a-choix .t-zone { transition: opacity .15s; }
+/* Ce qu'on survole redevient lisible : on doit pouvoir viser un voisin
+   sans avoir à désélectionner d'abord. */
+.terrain-bloc.a-choix .p-trajet:not(.actif):hover,
+.terrain-bloc.a-choix .t-fleche:not(.actif):hover,
+.terrain-bloc.a-choix .p-trajet:not(.actif):focus-visible,
+.terrain-bloc.a-choix .t-fleche:not(.actif):focus-visible { opacity: .75; }
