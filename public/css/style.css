@@ -1073,12 +1073,26 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
 .carte-moitie.haut { fill: var(--victoire); }
 .carte-moitie.bas { fill: var(--defaite); }
 /* La couture : le trait qui fait la balle. En épaisseur d'écran, sans
-   quoi elle s'épaissirait avec le zoom jusqu'à barrer la balle. */
+   quoi elle s'épaissirait avec le zoom jusqu'à barrer la balle.
+
+   Elle était tirée en couleur de texte : sur le thème sombre, un trait
+   presque blanc à moitié transparent posé sur du jaune vif — on ne le
+   voyait pas. Le même réflexe que pour le trait de côte et les lignes de
+   palier, et la même correction : la couleur du texte n'est pas faite
+   pour se détacher d'un aplat coloré, elle est faite pour le fond de la
+   page.
+
+   Une balle est jaune, verte ou rouge — trois teintes claires et
+   saturées, quel que soit le thème. Une couture d'encre sombre s'y
+   détache dans tous les cas — mesuré : 7,7 pour 1 sur le jaune, 5 pour 1
+   sur le vert, 4,1 pour 1 sur le rouge, là où il en faut 3. C'est aussi
+   la couleur du cerne : la balle est dessinée d'un seul trait. */
 .carte-couture {
   fill: none;
-  stroke: var(--texte);
-  stroke-opacity: .5;
-  stroke-width: 1;
+  stroke: #232a10;
+  stroke-opacity: .85;
+  stroke-width: 1.4;
+  stroke-linecap: round;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
@@ -1086,12 +1100,9 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
 .carte-club.gagnant .carte-halo { fill: var(--victoire); }
 .carte-club.perdu .carte-point { fill: var(--defaite); stroke-dasharray: 3 2; }
 .carte-club.perdu .carte-halo { fill: var(--defaite); }
-/* Sur fond de couleur pleine, la couture se lit en clair — et dans le cas
-   mixte elle n'est plus un ornement mais la frontière entre les deux
-   moitiés : elle s'épaissit d'autant. */
-.carte-club.gagnant .carte-couture,
-.carte-club.perdu .carte-couture { stroke: #fff; stroke-opacity: .8; }
-.carte-club.mixte .carte-couture { stroke: #fff; stroke-opacity: .95; stroke-width: 1.8; }
+/* Dans le cas mixte, la couture n'est plus un ornement mais la frontière
+   entre le vert et le rouge : elle s'épaissit d'autant. */
+.carte-club.mixte .carte-couture { stroke-opacity: 1; stroke-width: 1.9; }
 .carte-club { cursor: pointer; }
 .carte-club:hover .carte-halo, .carte-club:focus-visible .carte-halo { opacity: .34; }
 .carte-club:focus-visible { outline: none; }
