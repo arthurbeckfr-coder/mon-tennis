@@ -1475,6 +1475,27 @@ body.mode-court .view { padding-top: 6px; }
 /* Le titre est la poignée : on touche, le texte se déplie. Le chevron le
    dit, à la place du triangle natif qui ne se met pas en forme pareil
    d'un navigateur à l'autre. */
+/* Un bloc replié sur son titre. Même geste que la carte d'un conseil, et
+   même chevron : ce qui se touche pour ouvrir doit se ressembler partout. */
+.pli > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  list-style: none;
+  cursor: pointer;
+}
+.pli > summary::-webkit-details-marker { display: none; }
+.pli > summary::after {
+  content: '⌄';
+  margin-left: auto;
+  font-size: 1.1rem;
+  color: var(--muet);
+  transition: transform .15s;
+}
+.pli[open] > summary::after { transform: rotate(180deg); }
+.pli > summary h3 { margin: 0; }
+.pli[open] > summary { margin-bottom: 10px; }
+
 .court-carte-tete {
   display: flex;
   align-items: center;

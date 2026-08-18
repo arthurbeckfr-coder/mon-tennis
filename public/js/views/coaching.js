@@ -61,10 +61,15 @@ function compterParCoup(f) {
 
 
 /** Au premier lancement : on ne meuble pas avec des conseils inventés, on
- *  montre les situations à remplir. */
+ *  montre les situations à remplir.
+ *
+ *  Repliée sur son titre, parce qu'elle est longue et qu'on la lit une
+ *  fois. Dépliée par défaut, elle repoussait le court d'un écran entier
+ *  à chaque visite — or c'est le court qu'on vient voir, et le conseil
+ *  qu'on vient noter tient dans le « + ». */
 function amorce() {
-  return `<section class="carte carte-amorce">
-    <h3>Ton carnet est vide — c'est normal</h3>
+  return `<details class="carte carte-amorce pli">
+    <summary><h3>Ton carnet est vide — c'est normal</h3></summary>
     <p>Les conseils qui comptent sont ceux que tes profs te donnent, avec leurs mots.
        Je ne les invente pas à leur place. En revanche, les situations dont tu m'as
        parlé sont déjà prêtes : touche l'une d'elles pour noter ce qu'on t'a dit
@@ -78,7 +83,7 @@ function amorce() {
     <p class="tiny muted">Le réflexe à prendre : juste après le cours, dans la voiture,
        noter les deux ou trois phrases qui restent. C'est là qu'elles sont encore
        fraîches — et c'est ce carnet-là qui te servira en match.</p>
-  </section>`;
+  </details>`;
 }
 
 const neuf = () => ({
