@@ -1401,9 +1401,9 @@ export function chaussureForm(existant = null) {
  */
 export function blocDonnees() {
   return `<div class="form">
-      <h3>Sur tous mes appareils</h3>
-      <div id="bloc-sync"></div>
-
+      ${/* Le compte est en tête de la page, sous « Mon compte » : le
+            redire ici mettrait deux fois le même identifiant dans le
+            document, et le branchement ne saurait plus lequel remplir. */''}
       <p class="tiny muted">Le carnet vit d'abord dans ce navigateur : c'est ce qui le rend
         utilisable sur un court sans réseau. La synchronisation ne fait que transporter
         l'état d'un appareil à l'autre — et elle complète sans jamais écraser, donc deux

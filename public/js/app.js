@@ -104,10 +104,8 @@ function afficher() {
 
   document.querySelectorAll('.tabbar a').forEach(a =>
     a.classList.toggle('active', a.dataset.tab === route.tab));
-  // Les deux répertoires de la barre du haut s'allument comme des onglets,
-  // sans en occuper un.
-  $('btn-joueurs').classList.toggle('active', route.tab === '/joueurs');
-  $('btn-clubs').classList.toggle('active', route.tab === '/clubs');
+  // Le profil vit dans la barre du haut : il s'allume comme les autres.
+  $('btn-profil')?.classList.toggle('active', route.tab === '/matos');
 
   try {
     vue.innerHTML = route.render(params);
@@ -221,11 +219,11 @@ document.addEventListener('data-changed', () => {
    fonctionne exactement comme avant. C'est la règle qui compte, parce que
    l'écran le plus utile de ce site se consulte sur un terrain où le réseau
    ne passe pas. */
-/* Le témoin de synchronisation s'est déplacé avec la sauvegarde : il
-   marque désormais l'onglet du profil, où le bloc se trouve. Un témoin
-   n'a de sens qu'à côté de ce qu'il concerne. */
+/* Le témoin de synchronisation suit la sauvegarde : elle vit dans le
+   profil, il marque donc l'icône du profil. Un témoin n'a de sens qu'à
+   côté de ce qu'il concerne. */
 function rafraichirIndicateur() {
-  const b = document.querySelector('.tabbar a[data-tab="/matos"]');
+  const b = $('btn-profil');
   if (!b) return;
   if (nuage.enTrain()) { b.dataset.sync = 'cours'; b.title = 'Synchronisation en cours…'; }
   else if (nuage.connecte()) { b.dataset.sync = 'ok'; b.title = `Synchronisé — ${nuage.courriel()}`; }

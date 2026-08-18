@@ -18,6 +18,7 @@ import { pointDuClub } from '../carte.js';
 import { saisonDe } from './matchs.js';
 import { direTour } from '../store.js';
 import { distanceKm, situer } from '../geocodage.js';
+import { ECHELONS } from '../classement.js';
 import {
   CATEGORIES_COURSES, TROUSSE_TYPE, nomCause,
   statsCordages, ageCordage, dureesDeVie,
@@ -99,93 +100,173 @@ function ligneInfo(emoji, libelle, valeur, lien = '') {
     <div><span class="tiny muted">${h(libelle)}</span><br>${contenu}</div></li>`;
 }
 
+/* ─── Le profil, d'un seul tenant ──────────────────────────────────────
+ *
+ * C'était trois cartes en lecture seule, chacune avec un bouton qui
+ * ouvrait une fenêtre où l'on modifiait. Trois allers-retours pour
+ * changer un numéro de licence, et surtout : ce qu'on lisait n'était pas
+ * ce qu'on modifiait. Une page de réglages doit se régler sur place.
+ *
+ * Tout est donc éditable ici, et chaque champ s'enregistre en le
+ * quittant — pas de bouton « Enregistrer » à oublier. La connexion vient
+ * en tête : c'est elle qui décide si le reste vivra sur un seul appareil
+ * ou sur tous, et c'est la première chose à faire sur un téléphone neuf.
+ */
+/** Les champs du profil s'enregistrent en les quittant.
+ *
+ *  Pas de bouton « Enregistrer » : il se sait, se cherche et s'oublie, et
+ *  l'on repart d'un écran de réglages en croyant avoir réglé. `change` se
+ *  déclenche à la sortie du champ pour du texte, au choix pour une liste :
+ *  dans les deux cas au moment où l'on a fini.
+ *
+ *  Une adresse fait un détour de plus : elle est cherchée avant d'être
+ *  rangée, et l'on écrit sous le champ ce qu'on a trouvé — ou qu'on n'a
+ *  rien trouvé, ce qui vaut mieux qu'un point posé au hasard.
+ */
+function brancherProfil(vue) {
+  const textes = ['prenom', 'nom', 'licence', 'naissance', 'telephone', 'mail',
+                  'clubPrincipal', 'echelon', 'sexe'];
+
+  vue.addEventListener('change', async e => {
+    const el = e.target.closest('[name]');
+    if (!el || !vue.contains(el)) return;
+    const cle = el.name;
+
+    if (textes.includes(cle)) {
+      maj(s => { s.profil = { ...s.profil, [cle]: el.value.trim() }; });
+      return;
+    }
+    if (cle === 'gaucher') {
+      maj(s => { s.profil = { ...s.profil, gaucher: el.value === '1' }; });
+      return;
+    }
+    if (cle === 'coutKm') {
+      const v = el.value === '' ? null : Number(el.value);
+      maj(s => { s.profil = { ...s.profil, coutKm: v }; });
+      return;
+    }
+
+    if (cle === 'domicile' || cle === 'bureau') {
+      const adresse = el.value.trim();
+      const etat = vue.querySelector(`[data-etat="${cle}"]`);
+      if (!adresse) {
+        maj(s => { s.profil = { ...s.profil, [cle]: null }; });
+        return;
+      }
+      if (etat) etat.textContent = 'recherche…';
+      const r = await situer(adresse);
+      maj(s => {
+        s.profil = { ...s.profil, [cle]: r.ok
+          ? { adresse, point: r.point, libelle: r.libelle }
+          : { adresse, point: null, libelle: '' } };
+      });
+      if (!r.ok) toast(`Adresse non trouvée : ${r.erreur}`);
+    }
+  });
+}
 function vueMoi() {
   const p = store.profil;
-  const nomComplet = [p.prenom, p.nom].filter(Boolean).join(' ');
-  const infos = [
-    ligneInfo('🪪', 'Licence', p.licence),
-    ligneInfo('🏟️', 'Mon club', p.clubPrincipal),
-    ligneInfo('📞', 'Téléphone', p.telephone, p.telephone ? `tel:${p.telephone.replace(/\s/g, '')}` : ''),
-    ligneInfo('✉️', 'E-mail', p.mail, p.mail ? `mailto:${p.mail}` : ''),
-    ligneInfo('🎂', 'Naissance', p.naissance ? dateCourte(p.naissance) : ''),
-  ].filter(Boolean).join('');
 
-  const lieu = (emoji, libelle, l) => !l?.adresse ? '' :
-    `<li><span class="fiche-emoji">${emoji}</span>
-      <div><span class="tiny muted">${h(libelle)}</span><br>${h(l.libelle || l.adresse)}
-      ${l.point ? '' : ' <em class="tiny muted">(pas situé sur la carte)</em>'}</div></li>`;
+  const champ = (cle, libelle, o = {}) => `<label>${h(libelle)}
+    <input name="${cle}" type="${o.type || 'text'}" value="${h(p[cle] ?? '')}"
+      ${o.placeholder ? `placeholder="${h(o.placeholder)}"` : ''}
+      ${o.inputmode ? `inputmode="${o.inputmode}"` : ''}
+      ${o.autocomplete ? `autocomplete="${o.autocomplete}"` : ''}></label>`;
 
-  const lieux = lieu('🏠', 'Domicile', p.domicile) + lieu('💼', 'Travail', p.bureau);
-
-  /* Une adresse écrite mais jamais situées n'apparaît sur aucune carte, et
-     rien ne le dit assez fort : on croit la fonction en panne alors qu'il
-     manque une recherche d'un dixième de seconde. Le bouton la lance ici,
-     sans rouvrir le formulaire. */
-  const aSituer = [p.domicile, p.bureau].filter(l => l?.adresse && !l.point).length;
+  const lieu = (cle, libelle, exemple) => {
+    const l = p[cle];
+    return `<label>${h(libelle)}
+      <input name="${cle}" value="${h(l?.adresse || '')}" placeholder="${h(exemple)}"></label>
+      <p class="tiny muted" data-etat="${cle}">${
+        !l?.adresse ? 'Rien pour l\'instant.'
+        : l.point ? `📍 ${h(l.libelle || l.adresse)}`
+        : '⚠️ pas encore trouvée sur la carte — vérifie la commune et le code postal'}</p>`;
+  };
 
   return `
+    ${/* La connexion en tête : c'est elle qui décide si le reste vivra sur
+          un appareil ou sur tous. */''}
     <section class="carte">
-      <div class="fiche-tete">
-        <div>
-          <h2>${h(nomComplet || 'Moi')}</h2>
-          <p class="tiny muted">${h(p.echelon)}${p.gaucher ? ' · gaucher' : ''}${
-            p.sexe === 'f' ? ' · barème dames' : ''}</p>
+      <h3>Mon compte</h3>
+      <div id="bloc-sync"></div>
+    </section>
+
+    <section class="carte">
+      <h3>Qui je suis</h3>
+      <div class="form">
+        <div class="duo">
+          ${champ('prenom', 'Prénom', { placeholder: 'Arthur' })}
+          ${champ('nom', 'Nom', { placeholder: 'BECK' })}
         </div>
-        <button class="btn btn-ghost" data-identite>Modifier</button>
+        <div class="duo">
+          ${champ('licence', 'Numéro de licence', { placeholder: '1234567 A' })}
+          ${champ('naissance', 'Naissance', { type: 'date' })}
+        </div>
+        <div class="duo">
+          ${champ('telephone', 'Téléphone', { type: 'tel', autocomplete: 'tel' })}
+          ${champ('mail', 'E-mail', { type: 'email', autocomplete: 'email' })}
+        </div>
+        ${champ('clubPrincipal', 'Mon club', { placeholder: 'TC de ma ville' })}
+        <p class="tiny muted">Le numéro de licence est ce qu'on cherche le plus souvent,
+          debout au club, au moment de s'inscrire. Rien de tout cela ne sort du carnet.</p>
       </div>
-      ${infos ? `<ul class="fiche-infos">${infos}</ul>`
-        : `<p class="tiny muted">Rien de renseigné. Le numéro de licence est ce qu'on
-           cherche le plus souvent, debout au club, au moment de s'inscrire.</p>`}
     </section>
 
     <section class="carte">
-      <div class="fiche-tete">
-        <div><h3>D'où je pars</h3></div>
-        <button class="btn btn-ghost" data-profil>Régler</button>
+      <h3>Mon classement</h3>
+      <div class="form">
+        <div class="duo">
+          <label>Mon échelon
+            <select name="echelon">${ECHELONS.map(e =>
+              `<option value="${h(e)}" ${e === p.echelon ? 'selected' : ''}>${h(e)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Barème
+            <select name="sexe">
+              <option value="h" ${p.sexe === 'h' ? 'selected' : ''}>Messieurs</option>
+              <option value="f" ${p.sexe === 'f' ? 'selected' : ''}>Dames</option>
+            </select>
+          </label>
+        </div>
+        <label>Ma main
+          <select name="gaucher">
+            <option value="" ${!p.gaucher ? 'selected' : ''}>Droitier</option>
+            <option value="1" ${p.gaucher ? 'selected' : ''}>Gaucher</option>
+          </select>
+        </label>
+        <p class="tiny muted">La main décide de quel côté du terrain se trouve ton coup
+          droit, sur le dessin de l'écran « Sur le court ». Le classement de départ, et
+          c'est tout : le bilan, les victoires comptabilisées et les bonifications se
+          calculent depuis tes matchs, comme le fait la fédération.</p>
+        <div class="rangee-boutons">
+          <button class="btn btn-ghost" data-bareme>Voir et corriger le barème</button>
+        </div>
       </div>
-      ${lieux ? `<ul class="fiche-infos">${lieux}</ul>`
-        : `<p class="tiny muted">Aucune adresse. Renseigne ton domicile et le carnet saura
-           dire quels clubs sont à côté, et combien de kilomètres tu fais pour aller
-           jouer.</p>`}
-      ${aSituer ? `<p class="tiny muted">${aSituer > 1
-          ? 'Ces adresses ne sont pas encore placées sur la carte.'
-          : "Cette adresse n'est pas encore placée sur la carte."}</p>
-        <button class="btn btn-ghost" data-situer-lieux>📍 Placer sur la carte</button>` : ''}
-      ${p.coutKm ? `<p class="tiny muted">Coût du kilomètre réglé à ${p.coutKm} €.</p>` : ''}
     </section>
 
     <section class="carte">
-      <div class="fiche-tete">
-        <div><h3>Mon classement</h3></div>
-        <button class="btn btn-ghost" data-profil>Régler</button>
-      </div>
-      <ul class="fiche-infos">
-        <li><span class="fiche-emoji">🏅</span><div>
-          <span class="tiny muted">Échelon</span><br>${h(p.echelon)}</div></li>
-        <li><span class="fiche-emoji">✋</span><div>
-          <span class="tiny muted">Ma main</span><br>${p.gaucher ? 'Gaucher' : 'Droitier'}</div></li>
-      </ul>
-      <p class="tiny muted">Le détail du calcul et les projections se lisent dans l'onglet
-        Classement, en bas — qui ne fait que lire : tout ce qui se règle se règle ici.</p>
-      ${/* Le barème vient du profil et non de la page qui l'utilise : on
-            va régler ce qui est à soi là où l'on va se relire. */''}
-      <div class="rangee-boutons">
-        <button class="btn btn-ghost" data-bareme>Voir et corriger le barème</button>
+      <h3>D'où je pars</h3>
+      <div class="form">
+        <p class="tiny muted">Pour situer les clubs par rapport à chez toi et savoir
+          lesquels sont à côté. Une adresse est cherchée dès que tu quittes le champ, et
+          rien n'est deviné : une adresse non reconnue reste sans point plutôt que
+          d'être placée au hasard.</p>
+        ${lieu('domicile', 'Mon domicile', '12 rue des Écoles, 76000 Rouen')}
+        ${lieu('bureau', 'Mon travail', '3 place du Marché, 76200 Dieppe')}
+        <label>Coût du kilomètre
+          <input name="coutKm" type="number" min="0" step="0.01" inputmode="decimal"
+            value="${p.coutKm ?? ''}" placeholder="par exemple 0,30"></label>
+        <p class="tiny muted">Sert à estimer ce que la route coûte, dans l'onglet Argent.
+          Laissé vide, le carnet compte les kilomètres et s'arrête là plutôt que
+          d'inventer un prix.</p>
       </div>
     </section>
 
-    ${/* La sauvegarde et le transfert vivaient dans une fenêtre ouverte
-          depuis une disquette, en haut de l'écran. Deux défauts : l'icône
-          ne disait rien à qui ne l'a pas connue, et une fenêtre est un
-          lieu qu'on ne visite pas — or c'est ici qu'on cherche quand on
-          change de téléphone, c'est-à-dire une fois, sans savoir où
-          regarder. */''}
     <section class="carte">
       <h3>Sauvegarde et transfert</h3>
       ${blocDonnees()}
     </section>`;
 }
-
 /* ─── Ce que le tennis coûte ───────────────────────────────────────────
 
    Deux natures de chiffres, et l'écran ne les mélange jamais.
@@ -798,7 +879,10 @@ export function wire(vue, rerendre) {
   /* Le bloc de sauvegarde ne se branche que là où il est affiché : les
      autres onglets ne le contiennent pas, et brancher dans le vide
      lèverait une erreur sur un `querySelector` qui ne trouve rien. */
-  if (onglet === 'moi') brancherDonnees(vue);
+  if (onglet === 'moi') {
+    brancherDonnees(vue);
+    brancherProfil(vue);
+  }
   vue.addEventListener('click', async e => {
     const ry = e.target.closest('[data-rayon]');
     if (ry) { rayon = ry.dataset.rayon; rerendre(); return; }
