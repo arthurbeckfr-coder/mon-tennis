@@ -314,7 +314,35 @@ export function dessinerProfil({ selection = [], compte = {} } = {}) {
     <line class="p-service" x1="${P.FILET + 58}" y1="${P.SOL - 4}"
           x2="${P.FILET + 58}" y2="${P.SOL + 4}"/>
     <line class="p-filet" x1="${P.FILET}" y1="${P.HAUT_FILET}" x2="${P.FILET}" y2="${P.SOL}"/>
-    <circle class="p-joueur" cx="${P.FRAPPE_X - 6}" cy="${P.SOL - 10}" r="5"/>
+    ${/* Un joueur plutôt qu'un point. Le point ne disait pas d'où part la
+          balle ni pourquoi elle part de là : la raquette, elle, se trouve
+          exactement au point de frappe des trajectoires, et l'on comprend
+          d'un regard que tout part de la même main.
+
+          Dessiné au trait et non importé : le carnet n'embarque aucune
+          image, et un bonhomme de quinze lignes se colore tout seul avec
+          le thème là où un PNG resterait noir sur fond noir. */''}
+    <g class="p-joueur">
+      <circle class="p-joueur-tete" cx="${P.FRAPPE_X - 16}" cy="${P.SOL - 30}" r="4.2"/>
+      <path class="p-joueur-corps"
+            d="M ${P.FRAPPE_X - 16} ${P.SOL - 25}
+               L ${P.FRAPPE_X - 16} ${P.SOL - 13}"/>
+      <path class="p-joueur-corps"
+            d="M ${P.FRAPPE_X - 16} ${P.SOL - 13}
+               L ${P.FRAPPE_X - 21} ${P.SOL}
+               M ${P.FRAPPE_X - 16} ${P.SOL - 13}
+               L ${P.FRAPPE_X - 10} ${P.SOL}"/>
+      ${/* Le bras porteur monte vers la raquette, posée au point de frappe
+            même : c'est de là que partent toutes les courbes. */''}
+      <path class="p-joueur-corps"
+            d="M ${P.FRAPPE_X - 16} ${P.SOL - 23}
+               L ${P.FRAPPE_X - 8} ${P.FRAPPE_Y + 4}"/>
+      <path class="p-joueur-corps"
+            d="M ${P.FRAPPE_X - 16} ${P.SOL - 22}
+               L ${P.FRAPPE_X - 24} ${P.SOL - 16}"/>
+      <ellipse class="p-raquette" cx="${P.FRAPPE_X - 4}" cy="${P.FRAPPE_Y - 1}"
+               rx="3.4" ry="5" transform="rotate(28 ${P.FRAPPE_X - 4} ${P.FRAPPE_Y - 1})"/>
+    </g>
     ${traces}
   </svg>`;
 }
