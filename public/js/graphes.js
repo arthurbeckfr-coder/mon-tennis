@@ -364,6 +364,46 @@ export function brancherCourbe(racine) {
      les tant de repères, l'écart choisi pour qu'aucune n'en touche une
      autre. En s'approchant, l'intervalle se resserre tout seul et les
      mois remplacent les années. */
+  /** Les noms des paliers, chacun à la hauteur de sa ligne.
+   *
+   *  Ils se poussaient l'un l'autre vers le bas quand ils se touchaient :
+   *  entre 15 et 5/6 il y a quinze points, soit une vingtaine de pixels,
+   *  et deux libellés de quinze pixels de haut n'y tiennent pas tout à
+   *  fait. Le nom finissait à côté de sa ligne, ce qui est pire que de le
+   *  cacher : on lit un chiffre en face d'un trait qui n'est pas le sien.
+   *
+   *  Ils changent donc de côté plutôt que de hauteur — le premier à
+   *  gauche, celui qui le gênerait à droite — et chacun reste exactement
+   *  en face de son trait. Il n'y en a que trois : deux côtés suffisent.
+   *  Le décalage vertical ne sert plus que de dernier recours, si les
+   *  deux bords sont pris à la même hauteur. */
+  const placerPaliers = () => {
+    const r = svg.getBoundingClientRect();
+    if (!r.height) return;
+
+    const poses = [];                       // [haut, bas, côté]
+    const gene = (haut, bas, cote) =>
+      poses.some(p => p[2] === cote && !(haut > p[1] + 2 || bas < p[0] - 2));
+
+    for (const el of etiquettes) {
+      const px = ((Number(el.dataset.y) - vue[1]) / vue[3]) * r.height;
+      el.hidden = px < -20 || px > r.height + 20;
+      if (el.hidden) continue;
+
+      const h = el.offsetHeight || 15;
+      let haut = px - h / 2;
+      let cote = 'gauche';
+
+      if (gene(haut, haut + h, 'gauche')) {
+        if (!gene(haut, haut + h, 'droite')) cote = 'droite';
+        else haut = Math.max(...poses.map(p => p[1])) + 2;
+      }
+
+      el.classList.toggle('a-droite', cote === 'droite');
+      el.style.top = `${haut}px`;
+      poses.push([haut, haut + h, cote]);
+    }
+  };
   /* La rangée des dates est sœur du cadre, et non dedans : elle se lit
      sous le dessin, à la même largeur que lui. */
   const rangeeDates = bloc.parentElement?.querySelector('.courbe-dates');
@@ -541,6 +581,13 @@ export function brancherCourbe(racine) {
   });
 
   poser();
+  /* Une seconde passe au tour suivant, et à chaque changement de taille.
+     Au premier affichage, le dessin n'a pas toujours sa hauteur définitive
+     — une police qui se pose, un pli qui s'ouvre au-dessus — et tout ce
+     qui se place en pixels tomberait alors à zéro : les noms des paliers
+     s'empileraient en haut à gauche, tous à la même place. */
+  requestAnimationFrame(poser);
+  if (window.ResizeObserver) new ResizeObserver(poser).observe(svg);
 }
 
 export function courbe({ points, seuil = null, nomSeuil = '' }) {

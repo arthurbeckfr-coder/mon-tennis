@@ -1288,6 +1288,9 @@ a.carte-bulle-route {
      1px 0 2px var(--carte-2), -1px 0 2px var(--carte-2);
 }
 .courbe-palier-nom.courant { color: var(--accent); }
+/* Deux noms trop proches ne se poussent pas : le second passe à droite,
+   et reste en face de son trait. */
+.courbe-palier-nom.a-droite { left: auto; right: 6px; }
 
 /* Les points de chaque mois sont transparents : ils restent la cible du
    toucher, ils ne sont plus du décor. Seul celui qu'on a ouvert se
