@@ -359,10 +359,16 @@ export const TOURS = [
 export const nomTour = cle => TOURS.find(t => t.cle === cle)?.nom || '';
 
 /** Ce qu'on dit d'un match : « Vainqueur » quand la finale est gagnée,
- *  le tour lui-même sinon. */
+ *  le tour lui-même sinon.
+ *
+ *  La coupe et la médaille ne sont pas un ornement : dans une liste de
+ *  quarante lignes, elles se repèrent avant tout texte, et ce sont les
+ *  deux seules lignes qu'on y cherche vraiment. Le mot reste à côté —
+ *  une image seule ne se lit pas à voix haute, et se confond d'un
+ *  téléphone à l'autre. */
 export function direTour(m) {
   if (!m?.tour) return '';
-  if (m.tour === 'finale') return m.issue === 'V' ? 'Vainqueur' : 'Finaliste';
+  if (m.tour === 'finale') return m.issue === 'V' ? '🏆 Vainqueur' : '🥈 Finaliste';
   return nomTour(m.tour);
 }
 /* ─── Le championnat par équipes ───────────────────────────────────────
