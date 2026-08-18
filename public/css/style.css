@@ -1960,3 +1960,51 @@ body.mode-court .view { padding-top: 6px; }
   vector-effect: non-scaling-stroke;
   stroke-linejoin: round;
 }
+
+/* ===================================================================
+   Le court vu de côté
+   =================================================================== */
+.terrain-profil {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin: 6px auto 0;
+  height: auto;
+}
+.p-sol { stroke: var(--muet); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.p-filet { stroke: var(--texte); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.p-joueur { fill: var(--muet); opacity: .6; }
+
+/* Une trajectoire se vise mal : le trait fait deux pixels de large. La
+   cible transparente lui donne l'épaisseur d'un doigt sans se voir. */
+.p-cible {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16;
+  vector-effect: non-scaling-stroke;
+}
+.p-trait {
+  fill: none;
+  stroke: var(--muet);
+  stroke-width: 1.6;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+.p-trajet { cursor: pointer; }
+.p-trajet text {
+  fill: var(--muet);
+  font-size: 8px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--carte);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+.p-trajet:hover .p-trait, .p-trajet:focus-visible .p-trait { stroke: var(--texte); }
+.p-trajet:focus-visible { outline: none; }
+.p-trajet.actif .p-trait {
+  stroke: var(--accent);
+  stroke-width: 2.6;
+  stroke-dasharray: none;
+}
+.p-trajet.actif text { fill: var(--accent); }

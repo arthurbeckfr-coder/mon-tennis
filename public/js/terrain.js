@@ -36,15 +36,26 @@ export const COUPS = [
   { cle: 'volee',          nom: 'Volée',          type: 'zone' },
   { cle: 'adv-coup-droit', nom: 'Son coup droit', type: 'zone' },
   { cle: 'adv-revers',     nom: 'Son revers',     type: 'zone' },
-  { cle: 'croise',         nom: 'Croisé',         type: 'fleche' },
+  { cle: 'croise',         nom: 'Croisé long',    type: 'fleche' },
+  /* Le croisé court n'est pas un croisé plus faible : c'est un autre
+     coup, qui sort l'adversaire du court par le côté au lieu de le
+     repousser au fond. Il méritait sa flèche. */
+  { cle: 'croise-court',   nom: 'Croisé court',   type: 'fleche' },
   { cle: 'long-ligne',     nom: 'Long de ligne',  type: 'fleche' },
-  { cle: 'lob',            nom: 'Lob',            type: 'pastille', emoji: '🌙' },
-  { cle: 'smash',          nom: 'Smash',          type: 'pastille', emoji: '💥' },
-  { cle: 'amortie',        nom: 'Amortie',        type: 'pastille', emoji: '🪶' },
+  /* Les trajectoires se voient de profil et non du dessus : une amortie
+     et un lob tombent au même endroit vus d'en haut, et n'ont rien à voir.
+     D'où la seconde vue, et ce troisième type. */
+  { cle: 'lob',            nom: 'Lob',            type: 'profil', emoji: '🌙' },
+  { cle: 'amortie',        nom: 'Amortie',        type: 'profil', emoji: '🪶' },
+  { cle: 'smash',          nom: 'Smash',          type: 'profil', emoji: '💥' },
+  { cle: 'lift',           nom: 'Lifté',          type: 'profil', emoji: '🌀' },
+  { cle: 'plat',           nom: 'À plat',         type: 'profil', emoji: '➡️' },
+  { cle: 'slice',          nom: 'Slice',          type: 'profil', emoji: '🪃' },
 ];
 
 export const nomCoup = cle => COUPS.find(c => c.cle === cle)?.nom || cle;
 export const PASTILLES = COUPS.filter(c => c.type === 'pastille');
+export const PROFILS_COUPS = COUPS.filter(c => c.type === 'profil');
 
 /** Les zones, placées selon la main qui tient la raquette.
  *  Seule la position change : « coup droit » reste « coup droit ». */
@@ -77,13 +88,20 @@ function zones(gaucher) {
 function fleches(gaucher) {
   const depart = gaucher ? 72 : 168;
   const arrivee = gaucher ? 168 : 72;
+  /* Le croisé court meurt dans le carré de service, près du couloir :
+     c'est ce qui le distingue du croisé long, et ce qui sort l'adversaire
+     du court. Sa flèche s'arrête donc là où la balle tombe. */
+  const courtX = gaucher ? 186 : 54;
   return [
-    { cle: 'croise', nom: 'Croisé',
+    { cle: 'croise', nom: 'Croisé long',
       d: `M ${depart} 400 L ${arrivee} 68`,
-      lx: gaucher ? 148 : 92, ly: 210 },
+      lx: gaucher ? 152 : 88, ly: 232 },
+    { cle: 'croise-court', nom: 'Croisé court',
+      d: `M ${depart} 400 Q ${(depart + courtX) / 2} 300 ${courtX} 190`,
+      lx: gaucher ? 196 : 44, ly: 176 },
     { cle: 'long-ligne', nom: 'Long de ligne',
       d: `M ${depart} 400 L ${depart} 68`,
-      lx: depart, ly: 168 },
+      lx: depart, ly: 150 },
   ];
 }
 
@@ -157,20 +175,104 @@ export function dessinerTerrain({ selection = [], gaucher = false, compte = {} }
   </svg>`;
 }
 
+
+/* ─── Le court vu de côté ──────────────────────────────────────────────
+
+   Le dessin du dessus dit *où* la balle tombe. Il ne dit rien de ce
+   qu'elle fait en chemin — or une amortie et un lob tombent quasiment au
+   même endroit vus d'en haut, et n'ont rien à voir. La hauteur, c'est
+   l'autre moitié du tennis, et elle ne se voit que de profil.
+
+   Six trajectoires, tracées depuis le même point de frappe pour qu'on les
+   compare : c'est l'écart entre les courbes qui enseigne, pas chaque
+   courbe prise seule. Le service part de plus haut, parce qu'il part de
+   plus haut.
+
+   Les proportions ne sont pas celles d'un vrai court — un terrain fait
+   vingt-quatre mètres de long pour un filet d'un mètre, ce qui donnerait
+   un trait plat où l'on ne verrait rien. La hauteur est donc exagérée,
+   comme sur tous les schémas de tennis, et pour la même raison : on
+   dessine ce qu'il faut comprendre, pas ce qu'on mesurerait. */
+const P = {
+  SOL: 96,          // la ligne de terre
+  X0: 16, X1: 232,  // les deux fonds de court
+  FILET: 124,       // le filet, entre les deux
+  HAUT_FILET: 70,   // son sommet
+  FRAPPE_X: 30, FRAPPE_Y: 74,
+};
+
+const TRAJECTOIRES = [
+  /* Chaque étiquette est posée à la main, sur un espace libre de sa propre
+     courbe : sept trajectoires qui partent du même point se croisent
+     partout, et un placement automatique — au bout, au sommet — les
+     empilerait toutes au même endroit. */
+  { cle: 'lob', nom: 'Lob',
+    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 126 -34 210 86`,
+    lx: 128, ly: 4, ancre: 'middle' },
+  { cle: 'lift', nom: 'Lifté',
+    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 124 14 204 90`,
+    lx: 116, ly: 32, ancre: 'middle' },
+  { cle: 'smash', nom: 'Smash',
+    d: `M 54 16 Q 110 40 170 92`,
+    lx: 58, ly: 12, ancre: 'start' },
+  { cle: 'service', nom: 'Service',
+    d: `M 22 28 Q 92 40 150 86`,
+    lx: 18, ly: 22, ancre: 'start' },
+  { cle: 'plat', nom: 'À plat',
+    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 130 50 212 88`,
+    lx: 218, ly: 62, ancre: 'end' },
+  { cle: 'slice', nom: 'Slice',
+    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 132 66 192 93`,
+    lx: 196, ly: 84, ancre: 'end' },
+  { cle: 'amortie', nom: 'Amortie',
+    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 106 52 138 93`,
+    lx: 134, ly: 68, ancre: 'middle' },
+];
+
+/**
+ * Le court de profil, avec ses trajectoires cliquables.
+ * Même contrat que le terrain vu du dessus : une sélection, des comptes.
+ */
+export function dessinerProfil({ selection = [], compte = {} } = {}) {
+  const traces = TRAJECTOIRES.map(t => {
+    const n = compte[t.cle] || 0;
+    const actif = selection.includes(t.cle) ? ' actif' : '';
+    return `<g class="p-trajet${actif}" data-coup="${t.cle}"
+               role="button" tabindex="0" aria-pressed="${selection.includes(t.cle)}">
+      <title>${t.nom}${n ? ` — ${n} conseil(s)` : ''}</title>
+      <path class="p-cible" d="${t.d}"/>
+      <path class="p-trait" d="${t.d}" marker-end="url(#pointe)"/>
+      <text x="${t.lx}" y="${t.ly}" text-anchor="${t.ancre}"
+        >${t.nom}${n ? ` (${n})` : ''}</text>
+    </g>`;
+  }).join('');
+
+  return `<svg class="terrain-profil" viewBox="0 -6 248 112" role="group"
+               aria-label="Trajectoires de balle, vues de côté">
+    <rect class="t-surface" x="${P.X0 - 6}" y="${P.SOL - 2}"
+          width="${P.X1 - P.X0 + 12}" height="8" rx="2"/>
+    <line class="p-sol" x1="${P.X0 - 6}" y1="${P.SOL}" x2="${P.X1 + 6}" y2="${P.SOL}"/>
+    <line class="p-filet" x1="${P.FILET}" y1="${P.HAUT_FILET}" x2="${P.FILET}" y2="${P.SOL}"/>
+    <circle class="p-joueur" cx="${P.FRAPPE_X - 6}" cy="${P.SOL - 10}" r="5"/>
+    ${traces}
+  </svg>`;
+}
+
 /** Le terrain et ses pastilles, d'un bloc. Les deux écrans qui s'en
  *  servent — noter un conseil, le retrouver en match — affichent
  *  exactement le même dessin : ce qui a servi à ranger sert à chercher. */
 export function blocTerrain({ selection = [], gaucher = false, compte = {} } = {}) {
-  const pastilles = PASTILLES.map(p => {
-    const n = compte[p.cle] || 0;
-    return `<button type="button" class="pastille ${selection.includes(p.cle) ? 'actif' : ''}"
-              data-coup="${p.cle}" aria-pressed="${selection.includes(p.cle)}">
-      ${p.emoji} ${p.nom}${n ? ` <span class="tiny">(${n})</span>` : ''}</button>`;
-  }).join('');
-
+  /* Les deux vues d'un même court, l'une sous l'autre : du dessus pour
+     savoir où, de profil pour savoir comment. Elles partagent leur
+     sélection — toucher « amortie » en bas allume le même filtre que
+     toucher une zone en haut — parce que ce sont les mêmes conseils
+     qu'on cherche. */
   return `<div class="terrain-bloc">
     ${dessinerTerrain({ selection, gaucher, compte })}
-    <div class="pastilles" style="justify-content:center;margin-top:10px">${pastilles}</div>
+    <p class="tiny muted terrain-aide">Vue de dessus : où la balle tombe.</p>
+    ${dessinerProfil({ selection, compte })}
+    <p class="tiny muted terrain-aide">Vue de côté : ce qu'elle fait en chemin.
+      Les hauteurs sont exagérées — un vrai court donnerait un trait plat.</p>
   </div>`;
 }
 

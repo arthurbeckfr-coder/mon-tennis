@@ -6,6 +6,11 @@
    ressemble en match ? »). Ils partagent donc une barre d'onglets, au lieu
    de s'ignorer depuis deux coins opposés de l'écran.
 
+   Le court vient en premier, et c'est lui que la barre du bas ouvre. Le
+   rapport de force entre les deux est celui de l'usage : on note un
+   conseil une fois, on le relit vingt. Le carnet est du côté du réglage —
+   on y va quand on veut ranger, pas quand on veut jouer.
+
    Le carnet sert après le cours, au calme : on note ce que le prof vient
    de dire, on range, on relit. Il peut être dense.
 
@@ -79,10 +84,10 @@ const emojiCat = cle => CATEGORIES.find(x => x.cle === cle)?.emoji || '💡';
    libre. Ce n'est pas le moment de traverser un écran pour trouver un
    onglet. */
 const barreOnglets = actif => `<div class="segments" style="width:100%;margin-bottom:12px">
-  <button data-onglet-page="#/conseils" class="${actif === 'carnet' ? 'actif' : ''}"
-          style="flex:1">📓 Le carnet</button>
   <button data-onglet-page="#/court" class="${actif === 'court' ? 'actif' : ''}"
           style="flex:1">🎯 Sur le court</button>
+  <button data-onglet-page="#/conseils" class="${actif === 'carnet' ? 'actif' : ''}"
+          style="flex:1">📓 Le carnet</button>
 </div>`;
 
 /** Le passage d'un onglet à l'autre, posé par les deux écrans. */
@@ -289,8 +294,8 @@ export function renderCourt() {
           gaucher: !!store.profil.gaucher,
           compte: compterParCoup(f),
         })}
-        <p class="tiny muted terrain-aide">Touche la zone, la direction ou la pastille
-          qui correspond à ce que tu cherches.</p>` : ''}
+        <p class="tiny muted terrain-aide">Touche une zone, une direction ou une
+          trajectoire — celle qui correspond à ce que tu cherches.</p>` : ''}
 
       ${court.onglet === 'adversaire' ? `
         <div class="pastilles pastilles-grosses">
