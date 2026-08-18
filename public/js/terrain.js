@@ -316,62 +316,46 @@ export function dessinerProfil({ selection = [], compte = {} } = {}) {
     <line class="p-service" x1="${P.FILET + 58}" y1="${P.SOL - 4}"
           x2="${P.FILET + 58}" y2="${P.SOL + 4}"/>
     <line class="p-filet" x1="${P.FILET}" y1="${P.HAUT_FILET}" x2="${P.FILET}" y2="${P.SOL}"/>
-    ${/* ─── La silhouette ────────────────────────────────────────────
+    ${/* ─── Le joueur ────────────────────────────────────────────────
 
-          Un bonhomme au trait faisait dessin d'écolier : des bâtons pour
-          les membres, un rond pour la tête. Une silhouette pleine tient
-          mieux la comparaison avec le reste du carnet, dont tout le
-          vocabulaire graphique est fait d'aplats — les disques de la
-          carte, les barres des graphiques, les zones du terrain.
+          Un pictogramme à membres épais et bouts arrondis, dans la manière
+          des panneaux de gymnase : tête ronde détachée, tronc et membres
+          d'une même épaisseur, raquette au cadre ovale. C'est le style qui
+          se lit le plus petit — c'est d'ailleurs pour ça qu'on le trouve
+          sur les panneaux — et il tient à la taille d'un timbre, ce qui
+          est exactement la taille qu'il occupe ici.
 
-          Elle est dessinée en position de frappe, bras tendu, la raquette
-          exactement au départ des sept courbes : c'est ce point-là qui
-          justifie sa présence, et non le décor.
+          La forme naît des épaisseurs de trait, non d'un contour fermé :
+          six segments et deux ovales, là où une silhouette découpée
+          demandait vingt-cinq coordonnées qu'aucun humain ne pouvait
+          relire.
 
-          Quinze coordonnées plutôt qu'une image : le carnet n'embarque
-          aucun fichier binaire, et un aplat prend la couleur du thème là
-          où un PNG resterait noir sur fond noir. */''}
+          Il est en position de frappe, bras tendu, et la raquette tombe
+          exactement au départ des sept courbes — c'est ce point-là qui
+          justifie sa présence, pas le décor. */''}
     <g class="p-joueur">
-      ${/* Le corps d'un seul tenant : buste fuselé, appui avant fléchi,
-            appui arrière tendu. Un contour continu se lit mieux qu'un
-            assemblage de segments, et se remplit d'une seule couleur. */''}
-      <path class="p-silhouette" d="
-        M 14.5 70
-        C 17.2 70 18.4 72.2 18.2 74.4
-        L 17.6 79.6
-        C 19.6 80.2 21.2 81.4 22.2 83
-        L 20.4 84.6
-        C 19.4 83.4 18.2 82.6 16.8 82.2
-        L 16.2 87.2
-        L 19.6 95.8
-        L 16.6 95.8
-        L 13.6 88.6
-        L 10.2 95.8
-        L 7.2 95.8
-        L 11.6 86.4
-        L 12.2 79.4
-        C 10.6 79 9.4 78 8.8 76.6
-        L 11 75.6
-        C 11.4 76.6 12.2 77.2 13.2 77.4
-        L 12.8 74.4
-        C 12.6 72.2 11.8 70 14.5 70
-        Z"/>
-      <circle class="p-silhouette" cx="14.6" cy="66.6" r="3.4"/>
-      ${/* Le bras porteur, du buste à la raquette. */''}
-      <path class="p-bras" d="M 17 74 L 23.6 66.6"/>
-      ${/* La raquette : cadre, tamis suggéré, manche. Trois traits
-            suffisent — c'est un pictogramme, pas un catalogue. */''}
-      <g class="p-raquette-g"
-         transform="rotate(-34 ${P.FRAPPE_X - 2} ${P.FRAPPE_Y - 2})">
-        <ellipse class="p-raquette" cx="${P.FRAPPE_X - 2}" cy="${P.FRAPPE_Y - 3.5}"
-                 rx="3.2" ry="4.6"/>
-        <line class="p-corde" x1="${P.FRAPPE_X - 5}" y1="${P.FRAPPE_Y - 3.5}"
-              x2="${P.FRAPPE_X + 1}" y2="${P.FRAPPE_Y - 3.5}"/>
-        <line class="p-corde" x1="${P.FRAPPE_X - 2}" y1="${P.FRAPPE_Y - 8}"
-              x2="${P.FRAPPE_X - 2}" y2="${P.FRAPPE_Y + 1}"/>
-        <line class="p-manche" x1="${P.FRAPPE_X - 2}" y1="${P.FRAPPE_Y + 1}"
-              x2="${P.FRAPPE_X - 2}" y2="${P.FRAPPE_Y + 4.6}"/>
+      <circle class="p-tete" cx="13.6" cy="67.4" r="3.9"/>
+      ${/* Le tronc, des épaules aux hanches. */''}
+      <path class="p-membre" d="M 13.8 72 L 13.8 83.4"/>
+      ${/* Les jambes : appui arrière tendu, appui avant fléchi. */''}
+      <path class="p-membre" d="M 13.8 83.4 L 10.4 95.2"/>
+      <path class="p-membre" d="M 13.8 83.4 L 19.4 89.8 L 18.6 95.2"/>
+      ${/* Le bras libre, qui équilibre. */''}
+      <path class="p-membre" d="M 13.8 74 L 8.2 78.6"/>
+      ${/* Le bras porteur, jusqu'au point de frappe. */''}
+      <path class="p-membre" d="M 13.8 73.6 L 21.6 66.4"/>
+      ${/* La raquette : un cadre ovale et un manche, rien de plus. */''}
+      ${/* La rotation se fait autour du centre du cadre, lui-même posé au
+            point de frappe : c'est la seule façon que le tamis y tombe
+            vraiment, une rotation autour d'un autre point l'en éloignant
+            d'autant qu'elle tourne. Le manche part de là vers la main. */''}
+      <g transform="rotate(-38 ${P.FRAPPE_X} ${P.FRAPPE_Y})">
+        <line class="p-manche" x1="${P.FRAPPE_X}" y1="${P.FRAPPE_Y + 4.2}"
+              x2="${P.FRAPPE_X}" y2="${P.FRAPPE_Y + 9.4}"/>
+        <ellipse class="p-cadre" cx="${P.FRAPPE_X}" cy="${P.FRAPPE_Y}"
+                 rx="3.3" ry="4.2"/>
       </g>
+    </g>
     </g>
     ${traces}
   </svg>`;

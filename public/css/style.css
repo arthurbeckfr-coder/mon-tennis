@@ -2043,36 +2043,31 @@ body.mode-court .view { padding-top: 6px; }
 }
 .p-sol { stroke: var(--muet); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .p-filet { stroke: var(--texte); stroke-width: 2; vector-effect: non-scaling-stroke; }
-/* Le joueur, en aplat. Il n'a pas à attirer l'œil — ce sont les
-   trajectoires qu'on vient lire — mais il doit se poser franchement sur
-   le sol, et se lire à la taille d'un timbre. */
-.p-silhouette { fill: var(--texte); fill-opacity: .58; }
-.p-bras {
-  stroke: var(--texte);
-  stroke-opacity: .58;
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-}
-.p-raquette {
+/* Le joueur, en pictogramme : membres épais à bouts arrondis, tête ronde
+   détachée. C'est la manière des panneaux de gymnase, et c'est le style
+   qui se lit le plus petit — ce qui compte, puisqu'il tient dans un
+   timbre. Il n'a pas à attirer l'œil, ce sont les trajectoires qu'on vient
+   lire, mais il doit se poser franchement sur le sol. */
+.p-tete { fill: var(--texte); fill-opacity: .62; }
+.p-membre {
   fill: none;
   stroke: var(--texte);
-  stroke-opacity: .58;
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
+  stroke-opacity: .62;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.p-corde {
+.p-cadre {
+  fill: none;
   stroke: var(--texte);
-  stroke-opacity: .3;
-  stroke-width: .8;
-  vector-effect: non-scaling-stroke;
+  stroke-opacity: .62;
+  stroke-width: 1.8;
 }
 .p-manche {
   stroke: var(--texte);
-  stroke-opacity: .58;
-  stroke-width: 1.8;
+  stroke-opacity: .62;
+  stroke-width: 2;
   stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
 }
 
 /* Une trajectoire se vise mal : le trait fait deux pixels de large. La
