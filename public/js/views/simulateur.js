@@ -136,7 +136,7 @@ export function render() {
 
     ${rendreDescente(reglages, p)}
 
-    ${rendreCalendrier(reglages, cible, r)}
+    ${rendreCalendrier(reglages)}
 
     ${rendreRendement(reglages, cible, r, fin, vise)}
 
@@ -309,16 +309,27 @@ function rendreDescente(reglages, p) {
    « jusqu'à quand ». Le bilan glisse sur douze mois, donc une victoire
    finit par sortir de la fenêtre et le total baisse sans qu'on ait rien
    fait. Attendre coûte. */
-function rendreCalendrier(reglages, cible, r) {
-  if (!r.seuil || r.seuil.points == null) return '';
+function rendreCalendrier(reglages) {
+  /* ─── Cette section parle du classement qu'on a, jamais de celui qu'on
+         vise ────────────────────────────────────────────────────────────
 
-  /* Trois ans en arrière, cinq devant. Cette asymétrie a une raison : la
+     Elle suivait l'objectif choisi au-dessus : sélectionner 3/6 faisait
+     dire à la courbe « il te manque 430 points » et redessinait toute la
+     descente par rapport à un échelon qu'on n'a pas. Or la question posée
+     ici est l'inverse de celle du haut de page — non pas « qu'est-ce
+     qu'il me faut pour monter » mais « qu'est-ce que je perds si je ne
+     joue plus ». Elle n'a qu'une réponse, celle de son propre échelon.
+
+     Trois ans en arrière, cinq devant. Cette asymétrie a une raison : la
      descente est bridée à un échelon par douze mois, si bien qu'une chute
      de plusieurs classements s'étale mécaniquement sur plusieurs années.
      Sur deux ans on n'en voyait que le début, et le graphique laissait
      croire que tout s'arrêtait là. */
-  const etapes = projeter({ ...reglages, cible,
-                            debut: -36, mois: 60, depuis: store.profil.echelon });
+  const mien = store.profil.echelon;
+  if (seuil(mien, store.profil.sexe)?.points == null) return '';
+
+  const etapes = projeter({ ...reglages, cible: mien,
+                            debut: -36, mois: 60, depuis: mien });
   if (etapes.length < 2) return '';
 
   /* Le mois d'aujourd'hui se trouve, il ne se compte pas : son rang dans
@@ -337,12 +348,15 @@ function rendreCalendrier(reglages, cible, r) {
   return `<section class="carte">
     <h3>Le temps joue contre toi</h3>
     ${ech
-      ? `<p>Tant que tu ne rejoues pas, il te manque <strong>${maintenant.manque} points</strong>.
-         À partir de <strong>${h(ech.apres.libelle)}</strong> il t'en manquera
+      ? `<p>Tant que tu ne rejoues pas, il te manque <strong>${maintenant.manque} points</strong>
+         pour tenir ton <strong>${h(mien)}</strong>. À partir de
+         <strong>${h(ech.apres.libelle)}</strong> il t'en manquera
          <strong>${ech.apres.manque}</strong> : des victoires sortent de la fenêtre des douze
          mois et cessent de compter. Agir avant coûte ${ech.surcout} points de moins.</p>`
       : `<p class="tiny muted">Aucune de tes victoires comptées ne sort de la fenêtre dans
-         l'année qui vient : l'écart ne se creusera pas tout seul.</p>`}
+         l'année qui vient : ton ${h(mien)} ne se perdra pas tout seul.</p>`}
+    <p class="tiny muted">Tout ce qui suit parle de ton classement actuel, et de lui
+      seul : l'objectif choisi plus haut ne le change pas.</p>
 
     ${(() => {
       /* ─── Trois traits, pas davantage ─────────────────────────────
@@ -357,7 +371,6 @@ function rendreCalendrier(reglages, cible, r) {
          Le reste de la descente se lit en toutes lettres sous le
          graphique, échelon par échelon et date par date — c'est plus
          précis qu'un trait de plus. */
-      const mien = store.profil.echelon;
       const i = rang(mien);
       const paliers = [ECHELONS[i + 1], mien, ECHELONS[i - 1]]
         .filter(Boolean)
