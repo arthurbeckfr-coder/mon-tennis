@@ -134,6 +134,13 @@ const carteMaps = adresse =>
    sur quatre depuis quatorze matchs. */
 let tri = 'matchs';
 
+/* La surface retenue. Un club peut en avoir deux — terre battue dehors,
+   résine sous bulle — et il compte alors dans les deux : filtrer sur la
+   terre battue ne doit pas le faire disparaître sous prétexte qu'il a
+   aussi de la résine. C'est pour cela que le filtre lit une liste et non
+   une valeur. */
+let surface = 'tout';
+
 /* L'épreuve orpheline dont on regarde les matchs. Une seule à la fois :
    deux listes ouvertes se compareraient mal et rallongeraient l'écran
    pour rien. */
@@ -188,15 +195,39 @@ const TRIS = [
 
 const triCourant = () => TRIS.find(t => t.cle === tri) || TRIS[0];
 
-const barreTri = () => `<section class="barre-filtres">
-  <label class="tri">
-    <span>Trier par</span>
-    <select id="tri-club">
-      ${TRIS.map(t => `<option value="${t.cle}"${t.cle === tri ? ' selected' : ''}
-        >${h(t.nom)}</option>`).join('')}
-    </select>
-  </label>
-</section>`;
+/** Les surfaces réellement présentes dans les clubs, avec le nombre de
+ *  clubs qui les portent. On ne propose pas les huit surfaces du
+ *  vocabulaire : filtrer sur une moquette qu'on n'a jamais foulée ne
+ *  donnerait qu'une liste vide. */
+const surfacesConnues = () => {
+  const n = {};
+  for (const c of store.clubs) {
+    for (const s of c.surfaces || []) n[s] = (n[s] || 0) + 1;
+  }
+  return Object.keys(n).sort((a, b) => n[b] - n[a] || a.localeCompare(b, 'fr'))
+    .map(s => ({ nom: s, clubs: n[s] }));
+};
+
+const barreTri = () => {
+  const surfaces = surfacesConnues();
+  return `<section class="barre-filtres">
+    <label class="tri">
+      <span>Trier par</span>
+      <select id="tri-club">
+        ${TRIS.map(t => `<option value="${t.cle}"${t.cle === tri ? ' selected' : ''}
+          >${h(t.nom)}</option>`).join('')}
+      </select>
+    </label>
+    ${surfaces.length > 1 ? `<label class="tri">
+      <span>Surface</span>
+      <select id="surface-club">
+        <option value="tout"${surface === 'tout' ? ' selected' : ''}>Toutes</option>
+        ${surfaces.map(s => `<option value="${h(s.nom)}"${s.nom === surface ? ' selected' : ''}
+          >${h(s.nom)} (${s.clubs})</option>`).join('')}
+      </select>
+    </label>` : ''}
+  </section>`;
+};
 
 // =====================================================================
 //  La liste
@@ -525,7 +556,12 @@ function rattacherEpreuve(nom, clubId, annee = null) {
 }
 export function render() {
   const t = triCourant();
+  /* Le filtre de surface gouverne tout ce qui parle des clubs : la liste,
+     la carte et les deux premiers chiffres. Un club à deux surfaces
+     apparaît sous chacune — il n'y a pas à choisir laquelle est la
+     sienne, elles le sont toutes les deux. */
   const clubs = [...store.clubs]
+    .filter(c => surface === 'tout' || (c.surfaces || []).includes(surface))
     .map(c => {
       const matchs = matchsDuClub(c);
       // `matchsDuClub` rend les matchs du plus récent au plus ancien.
@@ -566,9 +602,12 @@ export function render() {
           descendre la chercher au bas de la page. */''}
     <section class="chiffres">
       <div class="chiffre" data-detail="clubs" title="Voir le détail"
-        ><b>${store.clubs.length}</b><span>clubs</span></div>
+        ><b>${clubs.length}</b><span>club${clubs.length > 1 ? 's' : ''}${
+          surface === 'tout' ? '' : ' retenus'}</span></div>
       <div class="chiffre" data-detail="situes" title="Voir le détail"
-        ><b>${store.matchs.length - sansClub}</b><span>matchs situés</span></div>
+        ><b>${surface === 'tout' ? store.matchs.length - sansClub
+          : clubs.reduce((t, c) => t + c.matchs.length, 0)}</b>
+        <span>matchs situés</span></div>
       <div class="chiffre" data-detail="surfaces" title="Voir le détail"
         ><b>${new Set(store.clubs.flatMap(c => c.surfaces || [])).size}</b>
         <span>surfaces</span></div>
@@ -583,12 +622,15 @@ export function render() {
 
     ${store.clubs.length > 1 ? barreClubs() : ''}
 
+    ${/* La barre vaut pour les deux onglets : filtrer sur la terre battue
+          doit vider la carte des clubs qui n'en ont pas, sinon le filtre
+          ment d'un onglet à l'autre. */''}
+    ${store.clubs.length > 1 ? barreTri() : ''}
+
     ${ongletClubs === 'carte' ? `<section class="carte">
       <h3>Où j'ai joué</h3>
       ${carteClubs(clubs)}
     </section>` : `
-    ${store.clubs.length > 1 ? barreTri() : ''}
-
     <ul class="clubs">
       ${clubs.map(c => `<li class="club-ligne" data-club="${h(c.club.id)}">
           <div class="club-corps">
@@ -919,6 +961,11 @@ export function wire(vue, rerendre) {
 
   vue.querySelector('#tri-club')?.addEventListener('change', e => {
     tri = e.target.value;
+    rerendre();
+  });
+
+  vue.querySelector('#surface-club')?.addEventListener('change', e => {
+    surface = e.target.value;
     rerendre();
   });
 
