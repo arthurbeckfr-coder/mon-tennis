@@ -187,15 +187,15 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
           data-x1="${a.x1.toFixed(1)}">${h(a.an)}</span>`).join('')}
     </div>
 
-    ${/* Le nom seul, sans son chiffre. « 15/1 · 360 pts » répété six fois
-          faisait une colonne de texte au bord gauche, plus large que ce
-          qu'elle annotait ; or on lit ces lignes pour savoir quel
-          classement on tient, pas pour relire un barème qu'on a sous les
-          yeux ailleurs. Le nombre de points reste au survol. */''}
+    ${/* Le nom, et le nombre de points qu'il demande. Les deux tenaient
+          mal quand il y avait six lignes — une colonne de texte au bord
+          gauche, plus large que ce qu'elle annotait. À trois, la place
+          existe, et le chiffre est la moitié de l'information : savoir
+          qu'on tient 15 ne dit pas qu'il y faut 360 points. */''}
     <div class="courbe-paliers">
       ${paliers.map(p => `<span class="courbe-palier-nom${p.echelon === actuel ? ' courant' : ''}"
           title="${h(p.echelon)} — ${p.points} points"
-          data-y="${y(p.points).toFixed(2)}">${h(p.echelon)}</span>`).join('')}
+          data-y="${y(p.points).toFixed(2)}">${h(p.echelon)} · ${p.points} pts</span>`).join('')}
     </div>
 
     ${/* La pastille du point choisi vit en HTML, comme la bulle. Dans le
