@@ -112,36 +112,11 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
     <svg viewBox="0 0 ${L} ${H}" preserveAspectRatio="none" role="img"
          aria-label="Bilan mois par mois, avec les paliers de classement">
       ${/* Les paliers d'abord : ils sont le fond sur lequel on lit. */''}
-      ${(() => {
-        /* Deux échelons voisins tiennent parfois à quinze points — 420 pour
-           15, 435 pour 5/6 — et leurs étiquettes se recouvrent alors que
-           les traits, eux, restent parfaitement distincts. On écarte donc
-           les noms sans toucher aux lignes : c'est le texte qui gêne, pas
-           la mesure. Un trait relie l'étiquette déplacée à sa ligne, sans
-           quoi on ne saurait plus laquelle elle nomme. */
-        const ECART = 17;
-        let derniere = -Infinity;
-        return [...paliers]
-          .sort((a, b) => b.points - a.points)   // du haut vers le bas
-          .map(p => {
-            const yl = y(p.points);
-            const pose = Math.max(yl - 6, derniere + ECART);
-            derniere = pose;
-            const decale = pose > yl - 4;
-            return `<g class="courbe-palier${p.echelon === actuel ? ' courant' : ''}">
-              <line x1="0" y1="${yl.toFixed(1)}" x2="${L}" y2="${yl.toFixed(1)}"/>
-              ${/* `data-colle` porte la marge à gauche du cadre : c'est
-                    `collerEtiquettes` qui replace ces éléments à chaque
-                    déplacement, pour que le nom d'un palier ne sorte
-                    jamais de l'écran. */''}
-              ${decale ? `<line class="courbe-palier-tige" data-colle="7"
-                    x1="7" y1="${yl.toFixed(1)}" x2="7" y2="${(pose - 4).toFixed(1)}"/>` : ''}
-              <text class="courbe-palier-nom" data-colle="${decale ? 13 : 8}"
-                    x="${decale ? 13 : 8}" y="${pose.toFixed(1)}"
-                    >${h(p.echelon)} · ${p.points} pts</text>
-            </g>`;
-          }).join('');
-      })()}
+      ${/* Les lignes restent dans le dessin : horizontales, elles ne
+            souffrent pas de l'étirement. Les noms, eux, en sortent — voir
+            plus bas. */''}
+      ${paliers.map(p => `<line class="courbe-palier-ligne${p.echelon === actuel ? ' courant' : ''}"
+          x1="0" y1="${y(p.points).toFixed(1)}" x2="${L}" y2="${y(p.points).toFixed(1)}"/>`).join('')}
 
       ${futur.length ? `<line class="g-aujourdhui" x1="${x(iCoupe).toFixed(1)}" y1="0"
             x2="${x(iCoupe).toFixed(1)}" y2="${H}"/>` : ''}
@@ -162,6 +137,23 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
           data-echelon="${h(p.echelon || '')}" data-detail="${h(p.detail || '')}"
           cx="${x(i).toFixed(2)}" cy="${y(p.valeur).toFixed(2)}" r="7"/>`).join('')}
     </svg>
+
+    ${/* ─── Pourquoi les noms des paliers ne sont pas dans le SVG ─────
+
+          Le dessin est étiré pour remplir la largeur — c'est ce qui permet
+          à la courbe de s'allonger quand on zoome sur le temps sans que
+          l'échelle des points bouge. Mais un texte placé dedans subit le
+          même étirement : en zoomant, les noms devenaient énormes et
+          déformés, jusqu'à recouvrir la courbe qu'ils devaient servir.
+
+          Ils vivent donc en HTML au-dessus du dessin, comme les bulles.
+          Ils gardent leur taille de lecture à tous les zooms, ne se
+          déforment pas, et restent au bord gauche sans qu'on ait à les y
+          recoller à la main. */''}
+    <div class="courbe-paliers">
+      ${paliers.map(p => `<span class="courbe-palier-nom${p.echelon === actuel ? ' courant' : ''}"
+          data-y="${y(p.points).toFixed(2)}">${h(p.echelon)} · ${p.points} pts</span>`).join('')}
+    </div>
 
     <div class="courbe-bulle" hidden>
       <button class="courbe-bulle-fermer" aria-label="Fermer">✕</button>
@@ -226,23 +218,31 @@ export function brancherCourbe(racine) {
     }
   };
 
-  /* Les noms des paliers restent collés au bord gauche de ce qu'on
-     regarde. Posés à une abscisse fixe, ils sortaient du cadre dès qu'on
-     se déplaçait vers la droite : les lignes continuaient, plus rien ne
-     disait à quel échelon elles correspondaient. Une échelle qu'on ne peut
-     plus lire ne sert à rien. */
-  const collerEtiquettes = () => {
-    for (const el of bloc.querySelectorAll('[data-colle]')) {
-      const marge = Number(el.dataset.colle) * (vue[2] / depart[2]);
-      const gx = vue[0] + marge;
-      if (el.tagName === 'text') el.setAttribute('x', gx.toFixed(1));
-      else { el.setAttribute('x1', gx.toFixed(1)); el.setAttribute('x2', gx.toFixed(1)); }
+  /* Les noms des paliers, posés à la hauteur de leur ligne. Deux échelons
+     voisins tiennent parfois à quinze points, et leurs noms se
+     recouvriraient : on les écarte de proche en proche, du haut vers le
+     bas, sans jamais toucher aux lignes — c'est le texte qui gêne, pas la
+     mesure. */
+  const etiquettes = [...bloc.querySelectorAll('.courbe-palier-nom')]
+    .sort((a, b) => Number(a.dataset.y) - Number(b.dataset.y));
+
+  const placerPaliers = () => {
+    const r = svg.getBoundingClientRect();
+    if (!r.height) return;
+    let derniere = -Infinity;
+    for (const el of etiquettes) {
+      const ySvg = Number(el.dataset.y);
+      const px = ((ySvg - vue[1]) / vue[3]) * r.height;
+      const pose = Math.max(px - el.offsetHeight / 2, derniere + 2);
+      derniere = pose + el.offsetHeight;
+      el.style.top = `${pose}px`;
+      el.hidden = px < -20 || px > r.height + 20;
     }
   };
 
   const poser = () => {
     svg.setAttribute('viewBox', vue.join(' '));
-    collerEtiquettes();
+    placerPaliers();
     placerBulle();
   };
 

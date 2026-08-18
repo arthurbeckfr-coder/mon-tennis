@@ -1154,14 +1154,16 @@ a.carte-bulle-route {
 /* Un palier, c'est ce qu'il faut pour tenir un échelon. La courbe qui
    passe dessous, c'est le classement qui se perd — on veut le voir sans
    avoir à lire un chiffre. */
-/* Le trait d'un palier était tiré en couleur de bordure : quarante-deux
-   sur cinquante-trois de gris, sur un fond de trente-trois. Un contraste
-   de 1,1 pour 1 — c'est-à-dire rien. La ligne existait, personne ne
-   pouvait la voir. C'est la même faute que le trait de côte de la carte,
-   et elle vient du même réflexe : prendre la couleur de bordure pour du
-   « discret » alors qu'elle est faite pour séparer deux aplats, pas pour
-   se détacher sur un seul. */
-.courbe-palier line {
+/* ─── Les paliers de classement ──────────────────────────────────────
+
+   Le trait était tiré en couleur de bordure : quarante-deux sur
+   cinquante-trois de gris, sur un fond de trente-trois. Un contraste de
+   1,1 pour 1 — c'est-à-dire rien. La ligne existait, personne ne pouvait
+   la voir. Même faute que le trait de côte de la carte, et même réflexe à
+   l'origine : prendre la couleur de bordure pour du « discret », alors
+   qu'elle est faite pour séparer deux aplats, pas pour se détacher sur un
+   seul. */
+.courbe-palier-ligne {
   stroke: var(--muet);
   stroke-width: 1.4;
   stroke-opacity: .55;
@@ -1169,15 +1171,35 @@ a.carte-bulle-route {
   vector-effect: non-scaling-stroke;
 }
 /* Celui qu'on occupe est le seul qui décide de quelque chose : le
-   franchir, c'est descendre. Il porte donc la couleur d'accent et un
-   trait plein. */
-.courbe-palier.courant line {
+   franchir, c'est descendre. */
+.courbe-palier-ligne.courant {
   stroke: var(--accent);
   stroke-opacity: .9;
   stroke-width: 2;
   stroke-dasharray: none;
 }
-.courbe-palier.courant .courbe-palier-nom { fill: var(--accent); }
+
+/* Les noms vivent en HTML par-dessus le dessin, et non dedans : le SVG
+   est étiré pour remplir la largeur, et un texte placé à l'intérieur
+   grossissait puis se déformait à chaque zoom. */
+.courbe-paliers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.courbe-palier-nom {
+  position: absolute;
+  left: 8px;
+  font-size: .74rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--muet);
+  background: color-mix(in srgb, var(--carte-2) 82%, transparent);
+  padding: 0 4px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.courbe-palier-nom.courant { color: var(--accent); }
 .courbe-palier-nom {
   fill: var(--muet);
   font-family: inherit;
@@ -1418,22 +1440,35 @@ body.mode-court .view { padding-top: 6px; }
    sur un téléphone serait un jeu d'adresse. */
 .t-fleche { cursor: pointer; }
 .t-fleche-cible { fill: none; stroke: transparent; stroke-width: 24; }
-/* Les flèches étaient tracées dans la couleur du texte du terrain, à 55 %
-   d'opacité : un gris pâle sur un vert soutenu, qu'on devinait plus qu'on
-   ne le voyait. Elles prennent l'orange des graphiques — celui qui a été
-   mesuré à 24,7 d'écart perceptuel avec le vert d'accent, et qui passe en
-   deutéranopie. La couleur ne porte d'ailleurs rien à elle seule : le
-   choix se lit aussi à l'épaisseur du trait et à l'extinction des
-   voisines. */
+/* ─── Comment rendre un trait visible sans crier ────────────────────
+
+   Premier essai : gris pâle à 55 % sur un vert soutenu — on le devinait.
+   Deuxième : orange vif — on le voyait, mais le dessin ressemblait à un
+   panneau de chantier.
+
+   La lisibilité d'un trait fin ne vient pas de sa teinte, elle vient de
+   son contraste avec ce qu'il traverse. Un liseré sombre posé sous un
+   trait clair sépare l'un de l'autre quel que soit le fond : c'est le
+   procédé des cartes d'état-major, et il tient sur un court vert comme
+   sur un fond crème. La couleur reste alors disponible pour ce qu'elle
+   doit vraiment dire — le coup qu'on a choisi. */
+.t-fleche-halo {
+  fill: none;
+  stroke: var(--terrain-sol);
+  stroke-width: 5.5;
+  stroke-opacity: .55;
+  stroke-linecap: round;
+}
 .t-fleche-trait {
   fill: none;
-  stroke: var(--serie-2);
-  stroke-width: 2.6;
-  stroke-dasharray: 8 5;
-  opacity: .95;
+  stroke: var(--terrain-texte);
+  stroke-width: 2.2;
+  stroke-dasharray: 9 5;
+  stroke-linecap: round;
+  opacity: 1;
 }
 .t-fleche text {
-  fill: var(--serie-2);
+  fill: var(--terrain-texte);
   font-size: 10px;
   font-weight: 600;
   text-anchor: middle;
@@ -1444,8 +1479,9 @@ body.mode-court .view { padding-top: 6px; }
   opacity: .8;
 }
 .t-fleche:hover .t-fleche-trait, .t-fleche:focus-visible .t-fleche-trait {
-  stroke-width: 3.4;
-  opacity: 1;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: none;
 }
 .t-fleche.actif .t-fleche-trait {
   stroke: var(--accent);
@@ -1454,7 +1490,7 @@ body.mode-court .view { padding-top: 6px; }
   opacity: 1;
 }
 .t-fleche.actif text { fill: var(--accent); opacity: 1; }
-.t-pointe { fill: var(--serie-2); }
+.t-pointe { fill: var(--terrain-texte); }
 .t-fleche.actif .t-pointe { fill: var(--accent); }
 
 .t-compte { fill: var(--accent); }
@@ -2007,22 +2043,35 @@ body.mode-court .view { padding-top: 6px; }
 }
 .p-sol { stroke: var(--muet); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .p-filet { stroke: var(--texte); stroke-width: 2; vector-effect: non-scaling-stroke; }
-/* Le joueur, au trait. Il n'a pas à attirer l'œil — ce sont les
-   trajectoires qu'on vient lire — mais il doit se distinguer du sol. */
-.p-joueur-tete { fill: var(--texte); opacity: .7; }
-.p-joueur-corps {
-  fill: none;
+/* Le joueur, en aplat. Il n'a pas à attirer l'œil — ce sont les
+   trajectoires qu'on vient lire — mais il doit se poser franchement sur
+   le sol, et se lire à la taille d'un timbre. */
+.p-silhouette { fill: var(--texte); fill-opacity: .58; }
+.p-bras {
   stroke: var(--texte);
-  stroke-width: 1.6;
-  stroke-opacity: .7;
+  stroke-opacity: .58;
+  stroke-width: 2.6;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
 .p-raquette {
   fill: none;
   stroke: var(--texte);
-  stroke-width: 1.4;
-  stroke-opacity: .7;
+  stroke-opacity: .58;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.p-corde {
+  stroke: var(--texte);
+  stroke-opacity: .3;
+  stroke-width: .8;
+  vector-effect: non-scaling-stroke;
+}
+.p-manche {
+  stroke: var(--texte);
+  stroke-opacity: .58;
+  stroke-width: 1.8;
+  stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
 
@@ -2034,17 +2083,26 @@ body.mode-court .view { padding-top: 6px; }
   stroke-width: 16;
   vector-effect: non-scaling-stroke;
 }
+.p-halo {
+  fill: none;
+  stroke: var(--carte-2);
+  stroke-width: 6;
+  stroke-opacity: .8;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
 .p-trait {
   fill: none;
-  stroke: var(--serie-2);
-  stroke-width: 2.2;
-  stroke-dasharray: 5 4;
-  stroke-opacity: .9;
+  stroke: var(--texte);
+  stroke-width: 1.8;
+  stroke-dasharray: 6 4;
+  stroke-opacity: .8;
+  stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
 .p-trajet { cursor: pointer; }
 .p-trajet text {
-  fill: var(--serie-2);
+  fill: var(--muet);
   font-size: 8px;
   font-weight: 600;
   paint-order: stroke;
@@ -2053,10 +2111,11 @@ body.mode-court .view { padding-top: 6px; }
   stroke-linejoin: round;
 }
 .p-trajet:hover .p-trait, .p-trajet:focus-visible .p-trait {
-  stroke-width: 3.2;
+  stroke: var(--accent);
+  stroke-width: 2.6;
   stroke-opacity: 1;
 }
-.p-trajet:hover text, .p-trajet:focus-visible text { fill: var(--texte); }
+.p-trajet:hover text, .p-trajet:focus-visible text { fill: var(--accent); }
 .p-trajet:focus-visible { outline: none; }
 .p-trajet.actif .p-trait {
   stroke: var(--accent);
@@ -2091,15 +2150,7 @@ body.mode-court .view { padding-top: 6px; }
 .terrain-bloc.a-choix .p-trajet:not(.actif):focus-visible,
 .terrain-bloc.a-choix .t-fleche:not(.actif):focus-visible { opacity: .75; }
 
-/* Quand une étiquette de palier a dû monter pour ne pas en recouvrir une
-   autre, un trait la relie à sa ligne : sans lui, on ne saurait plus
-   laquelle elle nomme. */
-.courbe-palier-tige {
-  stroke: var(--muet);
-  stroke-width: 1;
-  stroke-opacity: .45;
-  vector-effect: non-scaling-stroke;
-}
+
 
 /* Les deux molettes de durée, côte à côte et de même largeur : elles
    forment une seule saisie, et rien ne doit laisser croire que l'une
