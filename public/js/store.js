@@ -81,6 +81,10 @@ export const nomCategorie = c => CATEGORIES.find(x => x.cle === c)?.nom || c;
 function vide() {
   return {
     version: VERSION,
+    /* Les suppressions, datées : voir le bandeau sur la synchronisation. */
+    supprimes: [],
+    profilModifieLe: null,
+    baremeModifieLe: null,
     /* Rien de calculable ne se saisit : le bilan, les victoires
        comptabilisées et les points de bonus se déduisent de l'historique.
        Ils bougent à chaque match — les recopier à la main, c'était
@@ -143,46 +147,109 @@ export function sauver() {
   }
 }
 
+/* ─── Ce qu'il faut pour que deux appareils disent la même chose ───────
+ *
+ * Additionner deux listes suffit tant qu'on n'ajoute que. Dès qu'on
+ * corrige ou qu'on supprime, il faut savoir *quand* : sans date, un
+ * appareil qui n'a pas vu la correction renvoie l'ancienne version, et
+ * l'ancienne gagne parce qu'elle est arrivée en second. C'est ainsi qu'un
+ * score corrigé sur l'ordinateur redevenait faux le lendemain sur le
+ * téléphone.
+ *
+ * Deux ajouts, et tout se règle :
+ *
+ *   — chaque élément porte la date de sa dernière écriture. À la fusion,
+ *     entre deux versions d'un même identifiant, la plus récente gagne ;
+ *   — une suppression laisse une trace datée. Sans elle, l'appareil qui
+ *     détient encore l'élément le réintroduit à la fusion suivante, et
+ *     l'on ne peut plus rien effacer à deux.
+ *
+ * Les traces sont oubliées au bout de six mois : passé ce délai, tous les
+ * appareils ont vu la suppression, et les garder ne ferait qu'alourdir
+ * chaque envoi. Six mois, c'est le temps d'une saison plus une trêve —
+ * un téléphone qu'on n'a pas ouvert de tout ce temps a d'autres soucis.
+ */
+const LISTES = ['matchs', 'conseils', 'sources', 'clubs', 'raquettes',
+                'cordages', 'chaussures', 'courses', 'joueurs', 'depenses'];
+
+const MEMOIRE_TOMBES = 180 * 24 * 3600 * 1000;
+
+const maintenant = () => new Date().toISOString();
+
+/** Note la disparition d'un élément, pour que l'autre appareil ne le
+ *  ressuscite pas. */
+function oublier(s, id) {
+  if (!id) return;
+  s.supprimes = s.supprimes || [];
+  s.supprimes.push({ id, quand: maintenant() });
+}
+
+/** Les traces trop vieilles pour servir encore. */
+function purgerTombes(s) {
+  if (!s.supprimes?.length) return;
+  const limite = Date.now() - MEMOIRE_TOMBES;
+  s.supprimes = s.supprimes.filter(t => new Date(t.quand).getTime() > limite);
+}
 /** Modifie puis enregistre en un geste. */
 export function maj(fn) {
+  /* Le profil et le barème ne sont pas des listes : on ne peut pas les
+     dater élément par élément. On regarde donc s'ils ont bougé, et on
+     date le tout — c'est peu de chose à comparer, et cela couvre tous
+     les chemins d'écriture sans qu'aucun ait à y penser. */
+  const avantProfil = JSON.stringify(store.profil);
+  const avantBareme = JSON.stringify(store.bareme);
+
   fn(store);
+
+  if (JSON.stringify(store.profil) !== avantProfil) store.profilModifieLe = maintenant();
+  if (JSON.stringify(store.bareme) !== avantBareme) store.baremeModifieLe = maintenant();
   return sauver();
 }
 
 // =====================================================================
 //  Écritures
 // =====================================================================
-export const ajouterMatch = m => maj(s => s.matchs.unshift({ id: uid(), ...m }));
+export const ajouterMatch = m => maj(s => s.matchs.unshift({ id: uid(), ...m, modifieLe: maintenant() }));
 export const modifierMatch = (id, m) => maj(s => {
   const i = s.matchs.findIndex(x => x.id === id);
-  if (i >= 0) s.matchs[i] = { ...s.matchs[i], ...m };
+  if (i >= 0) s.matchs[i] = { ...s.matchs[i], ...m, modifieLe: maintenant() };
 });
-export const supprimerMatch = id => maj(s => { s.matchs = s.matchs.filter(m => m.id !== id); });
+export const supprimerMatch = id => maj(s => {
+  s.matchs = s.matchs.filter(m => m.id !== id);
+  oublier(s, id);
+});
 
-export const ajouterConseil = c => maj(s => s.conseils.unshift({ id: uid(), ...c }));
+export const ajouterConseil = c => maj(s => s.conseils.unshift({ id: uid(), ...c, modifieLe: maintenant() }));
 export const modifierConseil = (id, c) => maj(s => {
   const i = s.conseils.findIndex(x => x.id === id);
-  if (i >= 0) s.conseils[i] = { ...s.conseils[i], ...c };
+  if (i >= 0) s.conseils[i] = { ...s.conseils[i], ...c, modifieLe: maintenant() };
 });
-export const supprimerConseil = id => maj(s => { s.conseils = s.conseils.filter(c => c.id !== id); });
+export const supprimerConseil = id => maj(s => {
+  s.conseils = s.conseils.filter(c => c.id !== id);
+  oublier(s, id);
+});
 export const basculerFavori = id => maj(s => {
   const c = s.conseils.find(x => x.id === id);
-  if (c) c.favori = !c.favori;
+  if (c) { c.favori = !c.favori; c.modifieLe = maintenant(); }
 });
 
-export const ajouterSource = x => maj(s => s.sources.push({ id: uid(), ...x }));
-export const supprimerSource = id => maj(s => { s.sources = s.sources.filter(x => x.id !== id); });
+export const ajouterSource = x => maj(s => s.sources.push({ id: uid(), ...x, modifieLe: maintenant() }));
+export const supprimerSource = id => maj(s => {
+  s.sources = s.sources.filter(x => x.id !== id);
+  oublier(s, id);
+});
 
-export const ajouterClub = c => maj(s => s.clubs.push({ id: uid(), sources: [], ...c }));
+export const ajouterClub = c => maj(s => s.clubs.push({ id: uid(), sources: [], ...c, modifieLe: maintenant() }));
 export const modifierClub = (id, c) => maj(s => {
   const i = s.clubs.findIndex(x => x.id === id);
-  if (i >= 0) s.clubs[i] = { ...s.clubs[i], ...c };
+  if (i >= 0) s.clubs[i] = { ...s.clubs[i], ...c, modifieLe: maintenant() };
 });
 export const supprimerClub = id => maj(s => {
   s.clubs = s.clubs.filter(c => c.id !== id);
+  oublier(s, id);
   // Un match rattaché à la main à ce club redevient orphelin plutôt que
   // de pointer dans le vide.
-  s.matchs.forEach(m => { if (m.clubId === id) delete m.clubId; });
+  s.matchs.forEach(m => { if (m.clubId === id) { delete m.clubId; m.modifieLe = maintenant(); } });
 });
 
 // =====================================================================
@@ -192,12 +259,15 @@ export const supprimerClub = id => maj(s => {
    à la main quatre fois n'aurait rien apporté qu'une occasion de se
    tromper à la quatrième. */
 const listeDe = (cle) => ({
-  ajouter: x => maj(s => s[cle].unshift({ id: uid(), ...x })),
+  ajouter: x => maj(s => s[cle].unshift({ id: uid(), ...x, modifieLe: maintenant() })),
   modifier: (id, x) => maj(s => {
     const i = s[cle].findIndex(y => y.id === id);
-    if (i >= 0) s[cle][i] = { ...s[cle][i], ...x };
+    if (i >= 0) s[cle][i] = { ...s[cle][i], ...x, modifieLe: maintenant() };
   }),
-  supprimer: id => maj(s => { s[cle] = s[cle].filter(y => y.id !== id); }),
+  supprimer: id => maj(s => {
+    s[cle] = s[cle].filter(y => y.id !== id);
+    oublier(s, id);
+  }),
 });
 
 export const raquettes  = listeDe('raquettes');
@@ -213,13 +283,18 @@ export const basculerAchat = id => maj(s => {
   if (!a) return;
   a.achete = !a.achete;
   a.dateAchat = a.achete ? new Date().toISOString().slice(0, 10) : '';
+  a.modifieLe = maintenant();
 });
 
 /** Vide les articles cochés qui ne sont pas récurrents. Les récurrents
  *  restent : on rachètera des balles, ce serait absurde de les ressaisir. */
 export const rangerCourses = () => maj(s => {
+  const partis = s.courses.filter(a => a.achete && !a.recurrent);
   s.courses = s.courses.filter(a => !a.achete || a.recurrent);
-  s.courses.forEach(a => { if (a.achete && a.recurrent) { a.achete = false; } });
+  partis.forEach(a => oublier(s, a.id));
+  s.courses.forEach(a => {
+    if (a.achete && a.recurrent) { a.achete = false; a.modifieLe = maintenant(); }
+  });
 });
 
 export const raquetteDe = id => store.raquettes.find(r => r.id === id) || null;
@@ -250,20 +325,21 @@ export const CATEGORIES_DEPENSE = [
 export const nomCategorieDepense = cle =>
   CATEGORIES_DEPENSE.find(c => c.cle === cle)?.nom || cle;
 
-export const ajouterDepense = d => maj(s => s.depenses.push({ id: uid(), ...d }));
+export const ajouterDepense = d => maj(s => s.depenses.push({ id: uid(), ...d, modifieLe: maintenant() }));
 export const modifierDepense = (id, d) => maj(s => {
   const i = s.depenses.findIndex(x => x.id === id);
-  if (i >= 0) s.depenses[i] = { ...s.depenses[i], ...d };
+  if (i >= 0) s.depenses[i] = { ...s.depenses[i], ...d, modifieLe: maintenant() };
 });
 export const supprimerDepense = id => maj(s => {
   s.depenses = s.depenses.filter(d => d.id !== id);
+  oublier(s, id);
 });
 
 export const noterJoueur = (nom, donnees) => maj(s => {
   const cle = (n) => (n || '').trim().toUpperCase();
   const i = s.joueurs.findIndex(j => cle(j.nom) === cle(nom));
-  if (i >= 0) s.joueurs[i] = { ...s.joueurs[i], ...donnees, nom };
-  else s.joueurs.push({ id: uid(), nom, ...donnees });
+  if (i >= 0) s.joueurs[i] = { ...s.joueurs[i], ...donnees, nom, modifieLe: maintenant() };
+  else s.joueurs.push({ id: uid(), nom, ...donnees, modifieLe: maintenant() });
 });
 
 // =====================================================================
@@ -512,89 +588,130 @@ export function importerJSON(texte, mode = 'fusion') {
       : { ok: false, erreur: r.erreur };
   }
 
-  let nm = 0, nc = 0, ns = 0;
-  const cleMatch = m => m.id || `${m.date}|${(m.adversaire || '').toLowerCase()}`;
-  const cleConseil = c => c.id || (c.titre || '').toLowerCase();
+  /* ─── La fusion ────────────────────────────────────────────────────
 
-  const vusM = new Set(store.matchs.map(cleMatch));
-  for (const m of (lu.matchs || [])) {
-    if (vusM.has(cleMatch(m))) continue;
-    store.matchs.push({ ...m, id: m.id || uid() });
-    vusM.add(cleMatch(m));
-    nm++;
-  }
-  const vusC = new Set(store.conseils.map(cleConseil));
-  for (const c of (lu.conseils || [])) {
-    if (vusC.has(cleConseil(c))) continue;
-    store.conseils.push({ ...c, id: c.id || uid() });
-    vusC.add(cleConseil(c));
-    nc++;
-  }
-  const vusS = new Set(store.sources.map(x => (x.url || '').toLowerCase()));
-  for (const x of (lu.sources || [])) {
-    if (vusS.has((x.url || '').toLowerCase())) continue;
-    store.sources.push({ ...x, id: x.id || uid() });
-    vusS.add((x.url || '').toLowerCase());
-    ns++;
-  }
+     Trois règles, et elles suffisent à ce que trois appareils finissent
+     par dire la même chose sans jamais se demander lequel a raison :
 
-  let nc2 = 0;
-  const vusCl = new Set(store.clubs.map(c => (c.nom || '').toLowerCase()));
-  for (const c of (lu.clubs || [])) {
-    if (vusCl.has((c.nom || '').toLowerCase())) continue;
-    store.clubs.push({ sources: [], ...c, id: c.id || uid() });
-    vusCl.add((c.nom || '').toLowerCase());
-    nc2++;
+       1. un élément inconnu s'ajoute ;
+       2. un élément connu des deux côtés est gardé dans sa version la
+          plus récemment écrite ;
+       3. un élément supprimé après sa dernière écriture disparaît, où
+          qu'il se trouve.
+
+     C'est la convergence par horodatage, et son défaut est connu : deux
+     corrections du même match, faites en même temps sur deux appareils,
+     ne se mélangent pas — la seconde écrite l'emporte entière. Pour un
+     carnet tenu par une personne, c'est le bon compromis ; le contraire
+     demanderait un journal d'opérations, et beaucoup de complication pour
+     un cas qui ne se produit pas.
+
+     Les carnets d'avant cette règle n'ont pas de dates. Un élément sans
+     date perd contre un élément daté, et c'est le bon sens : le daté a
+     forcément été écrit après, puisqu'il l'a été par une version du
+     carnet qui date. */
+  const avant = JSON.stringify(store);
+
+  /* Les traces de suppression des deux côtés, la plus récente pour un
+     même identifiant. */
+  const tombes = new Map();
+  for (const t of [...(store.supprimes || []), ...(lu.supprimes || [])]) {
+    if (!t?.id) continue;
+    const q = tombes.get(t.id);
+    if (!q || t.quand > q) tombes.set(t.id, t.quand);
   }
 
-  /* Le matériel se fusionne sur l'identité seule : deux raquettes du même
-     modèle sont deux raquettes, et deux cordages du même jour peuvent être
-     deux cordages. Rien ici ne se déduplique sur le contenu. */
-  let nMat = 0;
-  for (const cle of ['raquettes', 'cordages', 'chaussures', 'courses', 'joueurs', 'depenses']) {
-    const vus = new Set(store[cle].map(x => x.id));
-    for (const x of (lu[cle] || [])) {
-      if (x.id && vus.has(x.id)) continue;
-      store[cle].push({ ...x, id: x.id || uid() });
-      if (x.id) vus.add(x.id);
-      nMat++;
+  /* Un élément venu d'un carnet ancien peut n'avoir pas d'identifiant.
+     On le reconnaît alors à son contenu — la date et l'adversaire pour un
+     match, le titre pour un conseil — plutôt que de le dupliquer à chaque
+     fusion. */
+  const cleDeSecours = (liste, x) =>
+    liste === 'matchs' ? `${x.date}|${(x.adversaire || '').toLowerCase()}`
+    : liste === 'conseils' ? (x.titre || '').toLowerCase()
+    : liste === 'clubs' ? (x.nom || '').toLowerCase()
+    : liste === 'sources' ? (x.url || '').toLowerCase()
+    : null;
+
+  const compte = { ajoutes: 0, majs: 0, retires: 0 };
+
+  for (const liste of LISTES) {
+    const par = new Map();
+    const secours = new Map();
+    for (const x of store[liste] || []) {
+      par.set(x.id, x);
+      const c = cleDeSecours(liste, x);
+      if (c) secours.set(c, x.id);
     }
+
+    for (const brut of (lu[liste] || [])) {
+      const x = { ...brut };
+      if (!x.id) {
+        const c = cleDeSecours(liste, x);
+        x.id = (c && secours.get(c)) || uid();
+      }
+      const local = par.get(x.id);
+      if (!local) {
+        par.set(x.id, x);
+        const c = cleDeSecours(liste, x);
+        if (c) secours.set(c, x.id);
+        compte.ajoutes++;
+      } else if ((x.modifieLe || '') > (local.modifieLe || '')) {
+        par.set(x.id, x);
+        compte.majs++;
+      }
+    }
+
+    const sortie = [];
+    for (const x of par.values()) {
+      const mort = tombes.get(x.id);
+      /* Supprimé après sa dernière écriture : il reste supprimé. Écrit
+         après avoir été supprimé — on l'a recréé ailleurs — il revit. */
+      if (mort && mort >= (x.modifieLe || '')) { compte.retires++; continue; }
+      sortie.push(x);
+    }
+    store[liste] = sortie;
   }
 
-  /* Une fusion qui n'apporte rien n'écrit rien, et surtout ne prévient
+  store.supprimes = [...tombes].map(([id, quand]) => ({ id, quand }));
+  purgerTombes(store);
+
+  /* Le profil et le barème : le plus récemment écrit gagne. Auparavant on
+     ne prenait celui d'en face que si le sien n'avait jamais été touché,
+     ce qui rendait tout réglage local définitif — changer d'échelon sur
+     l'ordinateur ne descendait jamais sur le téléphone. */
+  if (lu.profil && (lu.profilModifieLe || '') > (store.profilModifieLe || '')) {
+    store.profil = { ...vide().profil, ...lu.profil };
+    store.profilModifieLe = lu.profilModifieLe;
+  }
+  if (lu.bareme && (lu.baremeModifieLe || '') > (store.baremeModifieLe || '')) {
+    store.bareme = { ...BAREME_DEFAUT, ...lu.bareme };
+    store.baremeModifieLe = lu.baremeModifieLe;
+  }
+
+  /* Une fusion qui ne change rien n'écrit rien, et surtout ne prévient
      personne. Ce n'est pas une économie d'écriture : `sauver()` annonce un
      changement, l'application se redessine et programme un envoi, l'envoi
-     refusionne le carnet distant — et l'on repart pour un tour. Toutes les
-     quatre secondes, sur une page qu'on essayait simplement de lire. Le
-     silence est ici la correction, pas la politesse. */
-  const apports = nm + nc + ns + nc2 + nMat;
-  if (!apports) {
+     refusionne le carnet distant — et l'on repart pour un tour, indéfiniment.
+     Le silence est ici la correction, pas la politesse. */
+  if (JSON.stringify(store) === avant) {
     return { ok: true, matchs: 0, conseils: 0, sources: 0, clubs: 0, materiel: 0, mode };
   }
 
   store.matchs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const r = sauver();
-  return r.ok ? { ok: true, matchs: nm, conseils: nc, sources: ns, clubs: nc2, materiel: nMat, mode }
-              : { ok: false, erreur: r.erreur };
+  return r.ok
+    ? { ok: true, matchs: compte.ajoutes, conseils: 0, sources: 0, clubs: 0,
+        materiel: 0, majs: compte.majs, retires: compte.retires, mode }
+    : { ok: false, erreur: r.erreur };
 }
 
 /** Fusionne ce qui vient d'un autre appareil.
  *
- *  Les listes se complètent sans jamais s'écraser — c'est la propriété
- *  qui compte : la panne qu'on ne pardonne pas est celle qui efface trois
- *  conseils notés après un cours.
- *
- *  Le profil et le barème font exception, parce qu'ils ne sont pas des
- *  listes : on ne peut pas « additionner » deux classements. On prend
- *  alors celui d'en face uniquement si le sien n'a jamais été touché — un
- *  appareil neuf hérite ainsi des réglages, sans qu'un appareil déjà réglé
- *  se fasse déclasser par un autre. */
+ *  Tout le travail est dans `importerJSON` : la règle de fusion est la
+ *  même qu'on reprenne un fichier à la main ou qu'on synchronise. Ici on
+ *  ne fait que compter ce qui a changé, pour pouvoir le dire.
+ */
 export function fusionnerDistant(distant) {
-  const neuf = vide();
-  const profilVierge = !store.profil.prenom
-    && store.profil.echelon === neuf.profil.echelon
-    && !store.profil.licence;
-
   const avant = {
     matchs: store.matchs.length, conseils: store.conseils.length,
     clubs: store.clubs.length, joueurs: store.joueurs.length,
@@ -603,32 +720,16 @@ export function fusionnerDistant(distant) {
   const r = importerJSON(JSON.stringify(distant), 'fusion');
   if (!r.ok) return { ok: false, erreur: r.erreur };
 
-  /* Reprendre un profil vierge sur un profil vierge n'est pas une reprise :
-     c'est une écriture qui n'apprend rien, annoncée comme un changement, à
-     chaque synchronisation — de quoi entretenir tout seul la boucle que la
-     fusion silencieuse vient de fermer. On exige donc que le profil d'en
-     face porte quelque chose. */
-  const profilUtile = !!distant.profil && (
-    distant.profil.prenom || distant.profil.licence ||
-    (distant.profil.echelon && distant.profil.echelon !== neuf.profil.echelon));
-
-  if (profilVierge && profilUtile) {
-    maj(s => {
-      s.profil = { ...neuf.profil, ...distant.profil };
-      s.bareme = { ...BAREME_DEFAUT, ...(distant.bareme || {}) };
-    });
-  }
-
   return {
     ok: true,
     matchs: store.matchs.length - avant.matchs,
     conseils: store.conseils.length - avant.conseils,
     clubs: store.clubs.length - avant.clubs,
     joueurs: store.joueurs.length - avant.joueurs,
-    profilRepris: profilVierge && profilUtile,
+    majs: r.majs || 0,
+    retires: r.retires || 0,
   };
 }
-
 export function toutEffacer() {
   store = vide();
   return sauver();
