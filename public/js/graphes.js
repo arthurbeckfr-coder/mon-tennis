@@ -89,7 +89,7 @@ export function barresGroupees({ groupes, series, unite = '', axe = '', ouvert =
  * @param {Array<{label, valeur, futur?, echelon?, detail?}>} o.points
  * @param {Array<{echelon: string, points: number}>} [o.paliers]
  */
-export function courbeBilan({ points, paliers = [] }) {
+export function courbeBilan({ points, paliers = [], actuel = '' }) {
   if (points.length < 2) return '';
 
   const L = 1000, H = 300, marge = { haut: 12, bas: 12 };
@@ -112,11 +112,31 @@ export function courbeBilan({ points, paliers = [] }) {
     <svg viewBox="0 0 ${L} ${H}" preserveAspectRatio="none" role="img"
          aria-label="Bilan mois par mois, avec les paliers de classement">
       ${/* Les paliers d'abord : ils sont le fond sur lequel on lit. */''}
-      ${paliers.map(p => `<g class="courbe-palier">
-        <line x1="0" y1="${y(p.points).toFixed(1)}" x2="${L}" y2="${y(p.points).toFixed(1)}"/>
-        <text class="courbe-palier-nom" x="6" y="${(y(p.points) - 4).toFixed(1)}"
-              >${h(p.echelon)}</text>
-      </g>`).join('')}
+      ${(() => {
+        /* Deux échelons voisins tiennent parfois à quinze points — 420 pour
+           15, 435 pour 5/6 — et leurs étiquettes se recouvrent alors que
+           les traits, eux, restent parfaitement distincts. On écarte donc
+           les noms sans toucher aux lignes : c'est le texte qui gêne, pas
+           la mesure. Un trait relie l'étiquette déplacée à sa ligne, sans
+           quoi on ne saurait plus laquelle elle nomme. */
+        const ECART = 17;
+        let derniere = -Infinity;
+        return [...paliers]
+          .sort((a, b) => b.points - a.points)   // du haut vers le bas
+          .map(p => {
+            const yl = y(p.points);
+            const pose = Math.max(yl - 6, derniere + ECART);
+            derniere = pose;
+            const decale = pose > yl - 4;
+            return `<g class="courbe-palier${p.echelon === actuel ? ' courant' : ''}">
+              <line x1="0" y1="${yl.toFixed(1)}" x2="${L}" y2="${yl.toFixed(1)}"/>
+              ${decale ? `<line class="courbe-palier-tige" x1="7" y1="${yl.toFixed(1)}"
+                    x2="7" y2="${(pose - 4).toFixed(1)}"/>` : ''}
+              <text class="courbe-palier-nom" x="${decale ? 13 : 8}" y="${pose.toFixed(1)}"
+                    >${h(p.echelon)} · ${p.points} pts</text>
+            </g>`;
+          }).join('');
+      })()}
 
       ${futur.length ? `<line class="g-aujourdhui" x1="${x(iCoupe).toFixed(1)}" y1="0"
             x2="${x(iCoupe).toFixed(1)}" y2="${H}"/>` : ''}

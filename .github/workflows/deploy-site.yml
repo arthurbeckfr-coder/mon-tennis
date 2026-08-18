@@ -60,6 +60,40 @@ jobs:
           fi
           echo "OK — aucune clé secrète dans le bundle."
 
+      # La carte d'imports doit couvrir tous les modules, sans quoi un
+      # correctif arrive à moitié : le nouveau app.js avec l'ancien
+      # terrain.js, et l'on croit que le correctif ne marche pas. Le
+      # déploiement échoue plutôt que de laisser passer l'oubli.
+      - name: Vérifier que la carte d'imports est complète
+        run: |
+          node - <<'JS'
+          const fs = require('fs');
+          const html = fs.readFileSync('public/index.html', 'utf8');
+          const bloc = html.match(/<script type="importmap">([sS]*?)</script>/);
+          if (!bloc) { console.error('::error::Aucune carte d'imports dans index.html.'); process.exit(1); }
+          const carte = JSON.parse(bloc[1]);
+          const mods = [];
+          (function marche(d, p) {
+            for (const e of fs.readdirSync('public/' + d, { withFileTypes: true })) {
+              if (e.isDirectory()) marche(d + '/' + e.name, p + e.name + '/');
+              else if (e.name.endsWith('.js')) mods.push(p + e.name);
+            }
+          })('js', 'js/');
+          const absents = mods.filter(m => !carte.imports['./' + m]);
+          if (absents.length) {
+            console.error('::error::Modules absents de la carte d'imports : ' + absents.join(', ')
+              + ' — relance « node outils/carte-imports.mjs <version> ».');
+            process.exit(1);
+          }
+          const versions = new Set(Object.values(carte.imports).map(v => v.split('?v=')[1]));
+          const entree = (html.match(/js/app.js?v=(d+)/) || [])[1];
+          if (versions.size !== 1 || !versions.has(entree)) {
+            console.error('::error::La carte d'imports et le module d'entrée ne portent pas la même version.');
+            process.exit(1);
+          }
+          console.log('OK — ' + mods.length + ' modules, version ' + entree + '.');
+          JS
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

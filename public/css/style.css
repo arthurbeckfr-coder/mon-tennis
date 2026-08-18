@@ -270,14 +270,22 @@ a.icon-btn { display: grid; place-items: center; text-decoration: none; }
 }
 body.mode-court .fab { display: none; }
 
-/* Le micro se pose au-dessus du « + » : c'est le geste le plus rapide
-   après un match, il mérite d'être atteignable sans viser. */
+/* Le micro se pose à gauche du « + », sur la même ligne. Au-dessus, il
+   recouvrait le bas de l'écran sur deux étages et masquait souvent la
+   dernière ligne d'une liste ; côte à côte, les deux boutons n'en
+   occupent qu'un. Le pouce les atteint aussi bien, et rien ne se cache
+   derrière. */
 .fab-2 {
-  bottom: calc(136px + env(safe-area-inset-bottom));
+  right: calc(16px + 56px + 12px);
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  width: 48px;
+  height: 48px;
+  /* Aligné sur le centre du « + », qui est plus grand. */
+  margin-bottom: 4px;
   background: var(--carte);
   color: var(--texte);
   border: 1px solid var(--bord);
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .btn-micro.ecoute {
@@ -1146,12 +1154,30 @@ a.carte-bulle-route {
 /* Un palier, c'est ce qu'il faut pour tenir un échelon. La courbe qui
    passe dessous, c'est le classement qui se perd — on veut le voir sans
    avoir à lire un chiffre. */
+/* Le trait d'un palier était tiré en couleur de bordure : quarante-deux
+   sur cinquante-trois de gris, sur un fond de trente-trois. Un contraste
+   de 1,1 pour 1 — c'est-à-dire rien. La ligne existait, personne ne
+   pouvait la voir. C'est la même faute que le trait de côte de la carte,
+   et elle vient du même réflexe : prendre la couleur de bordure pour du
+   « discret » alors qu'elle est faite pour séparer deux aplats, pas pour
+   se détacher sur un seul. */
 .courbe-palier line {
-  stroke: var(--bord);
-  stroke-width: 1;
-  stroke-dasharray: 6 5;
+  stroke: var(--muet);
+  stroke-width: 1.4;
+  stroke-opacity: .55;
+  stroke-dasharray: 7 5;
   vector-effect: non-scaling-stroke;
 }
+/* Celui qu'on occupe est le seul qui décide de quelque chose : le
+   franchir, c'est descendre. Il porte donc la couleur d'accent et un
+   trait plein. */
+.courbe-palier.courant line {
+  stroke: var(--accent);
+  stroke-opacity: .9;
+  stroke-width: 2;
+  stroke-dasharray: none;
+}
+.courbe-palier.courant .courbe-palier-nom { fill: var(--accent); }
 .courbe-palier-nom {
   fill: var(--muet);
   font-family: inherit;
@@ -2034,3 +2060,13 @@ body.mode-court .view { padding-top: 6px; }
 .terrain-bloc.a-choix .t-fleche:not(.actif):hover,
 .terrain-bloc.a-choix .p-trajet:not(.actif):focus-visible,
 .terrain-bloc.a-choix .t-fleche:not(.actif):focus-visible { opacity: .75; }
+
+/* Quand une étiquette de palier a dû monter pour ne pas en recouvrir une
+   autre, un trait la relie à sa ligne : sans lui, on ne saurait plus
+   laquelle elle nomme. */
+.courbe-palier-tige {
+  stroke: var(--muet);
+  stroke-width: 1;
+  stroke-opacity: .45;
+  vector-effect: non-scaling-stroke;
+}

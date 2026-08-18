@@ -378,6 +378,7 @@ function rendreCalendrier(reglages, cible, r) {
           ].join(' · '),
         })),
         paliers,
+        actuel: store.profil.echelon,
       })}
       <p class="tiny muted">Bilan mois par mois : mesuré jusqu'à aujourd'hui, puis projeté
         en pointillé si tu ne rejoues pas. Les traits horizontaux sont les points demandés
