@@ -104,6 +104,17 @@ const cleAdversaire = nom => (nom || '')
   .trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   .replace(/s+/g, ' ');
 
+/** Les options d'une molette de durée. `vide` place un tiret en tête,
+ *  pour que « non renseigné » se distingue de « zéro ». */
+function optsDuree(min, max, pas, choisi, vide) {
+  const lignes = [];
+  for (let v = min; v <= max; v += pas) {
+    const sel = !vide && v === choisi ? ' selected' : '';
+    lignes.push(`<option value="${v}"${sel}>${v}</option>`);
+  }
+  return lignes.join('');
+}
+
 export function matchForm(existant = null) {
   const m = existant || {
     date: aujourdhui(), issue: 'V', adversaire: '', echelonAdverse: store.profil.echelon,
@@ -164,11 +175,31 @@ export function matchForm(existant = null) {
       ${/* La durée ne vient d'aucune donnée fédérale : elle se note après
             coup, quand on y pense. Le champ reste donc facultatif et sans
             valeur par défaut — une durée inventée fausserait la moyenne
-            plus sûrement qu'une case vide. */''}
-      <label>Durée du match (minutes, facultatif)
-        <input type="number" name="duree" min="1" max="600" inputmode="numeric"
-               value="${h(m.duree ?? '')}" placeholder="par exemple 75">
-      </label>
+            plus sûrement qu'une case vide.
+
+            Deux molettes plutôt qu'un nombre de minutes : personne ne
+            pense « quatre-vingt-quinze minutes », on pense « une heure et
+            demie ». Convertir de tête est un effort qu'on s'épargne, et
+            l'on s'épargne surtout de taper — sur un téléphone, faire
+            défiler deux listes courtes va plus vite qu'ouvrir un clavier
+            numérique.
+
+            Les minutes vont de cinq en cinq : personne ne sait si son
+            match a duré 83 ou 85 minutes, et prétendre le contraire
+            donnerait une précision que la mesure n'a pas. */''}
+      <fieldset class="duree-bloc">
+        <legend>Durée du match (facultatif)</legend>
+        <div class="duree-molettes">
+          <label>Heures
+            <select name="dureeH">${optsDuree(0, 5, 1, Math.floor((m.duree ?? 0) / 60), m.duree == null)}</select>
+          </label>
+          <label>Minutes
+            <select name="dureeM">${optsDuree(0, 55, 5, m.duree == null ? 0 : (m.duree % 60), m.duree == null)}</select>
+          </label>
+        </div>
+        <p class="tiny muted">Laissé à zéro, rien n'est enregistré : le carnet préfère une
+          case vide à une durée inventée, qui fausserait les moyennes.</p>
+      </fieldset>
       <details ${m.tournoi || m.surface || m.notes ? 'open' : ''}>
         <summary>Contexte et ressenti</summary>
         <label>Épreuve
@@ -250,9 +281,13 @@ export function matchForm(existant = null) {
         const d = Object.fromEntries(new FormData(form));
         d.wo = form.wo.checked;
 
-        /* Un champ numérique vide rend '' : le stocker ferait une durée
-           « présente mais nulle », que les moyennes compteraient. */
-        d.duree = d.duree === '' ? null : Number(d.duree);
+        /* Deux molettes à zéro veulent dire « je n'ai pas noté », et non
+           « le match a duré zéro minute ». La nuance compte : une durée
+           nulle enregistrée entrerait dans les moyennes et les tirerait
+           vers le bas sans qu'on comprenne pourquoi. */
+        const minutes = (Number(d.dureeH) || 0) * 60 + (Number(d.dureeM) || 0);
+        d.duree = minutes > 0 ? minutes : null;
+        delete d.dureeH; delete d.dureeM;
 
         if (d.adversaire === '__nouveau') {
           const nom = (d.adversaireNouveau || '').trim();

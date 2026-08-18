@@ -2070,3 +2070,13 @@ body.mode-court .view { padding-top: 6px; }
   stroke-opacity: .45;
   vector-effect: non-scaling-stroke;
 }
+
+/* Les deux molettes de durée, côte à côte et de même largeur : elles
+   forment une seule saisie, et rien ne doit laisser croire que l'une
+   compte plus que l'autre. */
+.duree-bloc { margin-bottom: 12px; }
+.duree-molettes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.duree-molettes label { margin-bottom: 0; }
+/* Une molette assez haute pour qu'on voie qu'elle défile, et des chiffres
+   assez gros pour se viser au pouce. */
+.duree-molettes select { font-size: 16px; }
