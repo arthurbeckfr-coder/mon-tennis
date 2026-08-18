@@ -87,6 +87,19 @@ export function render() {
       Le bilan se calcule depuis l'historique : importe ton palmarès Ten'Up
       et tout le reste se remplit tout seul.</div>` : ''}
 
+    ${/* Ce que le championnat individuel a rapporté, puisque c'est déduit
+          et non saisi : il faut pouvoir vérifier d'un coup d'œil que le
+          carnet a bien reconnu les bonnes épreuves. */''}
+    ${(actuel.bonus?.points || actuel.bonus?.victoires) ? `<p class="tiny muted"
+        style="margin:0 4px 10px">Championnat individuel :
+      ${actuel.bonus.retenues} victoire(s) à ${actuel.bonus.valeur} points
+      — ${actuel.bonus.points} points de bonification${
+        actuel.bonus.nb > actuel.bonus.retenues
+          ? ` (sur ${actuel.bonus.nb}, le règlement n'en retient que ${actuel.bonus.retenues})` : ''}${
+        actuel.bonus.victoires
+          ? `, et ${actuel.bonus.victoires} victoire(s) bonus hors quota pour
+             ${h(actuel.bonus.editions.map(e => e.nom).join(', '))}` : ''}.</p>` : ''}
+
 
     <section class="choix-cible">
       <span class="etiquette">Objectif</span>
@@ -134,9 +147,15 @@ export function render() {
       <h3>D'où viennent ces chiffres</h3>
       <p class="tiny muted">Le barème et les seuils ne viennent pas d'une source de seconde
         main : ils ont été confrontés aux bilans officiels de Ten'Up et les reproduisent
-        au point près, à trois échelons différents. Une seule chose reste saisie à la
-        main — le bonus de victoires accordé au ratio (le « +2 » de « 9+2 » sur Ten'Up),
-        dont la formule n'est pas publiée. À zéro, le calcul est simplement pessimiste.</p>
+        au point près, à trois échelons différents. Plus rien ne se saisit : les
+        bonifications du championnat individuel — 15 points par victoire en 4e série,
+        20 en 3e, 25 en 2e, les trois meilleures retenues — et les victoires bonus hors
+        quota se lisent dans l'historique, comme le fait le règlement.</p>
+      <p class="tiny muted">Une réserve, et elle tient aux données et non à la règle :
+        l'historique ne dit pas le tour atteint dans un championnat. Une édition gagnée
+        se reconnaît quand même — c'est celle où tu n'as pas perdu — mais un finaliste
+        ne se distingue pas d'un demi-finaliste, et rien ne lui est compté. L'erreur va
+        donc toujours dans le même sens : jamais un classement annoncé qu'on n'a pas.</p>
       <div class="rangee-boutons">
         <button class="btn btn-ghost" data-bareme>Voir et corriger le barème</button>
         <a class="btn btn-ghost btn-tenup" href="${URL_TENUP}" target="_blank"

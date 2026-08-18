@@ -184,15 +184,24 @@ export function dansLaFenetre(dateISO, finISO = null) {
  * @param {string} [p.sexe]
  * @param {object} [p.bareme]
  * @param {number} [p.bonusVictoires] le « +2 » de « 9+2 » sur Ten'Up :
- *        victoires supplémentaires accordées au ratio victoires/défaites.
- *        Il varie selon l'échelon visé et sa formule n'est pas publiée —
- *        d'où la saisie manuelle, à 0 par défaut (donc pessimiste).
- * @param {number} [p.bonusPoints]  bonus en points (double, etc.).
+ *        victoires hors quota accordées au tour atteint en championnat
+ *        individuel. Laissé de côté, il se déduit de l'historique —
+ *        voir `bonusChampionnats`.
+ * @param {number} [p.bonusPoints]  les bonifications, en points. Même
+ *        chose : déduites si on ne les impose pas.
  */
 export function bilanA({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAUT,
-                         bonusVictoires = 0, bonusPoints = 0, finISO = null }) {
+                         bonusVictoires = null, bonusPoints = null, finISO = null }) {
   const s = seuil(cible, sexe);
-  const quota = (s?.victoires ?? 8) + bonusVictoires;
+
+  /* Le bonus se lit dans l'historique plutôt que dans un réglage : c'est
+     le championnat individuel qui le donne, et il change à chaque
+     édition. Un appelant peut encore l'imposer — les simulations « et si
+     je gagnais deux matchs de plus » ont besoin de figer le reste. */
+  const bonus = bonusChampionnats({ matchs, cible, finISO });
+  const bv = bonusVictoires ?? bonus.victoires;
+  const bp = bonusPoints ?? bonus.points;
+  const quota = (s?.victoires ?? 8) + bv;
 
   const fenetre = matchs.filter(m => dansLaFenetre(m.date, finISO));
   const victoires = fenetre.filter(m => m.issue === 'V');
@@ -207,9 +216,11 @@ export function bilanA({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAUT,
 
   return {
     cible,
-    bilan: points + bonusPoints,
+    bilan: points + bp,
     points,
-    bonusPoints,
+    bonusPoints: bp,
+    bonusVictoires: bv,
+    bonus,
     quota,
     retenues,
     ecartees: notees.slice(quota),
@@ -220,6 +231,115 @@ export function bilanA({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAUT,
   };
 }
 
+// =====================================================================
+//  Les bonus du championnat individuel
+// =====================================================================
+/* ─── Ce que dit le règlement ────────────────────────────────────────
+ *
+ * Deux choses distinctes portent le même mot sur Ten'Up, et on les
+ * confond volontiers :
+ *
+ * — la **bonification**, en points. Chaque victoire (hors forfait) en
+ *   championnat individuel ajoute des points au bilan : 15 en 4e série
+ *   (et chez les jeunes, et en senior +), 20 en 3e série senior, 25 en
+ *   2e série senior. Seules les trois meilleures comptent pour un bilan
+ *   calculé jusqu'à l'échelon 0 ; cinq à partir de -2/6.
+ *
+ * — la **victoire bonus**, hors quota. Selon le tour atteint dans un
+ *   championnat, on est crédité d'une victoire supplémentaire qui ne
+ *   consomme pas une place du quota : c'est le « +2 » de « victoires
+ *   comptabilisées : 9+2 ». Le vainqueur d'un championnat départemental
+ *   ou régional en est crédité ; le total retenu est plafonné à deux.
+ *
+ * Source : FFT, « Bonifications et bonus associés aux championnats
+ * individuels », et les règlements sportifs.
+ *
+ * ─── Ce qu'on en déduit, et ce qu'on ne déduit pas ─────────────────
+ *
+ * Ces deux nombres se saisissaient à la main, recopiés de Ten'Up. Ils
+ * bougent à chaque championnat : la copie devenait fausse dès le match
+ * suivant. Ils se calculent maintenant depuis l'historique.
+ *
+ * Reste une limite, et elle est dans les données, pas dans la règle :
+ * l'historique ne dit pas le tour atteint. Une édition gagnée se
+ * reconnaît pourtant sans lui — c'est celle où l'on n'a pas perdu, la
+ * même lecture que pour les tournois gagnés. Un finaliste, lui, ne se
+ * distingue pas d'un demi-finaliste : on ne lui compte donc rien plutôt
+ * que de lui compter à tort. L'erreur va toujours dans le même sens,
+ * celui qui n'annonce pas un classement qu'on n'a pas.
+ */
+
+/** La série d'un échelon, au sens de la fédération. */
+export function serieDe(echelon) {
+  const i = rang(echelon);
+  if (i < 0) return 4;
+  if (i <= rang('30')) return 4;          // NC → 30
+  if (i <= rang('15')) return 3;          // 15/5 → 15
+  return 2;                               // 5/6 et au-delà
+}
+
+const POINTS_BONIFICATION = { 4: 15, 3: 20, 2: 25 };
+
+/** Combien de bonifications sont retenues pour un bilan calculé à `cible`. */
+function combienDeBonifications(cible) {
+  return rang(cible) >= rang('-2/6') ? 5 : 3;
+}
+
+/* Reconnaître un championnat individuel à son libellé.
+
+   Le championnat **par équipes** porte les mêmes mots et n'a rien à voir
+   ici : il ne donne ni bonification ni victoire bonus. Il se reconnaît à
+   « par équipes », au préfixe de division (« LIGUE-2022 … ») ou à la
+   mention d'une équipe. On l'écarte d'abord, et ce qui reste doit dire
+   explicitement « championnat » — ou son abréviation d'affiche « CHPT »,
+   « CHT » — pour compter. Un tournoi ordinaire ne donne rien. */
+const SANS_ACCENT = t => (t || '').toUpperCase()
+  .normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+export function estChampionnatIndividuel(libelle) {
+  const t = SANS_ACCENT(libelle);
+  if (!t) return false;
+  if (/PAR EQUIPE|EQUIPES|^LIGUE-|COUPE |INTERCLUB/.test(t)) return false;
+  return /CHAMPIONNAT|CHPT|\bCHT\b/.test(t);
+}
+
+/** Le bonus tel que la fédération le calculerait, lu dans l'historique.
+ *
+ *  @returns {{victoires: number, points: number, editions: Array, nb: number}}
+ */
+export function bonusChampionnats({ matchs = [], cible, finISO = null } = {}) {
+  const fenetre = matchs.filter(m => dansLaFenetre(m.date, finISO)
+                                  && estChampionnatIndividuel(m.tournoi));
+
+  /* Les bonifications : une par victoire, à la valeur de la série, et
+     seules les meilleures retenues — elles valent toutes pareil, donc
+     c'est un simple plafond. Un forfait ne compte pas : il n'y a pas eu
+     de match. */
+  const victoires = fenetre.filter(m => m.issue === 'V' && !m.wo);
+  const valeur = POINTS_BONIFICATION[serieDe(cible)] ?? 15;
+  const retenues = Math.min(victoires.length, combienDeBonifications(cible));
+
+  /* Les victoires bonus : une par édition gagnée, deux au plus. Une
+     édition est un championnat d'une année donnée — gagner celui de 2024
+     ne dit rien de celui de 2025. */
+  const editions = {};
+  for (const m of fenetre) {
+    const an = (m.date || '').slice(0, 4);
+    const cle = SANS_ACCENT(m.tournoi).replace(/(19|20)dd/g, '').trim() + ' ' + an;
+    editions[cle] = editions[cle] || { cle, nom: m.tournoi, an, v: 0, d: 0 };
+    if (m.issue === 'V') editions[cle].v++; else editions[cle].d++;
+  }
+  const gagnees = Object.values(editions).filter(e => e.v > 0 && e.d === 0);
+
+  return {
+    victoires: Math.min(gagnees.length, 2),
+    points: retenues * valeur,
+    valeur,
+    nb: victoires.length,
+    retenues,
+    editions: gagnees,
+  };
+}
 // =====================================================================
 //  Le simulateur
 // =====================================================================
