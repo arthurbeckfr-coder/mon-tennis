@@ -5,7 +5,8 @@
    que moi ? Est-ce que je perds toujours contre les gauchers ? Les
    compteurs du haut sont là pour ça, et non pour décorer. */
 
-import { h, hMulti, dateCourte, puce, dansLesDouzeMois, openModal } from '../util.js';
+import { h, hMulti, dateCourte, puce, dansLesDouzeMois, openModal,
+         puceNote, blocNote, brancherNotes } from '../util.js';
 import { store, bilanMatchs, surfaceDuMatch, estParEquipes, saisonEquipe, direTour,
          tournoisRemportes } from '../store.js';
 import { pointsVictoire, rang, ECHELONS } from '../classement.js';
@@ -140,8 +141,7 @@ function ligneMatch(m) {
               alors à la ligne suivante, et l'on cherchait des yeux ce
               qu'on venait de toucher. Bouton d'un côté, texte de l'autre :
               le premier ne bouge pas, le second s'affiche dessous. */''}
-        ${m.notes ? `<button type="button" class="match-info" data-note="${h(m.id)}"
-          aria-expanded="false" title="Ce que j'en retiens">ⓘ</button>` : ''}
+        ${puceNote(m)}
         ${/* Le tour se dit avant tout le reste du contexte : « vainqueur »
               ou « 1/4 de finale » raconte le match mieux qu'une durée. */''}
         ${direTour(m) ? puce(direTour(m), m.tour === 'finale' && m.issue === 'V'
@@ -154,8 +154,7 @@ function ligneMatch(m) {
       ${/* Le texte, replié par défaut : écrit en clair, une note de quinze
             lignes donnait à un match la hauteur de quatre autres — la
             liste devenait un journal et l'on ne comparait plus rien. */''}
-      ${m.notes ? `<p class="match-note" data-note-de="${h(m.id)}" hidden
-        >${hMulti(m.notes)}</p>` : ''}
+      ${blocNote(m)}
     </div>
     ${pts ? `<div class="match-points">+${pts}</div>` : ''}
   </li>`;
@@ -271,9 +270,8 @@ function fenetreEdition(cle) {
       ${liste.length ? `<ul class="matchs" style="margin-top:10px">
         ${liste.map(ligneMatch).join('')}</ul>` : ''}`,
     onMount: corps => {
+      brancherNotes(corps);
       corps.addEventListener('click', e => {
-        const info = e.target.closest('[data-note]');
-        if (info) { basculerNote(info, corps); return; }
         const li = e.target.closest('.match');
         if (!li) return;
         const m = store.matchs.find(x => x.id === li.dataset.id);
@@ -284,16 +282,6 @@ function fenetreEdition(cle) {
   });
 }
 
-/** Déplie ou replie la note d'un match, sans ouvrir sa fenêtre : le ⓘ
- *  est un geste de lecture, pas de correction. */
-function basculerNote(bouton, racine) {
-  const p = racine.querySelector(`[data-note-de="${CSS.escape(bouton.dataset.note)}"]`);
-  if (!p) return;
-  const ouvert = p.hidden;
-  p.hidden = !ouvert;
-  bouton.setAttribute('aria-expanded', String(ouvert));
-  bouton.classList.toggle('ouvert', ouvert);
-}
 /** Le panneau qui s'ouvre sous une colonne : le bilan de la tranche, puis
  *  ses matchs, cliquables comme partout ailleurs. */
 function rendreDetail(axe) {
@@ -670,6 +658,7 @@ export function render() {
 }
 
 export function wire(vue, rerendre) {
+  brancherNotes(vue);
   vue.querySelector('#periode')?.addEventListener('change', e => {
     filtre.periode = e.target.value;
     rerendre();
@@ -745,9 +734,6 @@ export function wire(vue, rerendre) {
 
     if (e.target.closest('[data-import]')) { importFFTForm(); return; }
     if (e.target.closest('[data-nouveau]')) { matchForm(); return; }
-
-    const info = e.target.closest('[data-note]');
-    if (info) { basculerNote(info, vue); return; }
 
     const li = e.target.closest('.match');
     if (li) {

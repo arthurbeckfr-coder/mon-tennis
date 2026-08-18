@@ -137,3 +137,42 @@ export function confirmer(question, detail = '') {
 /** Balise colorée réutilisée partout (profil d'adversaire, moment, issue). */
 export const puce = (texte, teinte = '') =>
   `<span class="puce ${teinte}">${h(texte)}</span>`;
+
+/* ─── La note d'un match, repliée derrière un ⓘ ────────────────────────
+
+   Écrite en clair dans une liste, une note de quinze lignes donne à un
+   match la hauteur de quatre autres : la liste devient un journal et l'on
+   ne compare plus rien. Repliée, elle ne coûte qu'un rond de vingt-deux
+   pixels, posé dans la ligne des chiffres — et le rond ne paraît que
+   s'il y a quelque chose à lire.
+
+   Les deux morceaux vivent ici plutôt que dans un écran : une ligne de
+   match s'affiche sur cinq pages différentes, et la note n'apparaissait
+   que sur une. Ce qui se répète doit s'écrire une fois. */
+
+/** Le ⓘ, à poser dans la ligne des chiffres. */
+export const puceNote = m => m?.notes
+  ? `<button type="button" class="match-info" data-note="${h(m.id)}"
+      aria-expanded="false" title="Ce que j'en retiens">ⓘ</button>`
+  : '';
+
+/** Le texte, replié, à poser juste après la ligne. */
+export const blocNote = m => m?.notes
+  ? `<p class="match-note" data-note-de="${h(m.id)}" hidden>${hMulti(m.notes)}</p>`
+  : '';
+
+/** Branche les ⓘ d'un écran. Le geste est de lecture, jamais d'édition :
+ *  il ne doit donc pas remonter jusqu'au gestionnaire qui ouvre le match. */
+export function brancherNotes(racine) {
+  racine.addEventListener('click', e => {
+    const b = e.target.closest('[data-note]');
+    if (!b) return;
+    e.stopPropagation();
+    const p = racine.querySelector(`[data-note-de="${CSS.escape(b.dataset.note)}"]`);
+    if (!p) return;
+    const ouvert = p.hidden;
+    p.hidden = !ouvert;
+    b.setAttribute('aria-expanded', String(ouvert));
+    b.classList.toggle('ouvert', ouvert);
+  }, true);
+}

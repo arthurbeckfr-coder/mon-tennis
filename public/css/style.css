@@ -2071,6 +2071,30 @@ body.mode-court .terrain-diapo .terrain {
    en faisant défiler, assez sobre pour ne pas concurrencer le titre de la
    section. */
 .annee-bloc + .annee-bloc { margin-top: 18px; }
+
+/* Sous l'année, l'épreuve : un titre plus discret que celui de l'année,
+   puisqu'il en dépend. Le nom du tournoi ne se répète plus sous chaque
+   match — écrit une fois, il devient le titre du chapitre qu'il ouvre. */
+.epreuve-bloc + .epreuve-bloc { margin-top: 12px; }
+.epreuve-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0 6px;
+  font-size: .84rem;
+}
+.epreuve-tete strong { color: var(--muet); letter-spacing: .02em; }
+
+/* La proposition de rattachement : le bouton, et la raison à côté. Elle
+   compte autant que lui — un carnet qui devine doit dire pourquoi. */
+.suggestion {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
 .annee-tete {
   display: flex;
   align-items: baseline;

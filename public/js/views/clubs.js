@@ -15,11 +15,12 @@
    sur un écran séparé : un club, c'est son adresse et son juge-arbitre et
    sa page Facebook. Trois écrans pour une même chose n'aidaient personne. */
 
-import { h, dateCourte, puce, confirmer, toast, openModal, closeModal } from '../util.js';
+import { h, dateCourte, puce, confirmer, toast, openModal, closeModal,
+         puceNote, blocNote, brancherNotes } from '../util.js';
 import {
   store, matchsDuClub, epreuvesOrphelines, bilanMatchs, positionMot,
   supprimerClub, ajouterClub, modifierClub, modifierMatch, clubDuMatch,
-  estParEquipes, PLATEFORMES,
+  estParEquipes, direTour, PLATEFORMES,
 } from '../store.js';
 import { clubConnuPour, MOTS_EN_PLUS, LIENS_CONNUS, urlTenupClub } from '../clubs-connus.js';
 import { carteClubs, brancherCarte, pointDuClub } from '../carte.js';
@@ -200,6 +201,146 @@ const barreTri = () => `<section class="barre-filtres">
 // =====================================================================
 //  La liste
 // =====================================================================
+/* ─── Deviner le club d'une épreuve orpheline ──────────────────────────
+ *
+ * Un tournoi revient chaque année, au même endroit et à peu près à la
+ * même date. C'est presque toujours vrai, et c'est une information que le
+ * carnet possède déjà sans s'en servir : si « TOURNOI OPEN » 2019 n'a pas
+ * de club mais que le « TOURNOI OPEN » 2022 est rattaché à Auffay, le
+ * premier s'est très probablement joué à Auffay aussi.
+ *
+ * Trois indices, du plus sûr au plus faible, et l'on s'arrête au premier
+ * qui parle :
+ *
+ *   1. le même libellé, une autre année, déjà rattaché ;
+ *   2. la même période de l'année, à dix jours près, pour une épreuve au
+ *      nom voisin — un tournoi d'été ne devient pas un tournoi d'hiver ;
+ *   3. les mêmes adversaires — un club fait jouer les mêmes gens, et deux
+ *      noms en commun ne sont pas un hasard dans un rayon de trente
+ *      kilomètres.
+ *
+ * Rien de tout cela n'est certain, et c'est pourquoi le carnet propose au
+ * lieu de décider : la raison est écrite à côté du nom du club, et un
+ * geste suffit à refuser en choisissant autre chose.
+ */
+const MOTS_VIDES = new Set(['TOURNOI', 'OPEN', 'DU', 'DE', 'DES', 'LE', 'LA', 'LES',
+  'ET', 'A', 'AU', 'AUX', 'EN', 'SENIOR', 'SENIORS', 'MESSIEURS', 'DAMES', 'HOMMES',
+  'FEMMES', 'CIRCUIT', 'CLASSEMENT', 'SIMPLE', 'MASCULIN', 'FEMININ', 'NC', 'PLUS']);
+
+const sansAccent = t => (t || '').toUpperCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^A-Z0-9]+/g, ' ').trim();
+
+/** Le libellé d'une épreuve, débarrassé de son millésime : c'est ce qui
+ *  reste identique d'une édition à l'autre. */
+const cleEpreuve = nom => sansAccent(nom)
+  .replace(/\b(19|20)\d\d\b/g, '').replace(/\s+/g, ' ').trim();
+
+/** Les mots qui distinguent une épreuve d'une autre. */
+const motsForts = nom => sansAccent(nom).split(' ')
+  .filter(m => m.length >= 3 && !MOTS_VIDES.has(m) && !/^(19|20)\d\d$/.test(m));
+
+/** Le jour de l'année, pour comparer deux éditions sans regarder l'année. */
+const jourDeLAnnee = date => {
+  const d = new Date((date || '') + 'T12:00:00');
+  if (isNaN(d)) return null;
+  return Math.round((d - new Date(d.getFullYear(), 0, 0)) / 86400000);
+};
+
+/** Le club le plus probable pour une épreuve sans club, et pourquoi.
+ *  @returns {{club, raison, sur}|null}
+ */
+function deviner(nom, matchs) {
+  const situes = store.matchs
+    .map(m => ({ m, club: clubDuMatch(m) }))
+    .filter(x => x.club);
+  if (!situes.length) return null;
+
+  const meilleur = compte => {
+    const cles = Object.keys(compte);
+    if (!cles.length) return null;
+    cles.sort((a, b) => compte[b].n - compte[a].n);
+    return compte[cles[0]];
+  };
+
+  /* 1. La même épreuve, une autre année. */
+  const cle = cleEpreuve(nom);
+  const parCle = {};
+  for (const { m, club } of situes) {
+    if (cleEpreuve(m.tournoi) !== cle) continue;
+    const k = club.id;
+    parCle[k] = parCle[k] || { club, n: 0, annees: new Set() };
+    parCle[k].n++;
+    parCle[k].annees.add((m.date || '').slice(0, 4));
+  }
+  const memeEpreuve = meilleur(parCle);
+  if (memeEpreuve) {
+    const ans = [...memeEpreuve.annees].filter(Boolean).sort();
+    return { club: memeEpreuve.club, sur: memeEpreuve.n,
+             raison: `même épreuve en ${ans.join(', ')}` };
+  }
+
+  /* 2. La même période de l'année, pour un nom voisin. */
+  const jours = matchs.map(m => jourDeLAnnee(m.date)).filter(j => j != null);
+  const mots = new Set(motsForts(nom));
+  if (jours.length && mots.size) {
+    const parPeriode = {};
+    for (const { m, club } of situes) {
+      const j = jourDeLAnnee(m.date);
+      if (j == null) continue;
+      /* Dix jours de part et d'autre, en passant par-dessus le nouvel an :
+         un tournoi de fin décembre revient début janvier. */
+      const proche = jours.some(x => {
+        const d = Math.abs(x - j);
+        return Math.min(d, 365 - d) <= 10;
+      });
+      if (!proche) continue;
+      const communs = motsForts(m.tournoi).filter(w => mots.has(w));
+      if (communs.length < 1) continue;
+      const k = club.id;
+      parPeriode[k] = parPeriode[k] || { club, n: 0, mot: communs[0] };
+      parPeriode[k].n++;
+    }
+    const memePeriode = meilleur(parPeriode);
+    if (memePeriode && memePeriode.n >= 2) {
+      return { club: memePeriode.club, sur: memePeriode.n,
+               raison: `même période, épreuve « ${memePeriode.mot} »` };
+    }
+  }
+
+  /* 3. Les mêmes adversaires. */
+  const advers = new Set(matchs.map(m => sansAccent(m.adversaire)).filter(Boolean));
+  if (advers.size) {
+    const parJoueur = {};
+    for (const { m, club } of situes) {
+      const a = sansAccent(m.adversaire);
+      if (!a || !advers.has(a)) continue;
+      const k = club.id;
+      parJoueur[k] = parJoueur[k] || { club, n: 0, noms: new Set() };
+      parJoueur[k].n++;
+      parJoueur[k].noms.add(m.adversaire);
+    }
+    const memesJoueurs = meilleur(parJoueur);
+    if (memesJoueurs && memesJoueurs.noms.size >= 2) {
+      return { club: memesJoueurs.club, sur: memesJoueurs.noms.size,
+               raison: `${memesJoueurs.noms.size} adversaires déjà croisés là-bas` };
+    }
+  }
+
+  return null;
+}
+/** Le bouton qui applique la devinette, avec sa raison écrite à côté.
+ *  `data-club-suggere` et non `data-club` : ce dernier ouvre la fiche
+ *  d'un club dans la liste, et le clic partirait ailleurs. */
+function boutonDevine(nom, matchs) {
+  const d = deviner(nom, matchs);
+  if (!d) return '';
+  return `<div class="suggestion">
+    <button class="btn btn-primary" data-suggere="${h(nom)}"
+      data-club-suggere="${h(d.club.id)}">Rattacher à ${h(d.club.nom)}</button>
+    <span class="tiny muted">${h(d.raison)}</span>
+  </div>`;
+}
 /** Le détail derrière une des quatre tuiles.
  *
  *  Trois d'entre elles racontent ce qu'on a — les clubs, les matchs
@@ -337,8 +478,9 @@ function fenetreChiffre(quoi) {
                 </div>`).join('')}
               </details>
 
+              ${boutonDevine(nom, m)}
               <label class="tiny muted">${cles.length > 1
-                ? 'Tout rattacher, toutes années confondues' : 'Rattacher à'}
+                ? 'Tout rattacher, toutes années confondues' : 'Ou choisir'}
                 ${menu(nom)}</label>
             </li>`;
           }).join('')}
@@ -355,6 +497,13 @@ function fenetreChiffre(quoi) {
       /* Un match se corrige d'ici comme d'ailleurs : c'est parfois le seul
          moyen de retrouver où il s'est joué. */
       corps.addEventListener('click', e => {
+        const s = e.target.closest('[data-suggere]');
+        if (s) {
+          rattacherEpreuve(s.dataset.suggere, s.dataset.clubSuggere);
+          closeModal();
+          return;
+        }
+
         const li = e.target.closest('[data-match]');
         if (!li) return;
         const match = store.matchs.find(x => x.id === li.dataset.match);
@@ -576,7 +725,9 @@ function rendreMatchsOrphelins(nom) {
               <span>${h(dateCourte(m.date))}</span>
               ${m.score ? `<span>${h(m.score)}</span>` : ''}
               ${m.surface ? puce(m.surface) : ''}
+              ${puceNote(m)}
             </div>
+            ${blocNote(m)}
           </div>
         </li>`).join('')}
       </ul>
@@ -590,6 +741,7 @@ function rendreMatchsOrphelins(nom) {
           c'est le joueur, et le refus l'obligeait à corriger sept matchs un
           par un pour un tournoi qui n'avait jamais bougé. L'année par année
           est là juste au-dessus pour les cas où il a bougé. */''}
+    ${boutonDevine(nom, liste)}
     ${store.clubs.length ? `<label class="tri" style="margin-top:10px">
       <span>${cles.length > 1 ? 'Tout rattacher, toutes années confondues, à'
                               : 'Tout rattacher à'}</span>${menu(nom)}</label>
@@ -705,22 +857,46 @@ export function renderFiche(params) {
                 <span class="tiny muted">${annees[a].length} match(s) —
                   ${ba.v}V–${ba.d}D</span>
               </div>
-              <ul class="matchs">
-                ${annees[a].map(m => `<li class="match ${m.issue === 'V' ? 'gagne' : 'perdu'}"
-                                        data-match="${h(m.id)}">
-                  <div class="match-issue">${m.issue}</div>
-                  <div class="match-corps">
-                    <div class="match-tete">
-                      <strong>${h(m.adversaire || '—')}</strong>${puce(m.echelonAdverse)}
+              ${/* Sous l'année, l'épreuve. Un club reçoit plusieurs tournois
+                    dans la même saison — un open en janvier, un interne au
+                    printemps — et leur nom répété sous chaque match faisait
+                    une colonne de bruit. Écrit une fois en tête de groupe,
+                    il devient le titre du chapitre qu'il ouvre. */''}
+              ${(() => {
+                const eps = {};
+                for (const m of annees[a]) {
+                  const e = (m.tournoi || 'Sans épreuve').trim();
+                  (eps[e] = eps[e] || []).push(m);
+                }
+                return Object.keys(eps).map(e => {
+                  const be = bilanMatchs(eps[e]);
+                  return `<div class="epreuve-bloc">
+                    <div class="epreuve-tete">
+                      <strong>${h(e)}</strong>
+                      <span class="tiny muted">${eps[e].length} match(s) —
+                        ${be.v}V–${be.d}D</span>
                     </div>
-                    <div class="match-bas">
-                      <span>${h(dateCourte(m.date))}</span>
-                      ${m.score ? `<span>${h(m.score)}</span>` : ''}
-                      ${m.tournoi ? `<span class="muted">${h(m.tournoi)}</span>` : ''}
-                    </div>
-                  </div>
-                </li>`).join('')}
-              </ul>
+                    <ul class="matchs">
+                      ${eps[e].map(m => `<li class="match ${m.issue === 'V' ? 'gagne' : 'perdu'}"
+                                            data-match="${h(m.id)}">
+                        <div class="match-issue">${m.issue}</div>
+                        <div class="match-corps">
+                          <div class="match-tete">
+                            <strong>${h(m.adversaire || '—')}</strong>${puce(m.echelonAdverse)}
+                          </div>
+                          <div class="match-bas">
+                            <span>${h(dateCourte(m.date))}</span>
+                            ${m.score ? `<span>${h(m.score)}</span>` : ''}
+                            ${m.tour ? puce(direTour(m)) : ''}
+                            ${puceNote(m)}
+                          </div>
+                          ${blocNote(m)}
+                        </div>
+                      </li>`).join('')}
+                    </ul>
+                  </div>`;
+                }).join('');
+              })()}
             </div>`;
           }).join('');
         })()}`
@@ -737,6 +913,7 @@ export function renderFiche(params) {
 //  Branchements
 // =====================================================================
 export function wire(vue, rerendre) {
+  brancherNotes(vue);
   brancherCarte(vue, id => { location.hash = `#/clubs/${id}`; });
 
   vue.querySelector('#tri-club')?.addEventListener('change', e => {
@@ -772,6 +949,9 @@ export function wire(vue, rerendre) {
 
     const dt = e.target.closest('[data-detail]');
     if (dt) { fenetreChiffre(dt.dataset.detail); return; }
+
+    const sg = e.target.closest('[data-suggere]');
+    if (sg) { rattacherEpreuve(sg.dataset.suggere, sg.dataset.clubSuggere); return; }
 
     const tv = e.target.closest('[data-tri-vers]');
     if (tv) { tri = tri === tv.dataset.triVers ? 'matchs' : tv.dataset.triVers; rerendre(); return; }
@@ -826,6 +1006,7 @@ export function wire(vue, rerendre) {
 }
 
 export function wireFiche(vue, rerendre) {
+  brancherNotes(vue);
   /* La carte se déplace et se pince ici comme ailleurs. Toucher le disque
      ouvre sa bulle ; « Voir la fiche » y renvoie à la page où l'on est
      déjà, ce qui ne coûte rien et évite un cas particulier de plus. */

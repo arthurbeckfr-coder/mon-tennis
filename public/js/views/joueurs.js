@@ -15,7 +15,8 @@
    noter « chipeur » sur un adversaire ramène les conseils du prof sur les
    chipeurs. */
 
-import { h, hMulti, dateCourte, puce, confirmer, toast } from '../util.js';
+import { h, hMulti, dateCourte, puce, confirmer, toast,
+         puceNote, blocNote, brancherNotes } from '../util.js';
 import { store, bilanMatchs, clubDuMatch, nomProfil, PROFILS } from '../store.js';
 import { rang } from '../classement.js';
 import { joueurForm, matchForm } from '../forms.js';
@@ -380,8 +381,9 @@ export function renderFiche(params) {
                 ${m.tournoi ? `<span class="muted">${h(m.tournoi)}</span>` : ''}
                 ${club ? `<span class="muted">${h(club.nom)}</span>` : ''}
                 ${m.surface ? puce(m.surface) : ''}
+                ${puceNote(m)}
               </div>
-              ${m.notes ? `<p class="match-note">${hMulti(m.notes)}</p>` : ''}
+              ${blocNote(m)}
             </div>
           </li>`;
         }).join('')}
