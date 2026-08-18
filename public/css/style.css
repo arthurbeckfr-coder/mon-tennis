@@ -202,11 +202,16 @@ a.icon-btn { display: grid; place-items: center; text-decoration: none; }
    du regard en arrivant, et il se lit mieux un peu plus gros. */
 #btn-retour { font-size: 22px; margin-left: -6px; }
 
-/* Une pastille discrète sur l'icône de sauvegarde : verte quand le carnet
-   est relié à un compte, orange pendant l'envoi. Discrète parce qu'elle
-   n'appelle aucune action — elle rassure, elle ne réclame pas. */
-.icon-btn[data-sync] { position: relative; }
-.icon-btn[data-sync]::after {
+/* Une pastille discrète : verte quand le carnet est relié à un compte,
+   orange pendant l'envoi. Discrète parce qu'elle n'appelle aucune action —
+   elle rassure, elle ne réclame pas.
+
+   Elle marquait la disquette de la barre du haut ; celle-ci a disparu avec
+   la fenêtre qu'elle ouvrait, et la pastille a suivi la sauvegarde jusqu'à
+   l'onglet du profil. Un témoin n'a de sens qu'à côté de ce qu'il
+   concerne. */
+.icon-btn[data-sync], .tabbar a[data-sync] { position: relative; }
+.icon-btn[data-sync]::after, .tabbar a[data-sync]::after {
   content: '';
   position: absolute;
   right: 5px;
@@ -216,8 +221,11 @@ a.icon-btn { display: grid; place-items: center; text-decoration: none; }
   border-radius: 50%;
   border: 2px solid var(--fond);
 }
-.icon-btn[data-sync="ok"]::after    { background: var(--victoire); }
-.icon-btn[data-sync="cours"]::after { background: var(--alerte); }
+.icon-btn[data-sync="ok"]::after, .tabbar a[data-sync="ok"]::after { background: var(--victoire); }
+.icon-btn[data-sync="cours"]::after, .tabbar a[data-sync="cours"]::after { background: var(--alerte); }
+/* Sur l'onglet, la pastille se pose plus haut : le bas de la barre est
+   déjà occupé par le nom de l'écran. */
+.tabbar a[data-sync]::after { right: 22px; bottom: 26px; }
 
 .view {
   max-width: 780px;

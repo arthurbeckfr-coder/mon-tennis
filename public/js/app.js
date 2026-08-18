@@ -4,7 +4,7 @@ import { charger, store } from './store.js';
 import { h, toast, openModal, closeModal } from './util.js';
 import { appliquerTheme, themeSuivant, themeActuel, ETIQUETTES } from './theme.js';
 import { matchForm, conseilForm, clubForm, profilForm,
-         importFFTForm, donneesForm } from './forms.js';
+         importFFTForm } from './forms.js';
 
 import * as matchs     from './views/matchs.js';
 import * as simulateur from './views/simulateur.js';
@@ -177,7 +177,6 @@ $('btn-theme').addEventListener('click', () => {
 });
 rafraichirBoutonTheme();
 
-$('btn-donnees').addEventListener('click', donneesForm);
 $('fab').addEventListener('click', ajoutRapide);
 
 // =====================================================================
@@ -222,11 +221,15 @@ document.addEventListener('data-changed', () => {
    fonctionne exactement comme avant. C'est la règle qui compte, parce que
    l'écran le plus utile de ce site se consulte sur un terrain où le réseau
    ne passe pas. */
+/* Le témoin de synchronisation s'est déplacé avec la sauvegarde : il
+   marque désormais l'onglet du profil, où le bloc se trouve. Un témoin
+   n'a de sens qu'à côté de ce qu'il concerne. */
 function rafraichirIndicateur() {
-  const b = $('btn-donnees');
+  const b = document.querySelector('.tabbar a[data-tab="/matos"]');
+  if (!b) return;
   if (nuage.enTrain()) { b.dataset.sync = 'cours'; b.title = 'Synchronisation en cours…'; }
   else if (nuage.connecte()) { b.dataset.sync = 'ok'; b.title = `Synchronisé — ${nuage.courriel()}`; }
-  else { delete b.dataset.sync; b.title = 'Sauvegarde et transfert'; }
+  else { delete b.dataset.sync; b.title = 'Mon profil'; }
 }
 document.addEventListener('sync-change', rafraichirIndicateur);
 rafraichirIndicateur();

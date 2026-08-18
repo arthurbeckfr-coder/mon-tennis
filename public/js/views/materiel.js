@@ -23,7 +23,8 @@ import {
   statsCordages, ageCordage, dureesDeVie,
 } from '../materiel.js';
 import { courseForm, raquetteForm, cordageForm, chaussureForm, depenseForm,
-         identiteForm, profilForm, baremeForm } from '../forms.js';
+         identiteForm, profilForm, baremeForm,
+         blocDonnees, brancherDonnees } from '../forms.js';
 
 let onglet = 'moi';
 
@@ -171,6 +172,17 @@ function vueMoi() {
       <div class="rangee-boutons">
         <button class="btn btn-ghost" data-bareme>Voir et corriger le barème</button>
       </div>
+    </section>
+
+    ${/* La sauvegarde et le transfert vivaient dans une fenêtre ouverte
+          depuis une disquette, en haut de l'écran. Deux défauts : l'icône
+          ne disait rien à qui ne l'a pas connue, et une fenêtre est un
+          lieu qu'on ne visite pas — or c'est ici qu'on cherche quand on
+          change de téléphone, c'est-à-dire une fois, sans savoir où
+          regarder. */''}
+    <section class="carte">
+      <h3>Sauvegarde et transfert</h3>
+      ${blocDonnees()}
     </section>`;
 }
 
@@ -783,6 +795,10 @@ function vueChaussures() {
 //  Branchements
 // =====================================================================
 export function wire(vue, rerendre) {
+  /* Le bloc de sauvegarde ne se branche que là où il est affiché : les
+     autres onglets ne le contiennent pas, et brancher dans le vide
+     lèverait une erreur sur un `querySelector` qui ne trouve rien. */
+  if (onglet === 'moi') brancherDonnees(vue);
   vue.addEventListener('click', async e => {
     const ry = e.target.closest('[data-rayon]');
     if (ry) { rayon = ry.dataset.rayon; rerendre(); return; }

@@ -1386,11 +1386,21 @@ export function chaussureForm(existant = null) {
 // =====================================================================
 /* Le seul pont entre le téléphone et l'ordinateur. Il mérite donc d'être
    expliqué, pas rangé dans un menu comme une option d'export banale. */
-export function donneesForm() {
-  openModal({
-    title: 'Sauvegarde et transfert',
-    large: true,
-    body: `<div class="form">
+/* ─── Sauvegarde et transfert, dans la page du profil ──────────────────
+ *
+ * C'était une fenêtre ouverte depuis une disquette, dans la barre du
+ * haut. Deux défauts : l'icône ne disait rien à qui ne l'a pas connue,
+ * et une fenêtre est un lieu qu'on ne visite pas — or ce qu'elle contient
+ * est ce qu'on cherche justement quand on change de téléphone, c'est-à-
+ * dire une fois, sans savoir où regarder.
+ *
+ * Le contenu s'écrit donc dans la page du profil, à la suite de ce qui
+ * parle déjà de soi. Il reste une seule écriture pour les deux morceaux —
+ * le balisage et son branchement — parce que les séparer les ferait
+ * diverger.
+ */
+export function blocDonnees() {
+  return `<div class="form">
       <h3>Sur tous mes appareils</h3>
       <div id="bloc-sync"></div>
 
@@ -1426,9 +1436,11 @@ export function donneesForm() {
 
       <h3>Effacer</h3>
       <button class="btn btn-danger" data-vider>Tout effacer sur cet appareil</button>
-    </div>`,
-    onMount: () => {
-      const racine = document.getElementById('modal-root');
+    </div>`;
+}
+
+/** Branche le bloc ci-dessus, où qu'il soit posé. */
+export function brancherDonnees(racine) {
 
       /* Le bloc de synchronisation se redessine à chaque changement d'état :
          connecté ou non, en cours ou non. */
@@ -1545,22 +1557,18 @@ export function donneesForm() {
         const mode = racine.querySelector('#remplacer').checked ? 'remplacement' : 'fusion';
         const r = importerJSON(texte, mode);
         if (!r.ok) { toast(r.erreur); return; }
-        closeModal();
         toast(mode === 'remplacement'
           ? `Données remplacées : ${r.matchs} match(s), ${r.conseils} conseil(s).`
           : `Ajouté : ${r.matchs} match(s), ${r.conseils} conseil(s), ${r.sources} compte(s).`);
       };
 
       racine.querySelector('[data-vider]').onclick = async () => {
-        closeModal();
         if (await confirmer('Tout effacer sur cet appareil ?',
             'Matchs, conseils et comptes suivis disparaîtront. Pense à exporter avant.')) {
           toutEffacer();
           toast('Carnet vidé.');
         }
       };
-    },
-  });
 }
 
 export { sauver };
