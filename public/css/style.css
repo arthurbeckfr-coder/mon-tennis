@@ -2086,6 +2086,10 @@ body.mode-court .terrain-diapo .terrain {
 }
 .epreuve-tete strong { color: var(--muet); letter-spacing: .02em; }
 
+/* Le titre d'un tableau : une finale gagnée. C'est la seule ligne d'un
+   palmarès qu'on cherche des yeux, et elle mérite sa couleur. */
+.puce-titre { background: var(--accent); color: var(--accent-txt); border-color: var(--accent); font-weight: 600; }
+
 /* La proposition de rattachement : le bouton, et la raison à côté. Elle
    compte autant que lui — un carnet qui devine doit dire pourquoi. */
 .suggestion {

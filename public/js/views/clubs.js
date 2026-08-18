@@ -725,6 +725,7 @@ function rendreMatchsOrphelins(nom) {
               <span>${h(dateCourte(m.date))}</span>
               ${m.score ? `<span>${h(m.score)}</span>` : ''}
               ${m.surface ? puce(m.surface) : ''}
+              ${direTour(m) ? puce(direTour(m)) : ''}
               ${puceNote(m)}
             </div>
             ${blocNote(m)}

@@ -17,7 +17,7 @@
 
 import { h, hMulti, dateCourte, puce, confirmer, toast,
          puceNote, blocNote, brancherNotes } from '../util.js';
-import { store, bilanMatchs, clubDuMatch, nomProfil, PROFILS } from '../store.js';
+import { store, bilanMatchs, clubDuMatch, nomProfil, direTour, PROFILS } from '../store.js';
 import { rang } from '../classement.js';
 import { joueurForm, matchForm } from '../forms.js';
 import { carteClubs, brancherCarte } from '../carte.js';
@@ -381,6 +381,7 @@ export function renderFiche(params) {
                 ${m.tournoi ? `<span class="muted">${h(m.tournoi)}</span>` : ''}
                 ${club ? `<span class="muted">${h(club.nom)}</span>` : ''}
                 ${m.surface ? puce(m.surface) : ''}
+                ${direTour(m) ? puce(direTour(m), m.tour === 'finale' && m.issue === 'V' ? 'puce-titre' : '') : ''}
                 ${puceNote(m)}
               </div>
               ${blocNote(m)}
