@@ -371,20 +371,21 @@ function rendreCalendrier(reglages) {
       seul : l'objectif choisi plus haut ne le change pas.</p>
 
     ${(() => {
-      /* ─── Trois traits, pas davantage ─────────────────────────────
+      /* ─── Deux traits, pas davantage ──────────────────────────────
 
          On montrait tous les échelons traversés : jusqu'à sept traits
          serrés dans la hauteur d'un pouce, leurs noms empilés au bord
-         gauche, et la courbe perdue au milieu. Or trois suffisent à
-         répondre à la seule question qu'on pose ici — est-ce que je
-         tiens : celui du dessus, qu'on vise ; le sien, qu'on garde ou
-         qu'on perd ; celui du dessous, où l'on tombe.
+         gauche, et la courbe perdue au milieu. Trois ont mieux valu,
+         deux valent mieux encore : le sien, qu'on garde ou qu'on perd,
+         et celui du dessus, qu'on vise. La courbe se lit entre les deux,
+         et c'est tout ce qu'on lui demande ici.
 
-         Le reste de la descente se lit en toutes lettres sous le
-         graphique, échelon par échelon et date par date — c'est plus
-         précis qu'un trait de plus. */
+         Celui du dessous n'apportait rien qu'un troisième trait à
+         écarter : ce qu'on devient en tombant se lit en toutes lettres
+         sous le graphique, échelon par échelon et date par date — plus
+         précis qu'une ligne de plus. */
       const i = rang(mien);
-      const paliers = [ECHELONS[i + 1], mien, ECHELONS[i - 1]]
+      const paliers = [ECHELONS[i + 1], mien]
         .filter(Boolean)
         .map(e => ({ echelon: e, points: seuil(e, store.profil.sexe)?.points }))
         .filter(p => p.points != null)

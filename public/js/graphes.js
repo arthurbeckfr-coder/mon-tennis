@@ -321,49 +321,58 @@ export function brancherCourbe(racine) {
 
   /** ─── Où l'œil doit tomber en arrivant ───────────────────────────
  *
- *  Cadrer sur toute la courbe donne un graphique juste et inutile. Deux
- *  choses l'écrasent : un bilan qui a culminé très haut il y a deux ans,
- *  et une projection qui descend sur cinq ans jusqu'à trois classements
- *  plus bas. Entre les deux, les quinze points qui séparent 15 de 5/6
- *  font six pixels ; les traits se collent, leurs noms se poussent pour
- *  ne pas se recouvrir, et l'on jurerait qu'ils sont mal placés.
+ *  Deux exigences se contredisent, et tout est dans leur équilibre.
  *
- *  Le cadre d'arrivée tient donc à la bande des trois paliers, plus le
- *  bilan d'aujourd'hui — d'où l'on part — et un peu de mou sous le
- *  dernier trait pour voir la courbe le franchir. Ce qui compte ici est
- *  le passage : à quelle date la courbe croise la ligne. Ce qu'elle
- *  devient trois ans plus bas se lit en toutes lettres sous le
- *  graphique, échelon par échelon et date par date.
+ *  Voir la courbe : c'est le sujet du dessin, et un cadre serré sur les
+ *  deux traits n'en montrerait qu'une poignée de mois — le reste
+ *  au-dessus et en dessous, hors champ.
  *
- *  Le reste n'est pas perdu : le dézoom va jusqu'au cadrage total, et
- *  le glissement vertical avec lui.
+ *  Voir les deux traits séparément : quinze points séparent un échelon
+ *  du suivant, et sur une échelle de six cents cela fait six pixels.
+ *  Les noms se marchent dessus et l'on ne sait plus lequel on lit.
+ *
+ *  D'où la règle : le cadre se cale sur la partie récente de la courbe
+ *  — les douze derniers mois et la projection —, en écartant les valeurs
+ *  extrêmes, car un pic d'il y a deux ans ne doit pas décider de
+ *  l'échelle d'aujourd'hui. Les deux traits entrent toujours dedans.
+ *
+ *  Rien ne borne plus la hauteur du cadre : c'est la courbe qui décide,
+ *  et deux traits proches ne se confondent plus depuis que leurs noms
+ *  changent de côté au lieu de se pousser. Mieux vaut deux lignes serrées
+ *  et une courbe lisible que l'inverse.
+ *
+ *  Ce qui dépasse n'est pas perdu : le dézoom va jusqu'au cadrage total,
+ *  et le glissement vertical avec lui.
  */
   const cadrageEntier = () => {
     const total = cadrageTotal();
-    if (!mesures.length || niveaux.length < 2) return total;
+    if (!mesures.length || !niveaux.length) return total;
 
     const hautP = Math.min(...niveaux), basP = Math.max(...niveaux);
-    const bande = basP - hautP;
-
-    /* Le dernier point mesuré : c'est « où j'en suis », et le cadre
-       n'aurait pas de sens sans lui. */
     const passes = mesures.filter(m => !m.futur);
     const auj = passes.length ? passes[passes.length - 1].y : hautP;
 
-    const marge = Math.max(bande * 0.18, 10);
-    const haut = Math.min(hautP, auj) - marge;
-    const bas = Math.max(basP, auj) + Math.max(bande * 0.6, marge);
+    /* La partie récente : la projection, et l'année écoulée. */
+    const recents = [...mesures.filter(m => m.futur), ...passes.slice(-12)];
+    const ys = recents.map(m => m.y).sort((a, b) => a - b);
+    const q = p => ys[Math.min(ys.length - 1, Math.max(0, Math.round(p * (ys.length - 1))))];
+
+    let haut = Math.min(hautP, auj, q(0.08));
+    let bas = Math.max(basP, auj, q(0.92));
+
+    const marge = Math.max((bas - haut) * 0.12, 8);
+    haut -= marge; bas += marge;
+
+    /* Pas de plafond sur la hauteur : la courbe doit se voir en entier sur
+       la période qui compte, et deux traits trop proches ne se confondent
+       plus depuis que leurs noms changent de côté au lieu de se pousser.
+       Mieux vaut deux lignes serrées et une courbe lisible que l'inverse. */
     const hh = bas - haut;
 
     if (hh >= total[3]) return total;
     const y0 = Math.min(Math.max(haut, total[1]), total[1] + total[3] - hh);
     return [total[0], y0, total[2], hh];
   };
-  /* Les dates, sous le cadre. Toutes sont écrites dans la page ; c'est
-     ici qu'on décide lesquelles se voient — la première, puis une tous
-     les tant de repères, l'écart choisi pour qu'aucune n'en touche une
-     autre. En s'approchant, l'intervalle se resserre tout seul et les
-     mois remplacent les années. */
   /** Les noms des paliers, chacun à la hauteur de sa ligne.
    *
    *  Ils se poussaient l'un l'autre vers le bas quand ils se touchaient :
