@@ -321,15 +321,23 @@ export function bonusChampionnats({ matchs = [], cible, finISO = null } = {}) {
 
   /* Les victoires bonus : une par édition gagnée, deux au plus. Une
      édition est un championnat d'une année donnée — gagner celui de 2024
-     ne dit rien de celui de 2025. */
+     ne dit rien de celui de 2025.
+
+     Le tour, quand il est noté, tranche : une finale gagnée est un titre,
+     et c'est tout ce qu'il faut savoir. Sans lui, on retombe sur la
+     lecture d'origine — l'édition où l'on n'a pas perdu — qui rate le cas
+     du tableau abandonné en cours de route, mais ne compte jamais un
+     titre qu'on n'a pas. */
   const editions = {};
   for (const m of fenetre) {
     const an = (m.date || '').slice(0, 4);
-    const cle = SANS_ACCENT(m.tournoi).replace(/(19|20)dd/g, '').trim() + ' ' + an;
-    editions[cle] = editions[cle] || { cle, nom: m.tournoi, an, v: 0, d: 0 };
+    const cle = SANS_ACCENT(m.tournoi).replace(/\b(19|20)\d\d\b/g, '').trim() + ' ' + an;
+    editions[cle] = editions[cle] || { cle, nom: m.tournoi, an, v: 0, d: 0, titre: false };
     if (m.issue === 'V') editions[cle].v++; else editions[cle].d++;
+    if (m.tour === 'finale' && m.issue === 'V') editions[cle].titre = true;
   }
-  const gagnees = Object.values(editions).filter(e => e.v > 0 && e.d === 0);
+  const gagnees = Object.values(editions)
+    .filter(e => e.titre || (e.v > 0 && e.d === 0));
 
   return {
     victoires: Math.min(gagnees.length, 2),

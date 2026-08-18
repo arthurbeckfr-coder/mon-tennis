@@ -16,6 +16,7 @@ import { store, basculerAchat, rangerCourses, courses as coursesCRUD, raquetteDe
          clubDuMatch, CATEGORIES_DEPENSE, nomCategorieDepense, maj } from '../store.js';
 import { pointDuClub } from '../carte.js';
 import { saisonDe } from './matchs.js';
+import { direTour } from '../store.js';
 import { distanceKm, situer } from '../geocodage.js';
 import {
   CATEGORIES_COURSES, TROUSSE_TYPE, nomCause,
@@ -323,6 +324,25 @@ function detailArgent(quoi) {
     },
   };
 
+  if (quoi === 'gains') {
+    const g = gains(saisonRoute);
+    openModal({
+      title: 'Ce que les tournois ont rapporté',
+      body: `<p class="tiny muted">${g.total ? `${euros(g.total)} en tout` : 'Aucun gain en'
+          + ' argent'}${g.lots ? `, et ${g.lots} lot(s)` : ''}. Les lots ne sont pas
+          convertis en euros : un prix inventé passerait pour une recette.</p>
+        <ul class="clubs-adverses">${g.liste.map(x => `<li>
+          <div><strong>${h(x.adversaire || 'Adversaire inconnu')}</strong>
+            <div class="tiny muted">${h(dateCourte(x.date))}${
+              x.tournoi ? ' — ' + h(x.tournoi) : ''}${
+              direTour(x) ? ' — ' + h(direTour(x)) : ''}</div></div>
+          <div class="club-score"><b>${x.gainMontant ? euros(x.gainMontant) : ''}</b>
+            ${x.gainLot ? `<span class="tiny muted">${h(x.gainLot)}</span>` : ''}</div>
+        </li>`).join('')}</ul>`,
+    });
+    return;
+  }
+
   if ((quoi === 'km' || quoi === 'route') && route) {
     const n = route.lignes.reduce((t, x) => t + x.trajets, 0);
     vues[quoi] = {
@@ -353,6 +373,20 @@ function detailArgent(quoi) {
   const v = vues[quoi];
   if (v) openModal({ title: v.titre, body: v.corps });
 }
+/** Ce que les tournois ont rapporté : l'argent d'un côté, les lots de
+ *  l'autre. On ne convertit pas un cordage en euros — un prix inventé
+ *  passerait pour une recette. */
+function gains(saison = 'tout') {
+  const liste = store.matchs.filter(x =>
+    (x.gainMontant || x.gainLot)
+    && (saison === 'tout' || saisonDe(x.date) === Number(saison)));
+  return {
+    liste: liste.sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    total: liste.reduce((t, x) => t + (Number(x.gainMontant) || 0), 0),
+    lots: liste.filter(x => x.gainLot).length,
+  };
+}
+
 /** Les saisons où il s'est passé quelque chose qui coûte : un match dans
  *  un club situé, ou une dépense notée. */
 function saisonsDeRoute() {
@@ -383,6 +417,7 @@ function vueArgent() {
   const route = deplacements(saisonRoute);
   const tarif = Number(store.profil?.coutKm) || 0;
   const saisons = saisonsDeRoute();
+  const gagne = gains(saisonRoute);
 
   return `
     ${/* Le filtre en tête de page, et il gouverne tout ce qui suit. Une
@@ -411,6 +446,14 @@ function vueArgent() {
         ><b>${Math.round(route.kmTotal)}</b><span>km estimés</span></div>` : ''}
       ${route && tarif ? `<div class="chiffre" data-argent="route" title="Voir le détail"
         ><b>${euros(route.kmTotal * tarif)}</b><span>de route estimés</span></div>` : ''}
+      ${/* Ce que le tennis rapporte tient dans la même page que ce qu'il
+            coûte, sans jamais se soustraire : un lot n'est pas une
+            recette, et une estimation de route n'est pas une dépense
+            constatée. Trois natures de chiffres, trois cases. */''}
+      ${gagne.total || gagne.lots ? `<div class="chiffre" data-argent="gains"
+        title="Voir le détail"><b>${gagne.total ? euros(gagne.total)
+          : gagne.lots}</b><span>${gagne.total ? 'gagnés en tournoi'
+          : 'lot(s) gagné(s)'}</span></div>` : ''}
     </section>
 
     <div class="rangee-boutons" style="justify-content:center">

@@ -329,6 +329,42 @@ export function surfaceDuMatch(m) {
   return { surface: '', origine: 'inconnue' };
 }
 
+/* ─── Les tours d'un tableau ───────────────────────────────────────────
+
+   Un tableau de tournoi se remonte : premier tour, seizièmes, huitièmes,
+   quarts, demie, finale. Le tour n'est pas un détail de palmarès — c'est
+   lui qui donne les victoires bonus du classement, et c'est lui qu'on
+   raconte (« j'ai sorti un 15/1 en quart »).
+
+   « Vainqueur » n'est pas un tour et ne figure donc pas ici : c'est une
+   finale gagnée, et le carnet sait déjà laquelle des deux issues on a
+   enregistrée. Le déduire évite la contradiction — une finale perdue
+   cochée « vainqueur ».
+
+   La poule n'est pas un tour non plus au sens strict, mais elle se joue
+   et se note : sans elle, la moitié des championnats jeunes et des
+   tournois internes n'aurait rien à cocher. */
+export const TOURS = [
+  { cle: 'finale',   nom: 'Finale',           rang: 1 },
+  { cle: 'demie',    nom: '1/2 finale',       rang: 2 },
+  { cle: 'quart',    nom: '1/4 de finale',    rang: 3 },
+  { cle: 'huitieme', nom: '1/8 de finale',    rang: 4 },
+  { cle: 'seizieme', nom: '1/16 de finale',   rang: 5 },
+  { cle: 'trentedeuxieme', nom: '1/32 de finale', rang: 6 },
+  { cle: 'tour1',    nom: 'Premier tour',     rang: 7 },
+  { cle: 'poule',    nom: 'Poule',            rang: 8 },
+  { cle: 'qualif',   nom: 'Qualifications',   rang: 9 },
+];
+
+export const nomTour = cle => TOURS.find(t => t.cle === cle)?.nom || '';
+
+/** Ce qu'on dit d'un match : « Vainqueur » quand la finale est gagnée,
+ *  le tour lui-même sinon. */
+export function direTour(m) {
+  if (!m?.tour) return '';
+  if (m.tour === 'finale') return m.issue === 'V' ? 'Vainqueur' : 'Finaliste';
+  return nomTour(m.tour);
+}
 /* ─── Le championnat par équipes ───────────────────────────────────────
 
    Ce n'est pas un tournoi et il ne faut pas le compter comme tel. Une

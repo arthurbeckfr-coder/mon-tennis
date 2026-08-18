@@ -15,7 +15,7 @@ import {
   exporterJSON, importerJSON, toutEffacer,
   raquettes, cordages, chaussures, courses, noterJoueur,
   ajouterDepense, modifierDepense, supprimerDepense,
-  PROFILS, MOMENTS, CATEGORIES, PLATEFORMES, SURFACES, CATEGORIES_DEPENSE,
+  PROFILS, MOMENTS, CATEGORIES, PLATEFORMES, SURFACES, CATEGORIES_DEPENSE, TOURS,
 } from './store.js';
 import { ICONES, CATEGORIES_COURSES, CAUSES_CORDAGE } from './materiel.js';
 import { analyser, EXEMPLE } from './import-fft.js';
@@ -119,6 +119,7 @@ export function matchForm(existant = null) {
   const m = existant || {
     date: aujourdhui(), issue: 'V', adversaire: '', echelonAdverse: store.profil.echelon,
     score: '', tournoi: '', surface: '', notes: '', wo: false,
+    tour: '', gainMontant: null, gainLot: '',
   };
 
   /* Le club se devine du libellé de l'épreuve, et la surface se devine du
@@ -205,6 +206,36 @@ export function matchForm(existant = null) {
         <label>Épreuve
           <input name="tournoi" value="${h(m.tournoi)}" placeholder="Tournoi, championnat par équipes…">
         </label>
+        ${/* Le tour ne se devine d'aucune donnée : ni Ten'Up ni le score
+              ne disent où l'on en était dans le tableau. Il se coche, et
+              il sert deux fois — au récit (« sorti un 15/1 en quart ») et
+              au classement, où le tour atteint en championnat individuel
+              donne les victoires bonus. « Vainqueur » n'est pas dans la
+              liste : c'est une finale gagnée, et l'issue le dit déjà. */''}
+        <label>Tour
+          <select name="tour">
+            <option value="">— non précisé —</option>
+            ${TOURS.map(t => `<option value="${t.cle}"
+              ${m.tour === t.cle ? 'selected' : ''}>${h(t.nom)}</option>`).join('')}
+          </select>
+        </label>
+        ${m.tour === 'finale' || !m.tour ? `<p class="tiny muted">Une finale gagnée te
+          compte vainqueur du tableau ; perdue, finaliste. Rien à cocher de plus.</p>` : ''}
+
+        ${/* Ce qu'on a gagné : de l'argent, ou autre chose. Les deux
+              existent — un tournoi de village récompense en bons d'achat,
+              en cordage, en jambon. Une case pour le chiffre, qui
+              s'additionne, et une pour le reste, qui se raconte. */''}
+        <div class="duo">
+          <label>Gain en euros
+            <input type="number" name="gainMontant" min="0" step="1" inputmode="decimal"
+                   value="${m.gainMontant ?? ''}" placeholder="facultatif">
+          </label>
+          <label>Ou quoi d'autre
+            <input name="gainLot" value="${h(m.gainLot || '')}"
+                   placeholder="bon d'achat, cordage…">
+          </label>
+        </div>
         <label>Club
           <select name="clubId">
             <option value="">${deduit ? `Déduit du nom : ${h(deduit.nom)}` : 'Aucun club reconnu'}</option>
@@ -288,6 +319,11 @@ export function matchForm(existant = null) {
         const minutes = (Number(d.dureeH) || 0) * 60 + (Number(d.dureeM) || 0);
         d.duree = minutes > 0 ? minutes : null;
         delete d.dureeH; delete d.dureeM;
+
+        /* Un gain vide n'est pas un gain de zéro : la case reste nulle,
+           sans quoi tous les matchs entreraient dans le total à zéro euro
+           et l'on ne saurait plus lesquels ont vraiment rapporté. */
+        d.gainMontant = d.gainMontant === '' ? null : Number(d.gainMontant);
 
         if (d.adversaire === '__nouveau') {
           const nom = (d.adversaireNouveau || '').trim();

@@ -6,7 +6,7 @@
    compteurs du haut sont là pour ça, et non pour décorer. */
 
 import { h, hMulti, dateCourte, puce, dansLesDouzeMois, openModal } from '../util.js';
-import { store, bilanMatchs, surfaceDuMatch, estParEquipes, saisonEquipe,
+import { store, bilanMatchs, surfaceDuMatch, estParEquipes, saisonEquipe, direTour,
          tournoisRemportes } from '../store.js';
 import { pointsVictoire, rang, ECHELONS } from '../classement.js';
 import { matchForm, importFFTForm } from '../forms.js';
@@ -134,10 +134,25 @@ function ligneMatch(m) {
         <span>${h(dateCourte(m.date))}</span>
         ${m.score ? `<span>${h(m.score)}</span>` : ''}
         ${m.tournoi ? `<span class="muted">${h(m.tournoi)}</span>` : ''}
+        ${/* Le tour se dit avant tout le reste du contexte : « vainqueur »
+              ou « 1/4 de finale » raconte le match mieux qu'une durée. */''}
+        ${direTour(m) ? puce(direTour(m), m.tour === 'finale' && m.issue === 'V'
+          ? 'puce-titre' : '') : ''}
         ${m.duree ? `<span class="muted">${direDuree(m.duree)}</span>` : ''}
+        ${m.gainMontant ? puce(`${m.gainMontant} €`, 'puce-gain') : ''}
+        ${m.gainLot ? puce(h(m.gainLot), 'puce-gain') : ''}
         ${m.wo ? puce('non joué') : ''}
+        ${/* La note se replie derrière un ⓘ, et se déplie dans la ligne
+              elle-même. Écrite en clair, une note de quinze lignes
+              donnait à un match la hauteur de quatre autres : la liste
+              devenait un journal, et l'on ne comparait plus rien. Le
+              signe ne s'affiche que s'il y a quelque chose à lire — une
+              ligne sans lui est une ligne sans note. */''}
+        ${m.notes ? `<details class="match-note-pli">
+          <summary title="Ce que j'en retiens">ⓘ</summary>
+          <p class="match-note">${hMulti(m.notes)}</p>
+        </details>` : ''}
       </div>
-      ${m.notes ? `<p class="match-note">${hMulti(m.notes)}</p>` : ''}
     </div>
     ${pts ? `<div class="match-points">+${pts}</div>` : ''}
   </li>`;
@@ -254,6 +269,7 @@ function fenetreEdition(cle) {
         ${liste.map(ligneMatch).join('')}</ul>` : ''}`,
     onMount: corps => {
       corps.addEventListener('click', e => {
+        if (e.target.closest('.match-note-pli')) return;
         const li = e.target.closest('.match');
         if (!li) return;
         const m = store.matchs.find(x => x.id === li.dataset.id);
@@ -715,6 +731,10 @@ export function wire(vue, rerendre) {
 
     if (e.target.closest('[data-import]')) { importFFTForm(); return; }
     if (e.target.closest('[data-nouveau]')) { matchForm(); return; }
+
+    /* Déplier une note n'ouvre pas la fenêtre du match : le ⓘ est un
+       geste de lecture, pas de correction. */
+    if (e.target.closest('.match-note-pli')) return;
 
     const li = e.target.closest('.match');
     if (li) {

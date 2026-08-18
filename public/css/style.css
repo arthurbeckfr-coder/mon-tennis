@@ -626,6 +626,32 @@ body.mode-court .fab { display: none; }
   color: var(--muet);
   margin-top: 3px;
 }
+/* Le ⓘ d'une note : un rond de vingt-deux pixels dans la ligne des
+   chiffres, qui ne coûte pas une hauteur de ligne. Déplié, il prend la
+   largeur — d'où le `flex-basis` à cent pour cent, sans quoi la note se
+   lirait dans une colonne de trois centimètres. */
+.match-note-pli { flex: 0 0 auto; }
+.match-note-pli > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--bord);
+  color: var(--muet);
+  font-size: .74rem;
+  cursor: pointer;
+}
+.match-note-pli > summary::-webkit-details-marker { display: none; }
+.match-note-pli[open] { flex: 1 0 100%; }
+.match-note-pli[open] > summary {
+  border-color: var(--accent);
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
 .match-note {
   margin: 7px 0 0;
   font-size: .85rem;
