@@ -15,7 +15,7 @@
    sur un écran séparé : un club, c'est son adresse et son juge-arbitre et
    sa page Facebook. Trois écrans pour une même chose n'aidaient personne. */
 
-import { h, dateCourte, puce, confirmer, toast } from '../util.js';
+import { h, dateCourte, puce, confirmer, toast, openModal, closeModal } from '../util.js';
 import {
   store, matchsDuClub, epreuvesOrphelines, bilanMatchs, positionMot,
   supprimerClub, ajouterClub, modifierClub, modifierMatch, clubDuMatch,
@@ -200,6 +200,131 @@ const barreTri = () => `<section class="barre-filtres">
 // =====================================================================
 //  La liste
 // =====================================================================
+/** Le détail derrière une des quatre tuiles.
+ *
+ *  Trois d'entre elles racontent ce qu'on a — les clubs, les matchs
+ *  situés, les surfaces — et la quatrième donne de quoi agir : chaque
+ *  épreuve sans club y reçoit sa liste déroulante, et la choisir
+ *  rattache tous ses matchs d'un coup. Descendre au bas de la page pour
+ *  le faire restait possible, mais la tuile promettait de s'ouvrir : elle
+ *  ouvre donc là où le geste se fait.
+ */
+function fenetreChiffre(quoi) {
+  const ligne = (titre, detail, valeur) => `<li>
+    <div><strong>${h(titre)}</strong>
+      ${detail ? `<div class="tiny muted">${detail}</div>` : ''}</div>
+    <div class="club-score"><b>${h(valeur)}</b></div></li>`;
+
+  if (quoi === 'clubs') {
+    const liste = [...store.clubs]
+      .map(c => ({ c, n: matchsDuClub(c).length }))
+      .sort((a, b) => b.n - a.n || a.c.nom.localeCompare(b.c.nom, 'fr'));
+    openModal({
+      title: `Mes ${liste.length} clubs`,
+      body: `<ul class="clubs-adverses">${liste.map(x => ligne(x.c.nom,
+        [x.c.ville, (x.c.surfaces || []).join(', ')].filter(Boolean).join(' — '),
+        `${x.n} match(s)`)).join('')}</ul>`,
+    });
+    return;
+  }
+
+  if (quoi === 'situes') {
+    const liste = [...store.clubs]
+      .map(c => ({ c, m: matchsDuClub(c) }))
+      .filter(x => x.m.length)
+      .sort((a, b) => b.m.length - a.m.length);
+    const total = liste.reduce((t, x) => t + x.m.length, 0);
+    openModal({
+      title: `${total} matchs situés`,
+      body: `<p class="tiny muted">Un match est situé quand son épreuve nomme un club
+          reconnu, ou qu'on lui en a donné un à la main.</p>
+        <ul class="clubs-adverses">${liste.map(x => {
+          const b = bilanMatchs(x.m);
+          return ligne(x.c.nom, `${b.v}V–${b.d}D`, `${x.m.length} match(s)`);
+        }).join('')}</ul>`,
+    });
+    return;
+  }
+
+  if (quoi === 'surfaces') {
+    const par = {};
+    for (const c of store.clubs) {
+      for (const s of c.surfaces || []) {
+        par[s] = par[s] || { clubs: 0, matchs: 0 };
+        par[s].clubs++;
+        par[s].matchs += matchsDuClub(c).length;
+      }
+    }
+    const cles = Object.keys(par).sort((a, b) => par[b].clubs - par[a].clubs);
+    openModal({
+      title: `${cles.length} surfaces`,
+      body: cles.length
+        ? `<ul class="clubs-adverses">${cles.map(s => ligne(s,
+            `${par[s].matchs} match(s) joués dans ces clubs`,
+            `${par[s].clubs} club(s)`)).join('')}</ul>
+           <p class="tiny muted">Un club à plusieurs surfaces compte dans chacune :
+             les totaux ne s'additionnent donc pas.</p>`
+        : `<p class="tiny muted">Aucune surface renseignée. Elle se note sur la fiche
+           d'un club, et le carnet la propose ensuite à chaque match qui s'y joue.</p>`,
+    });
+    return;
+  }
+
+  /* Rattacher : la seule fenêtre qui agit. */
+  const orphelines = epreuvesOrphelines()
+    .filter(([nom]) => !estParEquipes({ tournoi: nom }));
+  const total = orphelines.reduce((t, [, n]) => t + n, 0);
+  const choix = [...store.clubs].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+
+  openModal({
+    title: `${total} match(s) à rattacher`,
+    large: true,
+    body: !orphelines.length
+      ? `<p class="tiny muted">Tout est rattaché. Les rencontres par équipes n'y
+         figurent pas : elles n'ont pas de club à trouver.</p>`
+      : `<p class="tiny muted">Choisis un club pour une épreuve, et tous ses matchs le
+          reçoivent. Une épreuve étalée sur plusieurs années s'est peut-être jouée
+          ailleurs d'une fois sur l'autre : le carnet le dit, et laisse faire — c'est
+          toi qui sais.</p>
+        <ul class="rattachements">
+          ${orphelines.map(([nom, n]) => {
+            const m = store.matchs.filter(x => !clubDuMatch(x)
+              && (x.tournoi || '(sans nom)').trim() === nom);
+            const annees = [...new Set(m.map(x => (x.date || '').slice(0, 4)))]
+              .filter(Boolean).sort();
+            return `<li>
+              <div class="rattachement-tete">
+                <strong>${h(nom)}</strong>
+                <span class="tiny muted">${n} match(s) — ${annees.length > 1
+                  ? `de ${h(annees[0])} à ${h(annees[annees.length - 1])}`
+                  : h(annees[0] || '')}</span>
+              </div>
+              <select data-rattacher-tout="${h(nom)}">
+                <option value="">— choisir un club —</option>
+                ${choix.map(c => `<option value="${h(c.id)}">${h(c.nom)}</option>`).join('')}
+              </select>
+            </li>`;
+          }).join('')}
+        </ul>`,
+    onMount: corps => corps.addEventListener('change', e => {
+      const sel = e.target.closest('[data-rattacher-tout]');
+      if (!sel || !sel.value) return;
+      rattacherEpreuve(sel.dataset.rattacherTout, sel.value);
+      closeModal();
+    }),
+  });
+}
+
+/** Donne un club à tous les matchs d'une épreuve. */
+function rattacherEpreuve(nom, clubId) {
+  const club = store.clubs.find(c => c.id === clubId);
+  if (!club) return;
+  const vises = store.matchs
+    .filter(m => !clubDuMatch(m) && (m.tournoi || '(sans nom)').trim() === nom);
+  for (const m of vises) modifierMatch(m.id, { clubId: club.id });
+  epreuveOuverte = null;
+  toast(`${vises.length} match(s) rattaché(s) à ${club.nom}.`);
+}
 export function render() {
   const t = triCourant();
   const clubs = [...store.clubs]
@@ -237,14 +362,19 @@ export function render() {
   }
 
   return `
+    ${/* Les quatre tuiles s'ouvrent : un total n'apprend rien tant qu'on
+          ne sait pas de quoi il est fait. La dernière ouvre en plus ce
+          qu'il faut pour agir — rattacher une épreuve à son club sans
+          descendre la chercher au bas de la page. */''}
     <section class="chiffres">
-      <div class="chiffre"><b>${store.clubs.length}</b><span>clubs</span></div>
-      <div class="chiffre"><b>${store.matchs.length - sansClub}</b><span>matchs situés</span></div>
-      <div class="chiffre ${tri === 'surfaces' ? 'actif' : ''}" data-tri-vers="surfaces"
-        title="Ranger les clubs par nombre de surfaces"
+      <div class="chiffre" data-detail="clubs" title="Voir le détail"
+        ><b>${store.clubs.length}</b><span>clubs</span></div>
+      <div class="chiffre" data-detail="situes" title="Voir le détail"
+        ><b>${store.matchs.length - sansClub}</b><span>matchs situés</span></div>
+      <div class="chiffre" data-detail="surfaces" title="Voir le détail"
         ><b>${new Set(store.clubs.flatMap(c => c.surfaces || [])).size}</b>
         <span>surfaces</span></div>
-      <div class="chiffre" data-aller="orphelines" title="Voir ces épreuves"
+      <div class="chiffre" data-detail="rattacher" title="Rattacher ces épreuves"
         ><b>${aRattacher}</b><span>à rattacher</span></div>
     </section>
 
@@ -530,13 +660,7 @@ export function wire(vue, rerendre) {
   vue.addEventListener('change', e => {
     const sel = e.target.closest('[data-rattacher-tout]');
     if (!sel || !sel.value) return;
-    const nom = sel.dataset.rattacherTout;
-    const club = store.clubs.find(c => c.id === sel.value);
-    const vises = store.matchs
-      .filter(m => !clubDuMatch(m) && (m.tournoi || '(sans nom)').trim() === nom);
-    for (const m of vises) modifierMatch(m.id, { clubId: club.id });
-    epreuveOuverte = null;
-    toast(`${vises.length} match(s) rattaché(s) à ${club.nom}.`);
+    rattacherEpreuve(sel.dataset.rattacherTout, sel.value);
   });
 
   // Une épreuve annoncée cliquable doit s'ouvrir au clavier aussi.
@@ -554,17 +678,11 @@ export function wire(vue, rerendre) {
     const oc = e.target.closest('[data-onglet-club]');
     if (oc) { ongletClubs = oc.dataset.ongletClub; rerendre(); return; }
 
-    /* Deux compteurs mènent quelque part, les deux autres non : le nombre
-       de clubs et les matchs situés ne cachent rien qu'on ne voie déjà à
-       l'écran, et une tuile qui promet une action sans en avoir vaut moins
-       qu'une tuile muette. */
+    const dt = e.target.closest('[data-detail]');
+    if (dt) { fenetreChiffre(dt.dataset.detail); return; }
+
     const tv = e.target.closest('[data-tri-vers]');
     if (tv) { tri = tri === tv.dataset.triVers ? 'matchs' : tv.dataset.triVers; rerendre(); return; }
-
-    if (e.target.closest('[data-aller="orphelines"]')) {
-      vue.querySelector('#orphelines')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
 
     const r = e.target.closest('[data-rattacher]');
     if (r) {

@@ -1987,13 +1987,38 @@ body.mode-court .terrain-diapo .terrain {
 
 /* Le détail est un <li> pour rester valide dans la liste, mais il ne se
    comporte pas comme une ligne : il occupe toute la largeur, et sa bordure
-   du haut ferait doublon avec celle de l'épreuve au-dessus. */
-.orphelines-detail {
+   du haut ferait doublon avec celle de l'épreuve au-dessus.
+
+   Le sélecteur nomme le <li> : sans lui, la règle des lignes — un seul
+   nom de classe et un nom d'élément, donc plus spécifique — l'emportait,
+   et le détail restait une rangée. Le bilan, la liste des matchs et la
+   note se retrouvaient en trois colonnes, chaque match écrasé dans le
+   tiers de la largeur. */
+.orphelines li.orphelines-detail {
   display: block;
   border-top: 0;
   padding: 4px 0 12px;
 }
 
+
+/* Les épreuves à rattacher, dans leur fenêtre : le nom et son compte
+   au-dessus, la liste déroulante en dessous et pleine largeur — sur un
+   téléphone, un menu posé à côté d'un long libellé de tournoi n'a plus
+   la place d'afficher un nom de club. */
+.rattachements { list-style: none; margin: 12px 0 0; padding: 0; }
+.rattachements li {
+  padding: 10px 0;
+  border-top: 1px solid var(--bord);
+}
+.rattachements li:first-child { border-top: 0; }
+.rattachement-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.rattachements select { width: 100%; }
 /* ===================================================================
    Adversaires
    =================================================================== */
