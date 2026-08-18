@@ -32,7 +32,7 @@ import { h } from './util.js';
 import { store } from './store.js';
 import { distanceKm, direDistance, lienItineraire } from './geocodage.js';
 import { CONTOURS } from './contours.js';
-import { ROUTES, VILLES } from './reperes.js';
+import { ROUTES, VILLES, COMMUNES_TRACE } from './reperes.js';
 
 /* Le centre officiel de chaque commune où l'on a joué, en [longitude,
    latitude]. Auffay a fusionné dans Val-de-Scie et Belleville-sur-Mer
@@ -164,13 +164,21 @@ export function carteClubs(clubs) {
 
   /* Les axes ne sont pas fermés : on reprend le même tracé sans le « Z »,
      sans quoi l'autoroute se refermerait sur elle-même en travers. */
-  const routes = ROUTES.map(r => {
-    const d = r.trace.map((c, i) => {
-      const [x, y] = projete(c);
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(4)} ${y.toFixed(4)}`;
-    }).join('');
-    return `<path class="carte-route" d="${d}"><title>${h(r.ref)}</title></path>`;
+  const ligne = trace => trace.map((c, i) => {
+    const [x, y] = projete(c);
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(4)} ${y.toFixed(4)}`;
   }).join('');
+
+  const routes = ROUTES.map(r =>
+    `<path class="carte-route" data-rang="${r.r}" d="${ligne(r.trace)}"
+       ><title>${h(r.ref)}</title></path>`).join('');
+
+  /* Les limites de communes ne se dessinent qu'une fois qu'on s'est
+     approché : de loin, vingt polygones se chevauchent en un gribouillis
+     qui masque les clubs. */
+  const limites = COMMUNES_TRACE.map(c =>
+    `<path class="carte-limite" data-rang="3" d="${ligne(c.trace)}Z"
+       ><title>${h(c.nom)}</title></path>`).join('');
 
   /* Les villes citées pour se situer portent un petit carré et leur nom.
      Elles se distinguent des clubs par la forme autant que par la
@@ -193,13 +201,21 @@ export function carteClubs(clubs) {
     </g>`;
   }).join('');
 
-  const villes = VILLES.map(v => {
-    const [x, y] = projete(v.point);
-    return `<g class="carte-ville" data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}">
-      <rect class="carte-ville-marque" x="${x.toFixed(4)}" y="${y.toFixed(4)}"/>
-      <text class="carte-ville-nom" x="${x.toFixed(4)}" y="${y.toFixed(4)}">${h(v.nom)}</text>
-    </g>`;
-  }).join('');
+  /* Une ville qui porte déjà un club n'a pas besoin de son étiquette : le
+     disque et son nom dans la bulle disent la même chose, et deux
+     marqueurs au même endroit se gênent. */
+  const villesDeClubs = new Set(clubs.map(c => sansAccent(c.club?.ville)));
+
+  const villes = VILLES
+    .filter(v => !villesDeClubs.has(sansAccent(v.nom)))
+    .map(v => {
+      const [x, y] = projete(v.point);
+      return `<g class="carte-ville" data-rang="${v.r}"
+          data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}">
+        <rect class="carte-ville-marque" x="${x.toFixed(4)}" y="${y.toFixed(4)}"/>
+        <text class="carte-ville-nom" x="${x.toFixed(4)}" y="${y.toFixed(4)}">${h(v.nom)}</text>
+      </g>`;
+    }).join('');
 
   return `<div class="carte-clubs" data-carte
        data-boite="${boite.x} ${boite.y} ${boite.w} ${boite.h}">
@@ -207,6 +223,7 @@ export function carteClubs(clubs) {
          preserveAspectRatio="xMidYMid meet" role="img"
          aria-label="Carte des clubs où j'ai joué">
       ${fond}
+      ${limites}
       ${routes}
       ${villes}
       ${ancres}
@@ -271,8 +288,11 @@ export function carteClubs(clubs) {
     sa couleur si ton bilan y est positif. Touche un club pour voir son nom, puis « Voir la
     fiche » pour l'ouvrir ; glisse pour te déplacer, pince ou molette pour zoomer — les
     disques gardent leur taille, ce sont les distances qui s'écartent.
-    Les carrés gris et les traits fins sont des repères — quelques villes et les grands
-    axes — et non des lieux où tu as joué.
+    Les carrés gris et les traits fins sont des repères — villes, axes routiers et limites
+    de communes — et non des lieux où tu as joué. La carte en montre d'autant plus que tu
+    t'approches : les grandes villes et les autoroutes de loin, les bourgs et les
+    nationales ensuite, les villages et les limites communales de près. Un nom qui manque
+    n'est pas absent, il attend la place.
     ${absents ? `${absents} club(s) ne figurent pas ici : leur ville n'est pas dans la
       table des communes, et les placer au hasard vaudrait moins que de le dire.` : ''}</p>`;
 }
@@ -349,8 +369,68 @@ export function brancherCarte(racine, ouvrirClub) {
      C'est aussi ce qui sépare enfin deux clubs voisins quand on
      s'approche : ils s'écartent sans grossir. */
   const clubs = [...bloc.querySelectorAll('.carte-club')];
-  const villes = [...bloc.querySelectorAll('.carte-ville')];
+  /* Rangées de la plus grosse ville à la plus petite : c'est l'ordre dans
+     lequel on décide qui garde son étiquette quand la place manque. */
+  const villes = [...bloc.querySelectorAll('.carte-ville')]
+    .sort((a, b) => Number(a.dataset.rang) - Number(b.dataset.rang));
   const ancresDom = [...bloc.querySelectorAll('.carte-ancre')];
+  const rangs = [...bloc.querySelectorAll('[data-rang]')];
+
+  /* ─── Ce qu'on montre à chaque échelle ───────────────────────────────
+
+     Une carte routière ne dit pas les mêmes noms au 1/1 000 000 et au
+     1/25 000, et pour une raison qui n'a rien d'esthétique : cent
+     cinquante étiquettes sur un écran de téléphone se recouvrent jusqu'à
+     ce qu'on ne lise plus rien, clubs compris — or les clubs sont le
+     sujet.
+
+     Le seuil se mesure sur la largeur de la vue, en degrés, c'est-à-dire
+     sur la surface réellement embrassée. À plus d'un demi-degré on
+     regarde un département : seules les villes de plus de dix mille
+     habitants et les autoroutes ont leur place. En dessous de trois
+     dixièmes on regarde un canton : les bourgs et les nationales
+     arrivent. Sous un dixième, on est sur une commune : les villages et
+     les limites administratives peuvent enfin se lire. */
+  const rangVisible = largeur =>
+    largeur > 0.50 ? 1
+    : largeur > 0.16 ? 2
+    : 3;
+
+  /* Le rang ne suffit pas. Autour de Rouen, une douzaine de communes de
+     plus de dix mille habitants se touchent : toutes de rang 1, toutes
+     affichées, leurs noms s'empilent en un pâté illisible qui recouvre
+     jusqu'aux clubs.
+
+     On repasse donc derrière, à l'écran cette fois : les étiquettes sont
+     posées de la plus grosse ville à la plus petite, et celle qui
+     mordrait sur une déjà posée se tait. C'est ce que fait toute carte —
+     et c'est pourquoi le nom d'un village apparaît en s'approchant, quand
+     la place se libère, plutôt qu'à un seuil de zoom arbitraire.
+
+     Le carré du repère reste, lui : il occupe sept pixels et dit qu'il y a
+     là une commune, ce que le silence de l'étiquette n'enlève pas. */
+  const degager = () => {
+    const poses = [];
+    const chevauche = (a, b) =>
+      a.left < b.right + 3 && a.right + 3 > b.left &&
+      a.top < b.bottom + 2 && a.bottom + 2 > b.top;
+
+    for (const g of villes) {
+      const nom = g.querySelector('text');
+      if (g.classList.contains('efface')) { nom.classList.remove('muette'); continue; }
+      nom.classList.remove('muette');
+      const boite = nom.getBoundingClientRect();
+      if (boite.width === 0) continue;
+      if (poses.some(b => chevauche(boite, b))) nom.classList.add('muette');
+      else poses.push(boite);
+    }
+  };
+
+  const doserDetail = () => {
+    const seuil = rangVisible(vue[2]);
+    for (const el of rangs) el.classList.toggle('efface', Number(el.dataset.rang) > seuil);
+    degager();
+  };
 
   const redimensionner = ech => {
     for (const g of clubs) {
@@ -391,6 +471,7 @@ export function brancherCarte(racine, ouvrirClub) {
   const poser = () => {
     svg.setAttribute('viewBox', vue.join(' '));
     redimensionner(echelle());
+    doserDetail();
     placerBulle();
   };
 

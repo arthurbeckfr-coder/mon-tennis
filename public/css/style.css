@@ -1924,3 +1924,28 @@ body.mode-court .view { padding-top: 6px; }
 @media (prefers-reduced-motion: reduce) {
   .toast { transition: none; }
 }
+
+/* Un repère hors de portée du zoom courant s'efface au lieu de
+   disparaître : la transition évite le clignotement d'une carte dont la
+   moitié des noms surgirait d'un coup à chaque cran de zoom. */
+.carte-clubs .efface {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s;
+}
+.carte-clubs [data-rang] { transition: opacity .18s; }
+
+/* Les limites de communes : un trait fin, plus discret que la côte, qui
+   dit où l'on entre sans prétendre à autre chose. */
+.carte-limite {
+  fill: none;
+  stroke: var(--bord);
+  stroke-width: 1;
+  stroke-opacity: .7;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+
+/* Une étiquette qui n'a pas la place se tait, mais son repère reste : le
+   carré dit qu'il y a là une commune, et zoomer rendra son nom. */
+.carte-ville-nom.muette { opacity: 0; }
