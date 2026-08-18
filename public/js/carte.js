@@ -83,6 +83,23 @@ const couture = (x, y, r) =>
   + ` ${(x + r * 0.42).toFixed(4)} ${(y + r * 0.82).toFixed(4)}`
   + ` ${(x + r).toFixed(4)} ${y.toFixed(4)}`;
 
+/** Les deux moitiés que la couture découpe dans la balle : la même courbe
+ *  en S, refermée par le bord du disque d'un côté ou de l'autre.
+ *
+ *  C'est ce qui permet de dire « ici je gagne autant que je perds » sans
+ *  choisir entre le vert et le rouge — un club où l'on fait deux partout
+ *  n'est ni un bon ni un mauvais terrain, et le peindre d'une seule
+ *  couleur mentirait d'un match. La couture, qui est déjà là, fait la
+ *  ligne séparatrice : rien à ajouter au dessin.
+ *
+ *  `haut` choisit le sens de l'arc de retour. En SVG l'axe des y descend,
+ *  et le drapeau de balayage 0 ramène donc par le dessus.
+ */
+const moitie = (x, y, r, haut) =>
+  couture(x, y, r)
+  + ` A ${r.toFixed(4)} ${r.toFixed(4)} 0 0 ${haut ? 0 : 1}`
+  + ` ${(x - r).toFixed(4)} ${y.toFixed(4)} Z`;
+
 /** Le point d'un club : sa position saisie si elle existe, sinon celle de
  *  sa commune. Rien à défaut — on ne place pas un club au hasard. */
 export function pointDuClub(club) {
@@ -177,7 +194,7 @@ export function carteClubs(clubs, { couleur = 'club' } = {}) {
      disque qu'on lit, pas son rayon. Six à douze pixels de rayon — assez
      pour viser au pouce, assez peu pour que quatorze clubs ne fassent pas
      une tache. */
-  const rayonPx = n => 6 + 6 * Math.sqrt(n / maxMatchs);
+  const rayonPx = n => 7 + 7 * Math.sqrt(n / maxMatchs);
 
   /* La hauteur de la carte est fixée par la feuille de style. On s'en sert
      pour poser une première taille cohérente ; `brancherCarte` la corrige
@@ -290,12 +307,14 @@ export function carteClubs(clubs, { couleur = 'club' } = {}) {
         const [x, y] = p.xy;
         const rpx = rayonPx(p.matchs.length);
         const r = rpx / echInitiale;
-        /* Vert, rouge, ou rien. L'égalité ne se tranche pas : deux
-           victoires pour deux défaites n'est ni un bon ni un mauvais
-           terrain, et lui donner une couleur serait mentir d'un match. */
+        /* Vert, rouge, ou les deux. Un club où l'on a gagné et perdu
+           porte une balle en deux moitiés plutôt qu'une couleur moyenne :
+           la couture sert de ligne séparatrice, et l'on voit d'un coup
+           d'œil que l'endroit n'est ni acquis ni perdu. */
+        const mixte = couleur === 'bilan' && p.bilan.v > 0 && p.bilan.d > 0;
         const teinte = couleur !== 'bilan' || !p.bilan.total ? ''
-          : p.bilan.v > p.bilan.d ? 'gagnant'
-          : p.bilan.d > p.bilan.v ? 'perdu' : '';
+          : mixte ? 'mixte'
+          : p.bilan.v ? 'gagnant' : 'perdu';
         /* `data-club-carte` et non `data-club` : la liste des clubs
            utilise déjà `data-club`, et son gestionnaire attraperait le
            clic avant celui de la carte — court-circuitant le garde-fou
@@ -332,6 +351,8 @@ export function carteClubs(clubs, { couleur = 'club' } = {}) {
                   r="${(r * 1.9).toFixed(4)}"/>
           <circle class="carte-point" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
                   r="${r.toFixed(4)}"/>
+          ${mixte ? `<path class="carte-moitie haut" d="${moitie(x, y, r, true)}"/>
+            <path class="carte-moitie bas" d="${moitie(x, y, r, false)}"/>` : ''}
           <path class="carte-couture" d="${couture(x, y, r)}"/>
         </g>`;
       }).join('')}
@@ -531,8 +552,10 @@ export function brancherCarte(racine, ouvrirClub) {
       const r = Number(g.dataset.rpx) / ech;
       g.querySelector('.carte-point').setAttribute('r', r.toFixed(5));
       g.querySelector('.carte-halo').setAttribute('r', (r * 1.9).toFixed(5));
-      g.querySelector('.carte-couture')?.setAttribute('d',
-        couture(Number(g.dataset.x), Number(g.dataset.y), r));
+      const gx = Number(g.dataset.x), gy = Number(g.dataset.y);
+      g.querySelector('.carte-couture')?.setAttribute('d', couture(gx, gy, r));
+      g.querySelector('.carte-moitie.haut')?.setAttribute('d', moitie(gx, gy, r, true));
+      g.querySelector('.carte-moitie.bas')?.setAttribute('d', moitie(gx, gy, r, false));
     }
     for (const g of ancresDom) {
       const x = Number(g.dataset.x), y = Number(g.dataset.y);

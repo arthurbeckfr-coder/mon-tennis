@@ -1052,13 +1052,26 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
    règle tenue partout dans ce carnet : le contour d'une balle perdante
    est en pointillé, et la bulle donne le compte en toutes lettres. */
 .carte-halo { fill: var(--accent); opacity: .12; }
+
+/* Le jaune d'une balle neuve, et non celui d'un surligneur passé : le
+   premier essai — un vert-jaune terne — se posait sur un fond de carte
+   déjà clair et s'y fondait, contour compris. Deux corrections : la
+   teinte monte en saturation, et le contour devient un vrai cerne sombre
+   plutôt qu'un gris à moitié transparent. Sur la carte claire comme sur
+   la sombre, la balle se détache maintenant de tout ce qu'elle survole. */
 .carte-point {
-  fill: #d8e04a;
-  stroke: var(--texte);
-  stroke-opacity: .55;
-  stroke-width: 1;
+  fill: #dcf03c;
+  stroke: #232a10;
+  stroke-opacity: .9;
+  stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
 }
+
+/* Les deux moitiés d'un club où l'on gagne et où l'on perd. Elles se
+   posent par-dessus le disque, que la couture sépare déjà. */
+.carte-moitie { stroke: none; }
+.carte-moitie.haut { fill: var(--victoire); }
+.carte-moitie.bas { fill: var(--defaite); }
 /* La couture : le trait qui fait la balle. En épaisseur d'écran, sans
    quoi elle s'épaissirait avec le zoom jusqu'à barrer la balle. */
 .carte-couture {
@@ -1073,9 +1086,12 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
 .carte-club.gagnant .carte-halo { fill: var(--victoire); }
 .carte-club.perdu .carte-point { fill: var(--defaite); stroke-dasharray: 3 2; }
 .carte-club.perdu .carte-halo { fill: var(--defaite); }
-/* Sur fond de couleur pleine, la couture se lit en clair. */
+/* Sur fond de couleur pleine, la couture se lit en clair — et dans le cas
+   mixte elle n'est plus un ornement mais la frontière entre les deux
+   moitiés : elle s'épaissit d'autant. */
 .carte-club.gagnant .carte-couture,
 .carte-club.perdu .carte-couture { stroke: #fff; stroke-opacity: .8; }
+.carte-club.mixte .carte-couture { stroke: #fff; stroke-opacity: .95; stroke-width: 1.8; }
 .carte-club { cursor: pointer; }
 .carte-club:hover .carte-halo, .carte-club:focus-visible .carte-halo { opacity: .34; }
 .carte-club:focus-visible { outline: none; }
