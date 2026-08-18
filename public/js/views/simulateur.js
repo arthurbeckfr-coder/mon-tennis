@@ -134,6 +134,8 @@ export function render() {
 
     ${r.erreur ? `<div class="avis">${h(r.erreur)}</div>` : rendreResultat(r)}
 
+    ${r.erreur ? '' : rendreChemins(reglages, p, cible, r)}
+
     ${rendreDescente(reglages, p)}
 
     ${rendreCalendrier(reglages)}
@@ -208,27 +210,82 @@ function rendreResultat(r) {
 
     ${rendreMontee(r)}
 
-    ${/* Les chemins tenaient sur un titre nu, posé dans la page plutôt
-          que dans une carte. Ils y gagnent la leur — c'est ce qui leur
-          donne le pli, comme aux autres. */''}
-    ${r.scenarios.length ? `<section class="carte">
-      <h3>Les chemins possibles</h3>
-      <ul class="scenarios">
-        ${r.scenarios.map((sc, n) => `<li class="scenario ${n === 0 ? 'meilleur' : ''}">
-          <div class="scenario-tete">
-            <strong>${h(direScenario(sc))}</strong>
-            ${n === 0 ? puce('le plus court', 'puce-vert') : ''}
-          </div>
-          <div class="scenario-bas">
-            <span>${sc.matchs} match${sc.matchs > 1 ? 's' : ''}</span>
-            <span>+${sc.gain} points</span>
-            ${sc.parts.map(x => `<span class="muted">${x.n}×${h(x.echelon)} = ${x.points} pts</span>`).join('')}
-          </div>
-        </li>`).join('')}
-      </ul>
-    </section>`
-      : `<div class="avis">Aucun scénario réaliste ne comble cet écart en huit victoires.
-         Vise d'abord l'échelon juste au-dessus.</div>`}`;
+    ${/* Les chemins ont leur propre chapitre, plus bas : monter et ne pas
+          descendre sont deux faces d'une même question, et les séparer
+          d'un écran laissait croire que la seconde n'existait pas. */''}`;
+}
+
+/** Une liste de scénarios : « deux victoires à 15/1 », et ce qu'elle vaut. */
+function listeScenarios(scenarios) {
+  return `<ul class="scenarios">
+    ${scenarios.map((sc, n) => `<li class="scenario ${n === 0 ? 'meilleur' : ''}">
+      <div class="scenario-tete">
+        <strong>${h(direScenario(sc))}</strong>
+        ${n === 0 ? puce('le plus court', 'puce-vert') : ''}
+      </div>
+      <div class="scenario-bas">
+        <span>${sc.matchs} match${sc.matchs > 1 ? 's' : ''}</span>
+        <span>+${sc.gain} points</span>
+        ${sc.parts.map(x => `<span class="muted">${x.n}×${h(x.echelon)} = ${x.points} pts</span>`).join('')}
+      </div>
+    </li>`).join('')}
+  </ul>`;
+}
+
+/* ─── Les deux chemins ─────────────────────────────────────────────────
+
+   Monter et ne pas descendre sont la même question posée dans deux sens,
+   et l'écran n'en traitait qu'une. « Combien de victoires pour passer
+   5/6 » avait sa liste ; « combien pour ne pas retomber à 15/1 » n'avait
+   rien, alors que c'est la question qui se pose en premier quand le bilan
+   glisse.
+
+   Le calcul est le même, à deux choses près. La cible est son propre
+   échelon, et la date n'est pas aujourd'hui : c'est le mois où le manque
+   sera le plus grand dans l'année qui vient. Se maintenir aujourd'hui ne
+   veut rien dire quand trois victoires sortent de la fenêtre en novembre
+   — ce qu'il faut, c'est de quoi passer le pire mois.
+
+   Si aucun mois de l'année ne descend sous le seuil, il n'y a pas de
+   chemin à proposer : il n'y a rien à faire, et le dire est la bonne
+   réponse. */
+function rendreChemins(reglages, p, cible, r) {
+  const maintien = cible === p.echelon;
+
+  /* Le pire mois des douze qui viennent, et ce qu'il manquera ce jour-là. */
+  const etapes = projeter({ ...reglages, cible: p.echelon,
+                            debut: 0, mois: 12, depuis: p.echelon });
+  const pire = etapes.reduce((a, b) =>
+    (b.manque ?? 0) > (a.manque ?? 0) ? b : a, etapes[0] || {});
+  const menace = pire && pire.manque > 0;
+  const rTenir = menace
+    ? simuler({ ...reglages, echelon: p.echelon, cible: p.echelon, finISO: pire.fin })
+    : null;
+
+  return `<section class="carte">
+    <h3>Les chemins possibles</h3>
+
+    ${maintien ? '' : `<h4 class="sous-titre">Pour passer ${h(cible)}</h4>
+      ${r.scenarios.length ? listeScenarios(r.scenarios)
+        : `<div class="avis">Aucun scénario réaliste ne comble cet écart en huit
+           victoires. Vise d'abord l'échelon juste au-dessus.</div>`}`}
+
+    <h4 class="sous-titre">Pour garder ton ${h(p.echelon)}</h4>
+    ${!menace
+      ? `<p class="tiny muted">Rien à faire : aucun mois de l'année qui vient ne fait
+         passer ton bilan sous le seuil de ${h(p.echelon)}. Ce que tu as gagné te
+         couvre douze mois de plus.</p>`
+      : `<p class="tiny muted">Le mois le plus dur de l'année qui vient est
+         <strong>${h(pire.libelle)}</strong> : d'ici là des victoires sortent de la
+         fenêtre des douze mois, et il te manquera
+         <strong>${pire.manque} points</strong> pour tenir ${h(p.echelon)}. Voici de
+         quoi passer ce cap — une seule de ces lignes suffit.</p>
+        ${rTenir && rTenir.scenarios?.length ? listeScenarios(rTenir.scenarios)
+          : `<div class="avis">Aucun scénario réaliste ne comble cet écart en huit
+             victoires. Il faudra jouer plus, ou accepter le classement du dessous.</div>`}
+        ${maintien ? '' : `<p class="tiny muted">Ces victoires-là comptent aussi pour
+          monter : ce ne sont pas deux campagnes à mener, c'est la même.</p>`}`}
+  </section>`;
 }
 
 /* ─── La descente ──────────────────────────────────────────────────────

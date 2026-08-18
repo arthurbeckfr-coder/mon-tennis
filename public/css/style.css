@@ -2090,6 +2090,18 @@ body.mode-court .terrain-diapo .terrain {
    palmarès qu'on cherche des yeux, et elle mérite sa couleur. */
 .puce-titre { background: var(--accent); color: var(--accent-txt); border-color: var(--accent); font-weight: 600; }
 
+/* Un sous-chapitre : plus petit que le titre de section, et détaché de
+   ce qui le précède. Deux d'affilée doivent se distinguer sans qu'on
+   les compte. */
+.sous-titre {
+  margin: 16px 0 8px;
+  font-size: .94rem;
+  color: var(--muet);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.sous-titre:first-of-type { margin-top: 10px; }
+
 /* La proposition de rattachement : le bouton, et la raison à côté. Elle
    compte autant que lui — un carnet qui devine doit dire pourquoi. */
 .suggestion {
