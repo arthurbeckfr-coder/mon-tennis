@@ -198,6 +198,13 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
           data-y="${y(p.points).toFixed(2)}">${h(p.echelon)}</span>`).join('')}
     </div>
 
+    ${/* La pastille du point choisi vit en HTML, comme la bulle. Dans le
+          dessin, elle subissait l'étirement des deux axes — qui ne sont
+          pas au même facteur — et se déformait en une grosse olive verte
+          d'autant plus grosse qu'on zoomait. Un rond reste un rond quand
+          il est posé par-dessus. */''}
+    <span class="courbe-choisi" hidden></span>
+
     <div class="courbe-bulle" hidden>
       <button class="courbe-bulle-fermer" aria-label="Fermer">✕</button>
       <strong class="courbe-bulle-nom"></strong>
@@ -249,13 +256,21 @@ export function brancherCourbe(racine) {
   let vue = [...depart];
   let choisi = null;
 
+  const pastille = bloc.querySelector('.courbe-choisi');
+
   const placerBulle = () => {
-    if (!choisi) { bulle.hidden = true; return; }
+    if (!choisi) { bulle.hidden = true; if (pastille) pastille.hidden = true; return; }
     const r = svg.getBoundingClientRect();
     /* `preserveAspectRatio="none"` : le dessin s'étire pour remplir, donc
        chaque axe a son propre facteur — pas de lettrage à compenser. */
     const px = ((choisi.x - vue[0]) / vue[2]) * r.width;
     const py = ((choisi.y - vue[1]) / vue[3]) * r.height;
+
+    if (pastille) {
+      pastille.hidden = px < 0 || px > r.width || py < 0 || py > r.height;
+      pastille.style.left = `${px}px`;
+      pastille.style.top = `${py}px`;
+    }
 
     bulle.hidden = px < -30 || px > r.width + 30;
     if (bulle.hidden) return;
@@ -360,22 +375,29 @@ export function brancherCourbe(racine) {
     const px = el => ((Number(el.dataset.x) - vue[0]) / vue[2]) * r.width;
     const jour = rangeeDates?.querySelector('.courbe-jour');
 
-    let derniere = -Infinity;
-    for (const el of datesDom) {
-      const p = px(el);
-      /* On mesure caché : `offsetWidth` vaut zéro sur un élément replié,
+    /* « aujourd'hui » se pose en premier et les autres l'évitent : c'est
+       le repère qu'on cherche d'abord, et le laisser passer après les
+       mois le faisait chevaucher son voisin : « juin 26 aujourd'hui »
+       imprimés l'un sur l'autre. */
+    const poses = [];
+    const libre = (g, large) => poses.every(p => g > p[1] + 12 || g + large < p[0] - 12);
+
+    const poser1 = el => {
+      /* On mesure visible : `offsetWidth` vaut zéro sur un élément replié,
          et toutes les dates se croiraient alors minuscules. */
       el.hidden = false;
       const large = el.offsetWidth;
-      const gauche = p - large / 2;
-      const dedans = gauche > -2 && gauche + large < r.width + 2;
-      /* « aujourd'hui » passe avant les autres : c'est le repère qu'on
-         cherche en premier, et il coupe déjà le dessin d'un trait. */
-      const prioritaire = el === jour;
-      if (!dedans || (!prioritaire && gauche < derniere + 12)) { el.hidden = true; continue; }
+      const gauche = px(el) - large / 2;
+      if (gauche < -2 || gauche + large > r.width + 2 || !libre(gauche, large)) {
+        el.hidden = true;
+        return;
+      }
       el.style.left = `${gauche}px`;
-      derniere = gauche + large;
-    }
+      poses.push([gauche, gauche + large]);
+    };
+
+    if (jour) poser1(jour);
+    for (const el of datesDom) if (el !== jour) poser1(el);
   };
 
   const poser = () => {
@@ -491,7 +513,7 @@ export function brancherCourbe(racine) {
      désigner un mois plutôt qu'une cible. */
   bloc.addEventListener('click', e => {
     if (bouge) { bouge = false; return; }
-    if (e.target.closest('.courbe-bulle, .carte-outils')) return;
+    if (e.target.closest('.courbe-bulle, .courbe-outils')) return;
 
     const rs = svg.getBoundingClientRect();
     const xVue = versCourbe(e.clientX);

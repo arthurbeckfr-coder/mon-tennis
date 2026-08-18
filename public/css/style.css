@@ -1212,8 +1212,24 @@ a.carte-bulle-route {
 /* Les points de chaque mois sont transparents : ils restent la cible du
    toucher, ils ne sont plus du décor. Seul celui qu'on a ouvert se
    montre — c'est le repère de lecture, pas la donnée. */
+/* Les points restent invisibles dans le dessin : ils y sont pour se
+   laisser toucher, pas pour se voir. Celui qu on choisit est marqué par
+   une pastille posée par-dessus, en HTML — dans le SVG, étiré de deux
+   facteurs différents, un rond devenait une olive, et grossissait avec
+   le zoom. */
 .courbe-point { fill: transparent; stroke: none; }
-.courbe-point.choisi { fill: var(--accent); stroke: var(--carte); stroke-width: 3; }
+
+.courbe-choisi {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  margin: -6.5px 0 0 -6.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2.5px var(--carte-2);
+  pointer-events: none;
+  z-index: 1;
+}
 
 .courbe-bulle {
   position: absolute;

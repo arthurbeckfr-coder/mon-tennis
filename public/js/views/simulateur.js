@@ -343,12 +343,22 @@ function rendreCalendrier(reglages, cible, r) {
          l'année qui vient : l'écart ne se creusera pas tout seul.</p>`}
 
     ${(() => {
-      /* Les paliers affichés : les échelons que la courbe traverse
-         réellement, plus celui qu'on vise. En montrer vingt ferait un
-         peigne illisible où l'on ne verrait plus la courbe. */
-      const traverses = [...new Set(etapes.map(e => e.echelon).filter(Boolean))];
-      const utiles = [...new Set([...traverses, cible, store.profil.echelon])];
-      const paliers = utiles
+      /* ─── Trois traits, pas davantage ─────────────────────────────
+
+         On montrait tous les échelons traversés : jusqu'à sept traits
+         serrés dans la hauteur d'un pouce, leurs noms empilés au bord
+         gauche, et la courbe perdue au milieu. Or trois suffisent à
+         répondre à la seule question qu'on pose ici — est-ce que je
+         tiens : celui du dessus, qu'on vise ; le sien, qu'on garde ou
+         qu'on perd ; celui du dessous, où l'on tombe.
+
+         Le reste de la descente se lit en toutes lettres sous le
+         graphique, échelon par échelon et date par date — c'est plus
+         précis qu'un trait de plus. */
+      const mien = store.profil.echelon;
+      const i = rang(mien);
+      const paliers = [ECHELONS[i + 1], mien, ECHELONS[i - 1]]
+        .filter(Boolean)
         .map(e => ({ echelon: e, points: seuil(e, store.profil.sexe)?.points }))
         .filter(p => p.points != null)
         .sort((a, b) => a.points - b.points);
