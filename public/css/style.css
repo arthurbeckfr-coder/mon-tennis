@@ -2019,6 +2019,53 @@ body.mode-court .terrain-diapo .terrain {
   margin-bottom: 6px;
 }
 .rattachements select { width: 100%; }
+.rattachements label { display: block; margin-top: 6px; }
+
+/* Une épreuve se déplie sur ses matchs, année par année : c'est à cette
+   maille qu'un tournoi change de salle, et celle à laquelle on s'en
+   souvient. Le titre porte le chevron des autres plis du carnet. */
+.rattachement > summary { list-style: none; cursor: pointer; }
+.rattachement > summary::-webkit-details-marker { display: none; }
+.rattachement-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.rattachement-tete::after {
+  content: '⌄';
+  color: var(--muet);
+  transition: transform .15s;
+}
+.rattachement[open] > summary .rattachement-tete::after { transform: rotate(180deg); }
+.rattachement[open] > summary { margin-bottom: 8px; }
+
+.rattachement-annee { margin: 10px 0 12px; padding-left: 10px; border-left: 2px solid var(--bord); }
+.rattachement-annee-tete { display: flex; align-items: baseline; gap: 8px; }
+
+/* Les matchs, en lignes nues : on les lit pour reconnaître un lieu, pas
+   pour les comparer. Pas de cartes, pas de bordures — une ligne, un match. */
+.matchs-nus { list-style: none; margin: 6px 0; padding: 0; }
+.matchs-nus li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 5px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .82rem;
+}
+.matchs-nus li:hover { background: var(--carte-2); }
+.matchs-nus .issue-v, .matchs-nus .issue-d {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: .7rem;
+  font-weight: 700;
+  color: #fff;
+  flex: 0 0 auto;
+}
+.matchs-nus .issue-v { background: var(--victoire); }
+.matchs-nus .issue-d { background: var(--defaite); }
 /* ===================================================================
    Adversaires
    =================================================================== */

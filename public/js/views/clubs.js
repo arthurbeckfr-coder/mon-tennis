@@ -275,6 +275,14 @@ function fenetreChiffre(quoi) {
     .filter(([nom]) => !estParEquipes({ tournoi: nom }));
   const total = orphelines.reduce((t, [, n]) => t + n, 0);
   const choix = [...store.clubs].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  /* `data-rattacher-a` et non `data-rattacher` : ce dernier nomme déjà
+     les boutons de proposition, plus bas dans la page, et deux gestes
+     différents sous le même nom finissent par se croiser. */
+  const menu = (nom, annee) => `<select data-rattacher-a="${h(nom)}"${
+      annee ? ` data-annee="${h(annee)}"` : ''}>
+      <option value="">— choisir un club —</option>
+      ${choix.map(c => `<option value="${h(c.id)}">${h(c.nom)}</option>`).join('')}
+    </select>`;
 
   openModal({
     title: `${total} match(s) à rattacher`,
@@ -283,44 +291,85 @@ function fenetreChiffre(quoi) {
       ? `<p class="tiny muted">Tout est rattaché. Les rencontres par équipes n'y
          figurent pas : elles n'ont pas de club à trouver.</p>`
       : `<p class="tiny muted">Choisis un club pour une épreuve, et tous ses matchs le
-          reçoivent. Une épreuve étalée sur plusieurs années s'est peut-être jouée
-          ailleurs d'une fois sur l'autre : le carnet le dit, et laisse faire — c'est
-          toi qui sais.</p>
+          reçoivent. Touche son nom pour voir les matchs, année par année : un tournoi
+          qui change de salle d'une édition à l'autre se rattache alors une année à la
+          fois, sans toucher aux autres.</p>
         <ul class="rattachements">
           ${orphelines.map(([nom, n]) => {
-            const m = store.matchs.filter(x => !clubDuMatch(x)
-              && (x.tournoi || '(sans nom)').trim() === nom);
-            const annees = [...new Set(m.map(x => (x.date || '').slice(0, 4)))]
-              .filter(Boolean).sort();
+            const m = store.matchs
+              .filter(x => !clubDuMatch(x) && (x.tournoi || '(sans nom)').trim() === nom)
+              .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+            /* Une année, un bloc : c'est la maille à laquelle un tournoi
+               change de lieu, et celle à laquelle on s'en souvient. */
+            const annees = {};
+            for (const x of m) {
+              const a = (x.date || '').slice(0, 4) || '?';
+              (annees[a] = annees[a] || []).push(x);
+            }
+            const cles = Object.keys(annees).sort((a, b) => b.localeCompare(a));
+
             return `<li>
-              <div class="rattachement-tete">
-                <strong>${h(nom)}</strong>
-                <span class="tiny muted">${n} match(s) — ${annees.length > 1
-                  ? `de ${h(annees[0])} à ${h(annees[annees.length - 1])}`
-                  : h(annees[0] || '')}</span>
-              </div>
-              <select data-rattacher-tout="${h(nom)}">
-                <option value="">— choisir un club —</option>
-                ${choix.map(c => `<option value="${h(c.id)}">${h(c.nom)}</option>`).join('')}
-              </select>
+              <details class="rattachement">
+                <summary class="rattachement-tete">
+                  <strong>${h(nom)}</strong>
+                  <span class="tiny muted">${n} match(s) — ${cles.length > 1
+                    ? `de ${h(cles[cles.length - 1])} à ${h(cles[0])}`
+                    : h(cles[0] || '')}</span>
+                </summary>
+
+                ${cles.map(a => `<div class="rattachement-annee">
+                  <div class="rattachement-annee-tete">
+                    <strong>${h(a)}</strong>
+                    <span class="tiny muted">${annees[a].length} match(s)</span>
+                  </div>
+                  <ul class="matchs-nus">
+                    ${annees[a].map(x => `<li data-match="${h(x.id)}">
+                      <span class="issue-${x.issue === 'V' ? 'v' : 'd'}">${x.issue}</span>
+                      <span>${h(dateCourte(x.date))}</span>
+                      <strong>${h(x.adversaire || '—')}</strong>
+                      ${puce(x.echelonAdverse)}
+                      ${x.score ? `<span class="muted">${h(x.score)}</span>` : ''}
+                    </li>`).join('')}
+                  </ul>
+                  ${cles.length > 1 ? `<label class="tiny muted">Rattacher
+                    ${h(a)} seulement ${menu(nom, a)}</label>` : ''}
+                </div>`).join('')}
+              </details>
+
+              <label class="tiny muted">${cles.length > 1
+                ? 'Tout rattacher, toutes années confondues' : 'Rattacher à'}
+                ${menu(nom)}</label>
             </li>`;
           }).join('')}
         </ul>`,
-    onMount: corps => corps.addEventListener('change', e => {
-      const sel = e.target.closest('[data-rattacher-tout]');
-      if (!sel || !sel.value) return;
-      rattacherEpreuve(sel.dataset.rattacherTout, sel.value);
-      closeModal();
-    }),
+    onMount: corps => {
+      corps.addEventListener('change', e => {
+        const sel = e.target.closest('[data-rattacher-a]');
+        if (!sel || !sel.value) return;
+        const { rattacherA: nom, annee } = sel.dataset;
+        rattacherEpreuve(nom, sel.value, annee);
+        closeModal();
+      });
+
+      /* Un match se corrige d'ici comme d'ailleurs : c'est parfois le seul
+         moyen de retrouver où il s'est joué. */
+      corps.addEventListener('click', e => {
+        const li = e.target.closest('[data-match]');
+        if (!li) return;
+        const match = store.matchs.find(x => x.id === li.dataset.match);
+        if (match) { closeModal(); matchForm(match); }
+      });
+    },
   });
 }
-
-/** Donne un club à tous les matchs d'une épreuve. */
-function rattacherEpreuve(nom, clubId) {
+/** Donne un club aux matchs d'une épreuve — tous, ou ceux d'une année. */
+function rattacherEpreuve(nom, clubId, annee = null) {
   const club = store.clubs.find(c => c.id === clubId);
   if (!club) return;
   const vises = store.matchs
-    .filter(m => !clubDuMatch(m) && (m.tournoi || '(sans nom)').trim() === nom);
+    .filter(m => !clubDuMatch(m) && (m.tournoi || '(sans nom)').trim() === nom
+              && (!annee || (m.date || '').slice(0, 4) === annee));
   for (const m of vises) modifierMatch(m.id, { clubId: club.id });
   epreuveOuverte = null;
   toast(`${vises.length} match(s) rattaché(s) à ${club.nom}.`);
@@ -488,49 +537,67 @@ function rendreMatchsOrphelins(nom) {
   if (!liste.length) return '';
 
   const b = bilanMatchs(liste);
-  const annees = [...new Set(liste.map(m => (m.date || '').slice(0, 4)))].filter(Boolean);
-  const memeAnnee = annees.length === 1;
+
+  /* Une année, un bloc : c'est la maille à laquelle un tournoi change de
+     salle, et celle à laquelle on s'en souvient. */
+  const annees = {};
+  for (const m of liste) {
+    const a = (m.date || '').slice(0, 4) || '?';
+    (annees[a] = annees[a] || []).push(m);
+  }
+  const cles = Object.keys(annees).sort((x, y) => y.localeCompare(x));
+
+  const menu = (nom, annee) => !store.clubs.length ? '' : `<select data-rattacher-a="${h(nom)}"${
+      annee ? ` data-annee="${h(annee)}"` : ''}>
+      <option value="">— choisir un club —</option>
+      ${[...store.clubs].sort((x, y) => x.nom.localeCompare(y.nom, 'fr'))
+        .map(c => `<option value="${h(c.id)}">${h(c.nom)}</option>`).join('')}
+    </select>`;
 
   return `<li class="orphelines-detail">
     <p class="tiny muted">${b.v} victoire(s), ${b.d} défaite(s) —
-      ${memeAnnee ? `tout en ${h(annees[0])}`
-                  : `réparti sur ${annees.length} années (${h(annees.join(', '))})`}.</p>
-    <ul class="matchs" style="margin-top:8px">
-      ${liste.map(m => `<li class="match ${m.issue === 'V' ? 'gagne' : 'perdu'}"
-          data-match="${h(m.id)}">
-        <div class="match-issue">${m.issue}</div>
-        <div class="match-corps">
-          <div class="match-tete">
-            <strong>${h(m.adversaire || '—')}</strong>${puce(m.echelonAdverse)}
+      ${cles.length === 1 ? `tout en ${h(cles[0])}`
+        : `réparti sur ${cles.length} années (${h(cles.join(', '))})`}.</p>
+
+    ${cles.map(a => `<div class="rattachement-annee">
+      ${cles.length > 1 ? `<div class="rattachement-annee-tete">
+        <strong>${h(a)}</strong>
+        <span class="tiny muted">${annees[a].length} match(s)</span>
+      </div>` : ''}
+      <ul class="matchs" style="margin-top:8px">
+        ${annees[a].map(m => `<li class="match ${m.issue === 'V' ? 'gagne' : 'perdu'}"
+            data-match="${h(m.id)}">
+          <div class="match-issue">${m.issue}</div>
+          <div class="match-corps">
+            <div class="match-tete">
+              <strong>${h(m.adversaire || '—')}</strong>${puce(m.echelonAdverse)}
+            </div>
+            <div class="match-bas">
+              <span>${h(dateCourte(m.date))}</span>
+              ${m.score ? `<span>${h(m.score)}</span>` : ''}
+              ${m.surface ? puce(m.surface) : ''}
+            </div>
           </div>
-          <div class="match-bas">
-            <span>${h(dateCourte(m.date))}</span>
-            ${m.score ? `<span>${h(m.score)}</span>` : ''}
-            ${m.surface ? puce(m.surface) : ''}
-          </div>
-        </div>
-      </li>`).join('')}
-    </ul>
-    ${memeAnnee && store.clubs.length ? `<label class="tri" style="margin-top:10px">
-      <span>Tout rattacher à</span>
-      <select data-rattacher-tout="${h(nom)}">
-        <option value="">— choisir un club —</option>
-        ${[...store.clubs].sort((x, y) => x.nom.localeCompare(y.nom, 'fr'))
-          .map(c => `<option value="${h(c.id)}">${h(c.nom)}</option>`).join('')}
-      </select>
-    </label>
-    <p class="tiny muted">Ce rattachement se pose sur les matchs eux-mêmes, et non sur un
-      mot-clé : il ne vaut que pour ces ${liste.length} matchs, et se défait match par
-      match.</p>`
-    : `<p class="tiny muted">${memeAnnee ? '' : 'Ces matchs s\'étalant sur plusieurs années, '
-      }le rattachement en bloc n'est pas proposé : touche un match pour lui donner son
-      club, un par un.</p>`}
+        </li>`).join('')}
+      </ul>
+      ${cles.length > 1 ? `<label class="tri">
+        <span>Rattacher ${h(a)} seulement à</span>${menu(nom, a)}</label>` : ''}
+    </div>`).join('')}
+
+    ${/* Le rattachement en bloc ne se refuse plus aux épreuves étalées sur
+          plusieurs années. Il l'était par prudence — un tournoi peut
+          changer de club d'une édition à l'autre — mais celui qui le sait,
+          c'est le joueur, et le refus l'obligeait à corriger sept matchs un
+          par un pour un tournoi qui n'avait jamais bougé. L'année par année
+          est là juste au-dessus pour les cas où il a bougé. */''}
+    ${store.clubs.length ? `<label class="tri" style="margin-top:10px">
+      <span>${cles.length > 1 ? 'Tout rattacher, toutes années confondues, à'
+                              : 'Tout rattacher à'}</span>${menu(nom)}</label>
+      <p class="tiny muted">Ce rattachement se pose sur les matchs eux-mêmes, et non sur
+        un mot-clé : il ne vaut que pour ceux-là, et se défait match par match.</p>`
+      : ''}
   </li>`;
 }
-
-// =====================================================================
-//  La fiche
-// =====================================================================
 export function renderFiche(params) {
   const club = store.clubs.find(c => c.id === params[1]);
   if (!club) return `<div class="vide"><span class="emoji">🤷</span>Ce club n'existe plus.</div>`;
@@ -658,9 +725,10 @@ export function wire(vue, rerendre) {
      touche donc à aucun autre match, et celui qui se trompe corrige
      depuis la fiche du match. */
   vue.addEventListener('change', e => {
-    const sel = e.target.closest('[data-rattacher-tout]');
+    const sel = e.target.closest('[data-rattacher-a]');
     if (!sel || !sel.value) return;
-    rattacherEpreuve(sel.dataset.rattacherTout, sel.value);
+    const { rattacherA: epreuve, annee } = sel.dataset;
+    rattacherEpreuve(epreuve, sel.value, annee);
   });
 
   // Une épreuve annoncée cliquable doit s'ouvrir au clavier aussi.
