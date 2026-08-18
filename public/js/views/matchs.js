@@ -134,6 +134,14 @@ function ligneMatch(m) {
         <span>${h(dateCourte(m.date))}</span>
         ${m.score ? `<span>${h(m.score)}</span>` : ''}
         ${m.tournoi ? `<span class="muted">${h(m.tournoi)}</span>` : ''}
+        ${/* Le ⓘ se pose juste après l'épreuve et n'en bouge plus. Il a
+              d'abord été le résumé d'un `<details>`, dont le dépliement
+              faisait prendre toute la largeur au bloc — le signe partait
+              alors à la ligne suivante, et l'on cherchait des yeux ce
+              qu'on venait de toucher. Bouton d'un côté, texte de l'autre :
+              le premier ne bouge pas, le second s'affiche dessous. */''}
+        ${m.notes ? `<button type="button" class="match-info" data-note="${h(m.id)}"
+          aria-expanded="false" title="Ce que j'en retiens">ⓘ</button>` : ''}
         ${/* Le tour se dit avant tout le reste du contexte : « vainqueur »
               ou « 1/4 de finale » raconte le match mieux qu'une durée. */''}
         ${direTour(m) ? puce(direTour(m), m.tour === 'finale' && m.issue === 'V'
@@ -142,17 +150,12 @@ function ligneMatch(m) {
         ${m.gainMontant ? puce(`${m.gainMontant} €`, 'puce-gain') : ''}
         ${m.gainLot ? puce(h(m.gainLot), 'puce-gain') : ''}
         ${m.wo ? puce('non joué') : ''}
-        ${/* La note se replie derrière un ⓘ, et se déplie dans la ligne
-              elle-même. Écrite en clair, une note de quinze lignes
-              donnait à un match la hauteur de quatre autres : la liste
-              devenait un journal, et l'on ne comparait plus rien. Le
-              signe ne s'affiche que s'il y a quelque chose à lire — une
-              ligne sans lui est une ligne sans note. */''}
-        ${m.notes ? `<details class="match-note-pli">
-          <summary title="Ce que j'en retiens">ⓘ</summary>
-          <p class="match-note">${hMulti(m.notes)}</p>
-        </details>` : ''}
       </div>
+      ${/* Le texte, replié par défaut : écrit en clair, une note de quinze
+            lignes donnait à un match la hauteur de quatre autres — la
+            liste devenait un journal et l'on ne comparait plus rien. */''}
+      ${m.notes ? `<p class="match-note" data-note-de="${h(m.id)}" hidden
+        >${hMulti(m.notes)}</p>` : ''}
     </div>
     ${pts ? `<div class="match-points">+${pts}</div>` : ''}
   </li>`;
@@ -269,7 +272,8 @@ function fenetreEdition(cle) {
         ${liste.map(ligneMatch).join('')}</ul>` : ''}`,
     onMount: corps => {
       corps.addEventListener('click', e => {
-        if (e.target.closest('.match-note-pli')) return;
+        const info = e.target.closest('[data-note]');
+        if (info) { basculerNote(info, corps); return; }
         const li = e.target.closest('.match');
         if (!li) return;
         const m = store.matchs.find(x => x.id === li.dataset.id);
@@ -280,6 +284,16 @@ function fenetreEdition(cle) {
   });
 }
 
+/** Déplie ou replie la note d'un match, sans ouvrir sa fenêtre : le ⓘ
+ *  est un geste de lecture, pas de correction. */
+function basculerNote(bouton, racine) {
+  const p = racine.querySelector(`[data-note-de="${CSS.escape(bouton.dataset.note)}"]`);
+  if (!p) return;
+  const ouvert = p.hidden;
+  p.hidden = !ouvert;
+  bouton.setAttribute('aria-expanded', String(ouvert));
+  bouton.classList.toggle('ouvert', ouvert);
+}
 /** Le panneau qui s'ouvre sous une colonne : le bilan de la tranche, puis
  *  ses matchs, cliquables comme partout ailleurs. */
 function rendreDetail(axe) {
@@ -732,9 +746,8 @@ export function wire(vue, rerendre) {
     if (e.target.closest('[data-import]')) { importFFTForm(); return; }
     if (e.target.closest('[data-nouveau]')) { matchForm(); return; }
 
-    /* Déplier une note n'ouvre pas la fenêtre du match : le ⓘ est un
-       geste de lecture, pas de correction. */
-    if (e.target.closest('.match-note-pli')) return;
+    const info = e.target.closest('[data-note]');
+    if (info) { basculerNote(info, vue); return; }
 
     const li = e.target.closest('.match');
     if (li) {
