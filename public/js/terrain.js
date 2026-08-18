@@ -122,13 +122,18 @@ function fleches(gaucher) {
   return [
     { cle: 'croise', nom: 'Croisé long',
       d: `M ${depart} 400 L ${arrivee} 68`,
-      lx: gaucher ? 152 : 88, ly: 232 },
+      /* Plus haut sur sa propre diagonale : à mi-hauteur, l'étiquette
+         tombait sur la flèche du croisé court, qui part du même coin. */
+      lx: gaucher ? 108 : 132, ly: 118 },
     { cle: 'croise-court', nom: 'Croisé court',
       d: `M ${depart} 400 Q ${(depart + courtX) / 2} 300 ${courtX} 190`,
       lx: gaucher ? 196 : 44, ly: 176 },
+    /* Le long de ligne est vertical : son nom, écrit en travers, tombait
+       forcément sur son propre trait. Il se lit donc dans le sens de la
+       flèche, posé à côté d'elle — comme le nom d'une rue sur un plan. */
     { cle: 'long-ligne', nom: 'Long de ligne',
       d: `M ${depart} 400 L ${depart} 68`,
-      lx: depart, ly: 150 },
+      lx: gaucher ? depart - 15 : depart + 15, ly: 150, vertical: true },
   ];
 }
 
@@ -144,6 +149,22 @@ const ligne = (x1, y1, x2, y2) =>
  */
 export function dessinerTerrain({ selection = [], gaucher = false, compte = {} } = {}) {
   const choisi = c => selection.includes(c) ? ' actif' : '';
+
+  /* ─── Pourquoi les noms sont dessinés à part ────────────────────────
+
+     Un SVG se peint dans l'ordre du document : les flèches, écrites après
+     les zones, passaient donc par-dessus leurs noms. « Son coup droit »
+     et « Son revers » se retrouvaient barrés d'un trait, et le liseré
+     posé sous les lettres n'y pouvait rien — il ne protège que de ce qui
+     est peint avant.
+
+     Les noms sont donc rassemblés ici et posés en dernier, au-dessus de
+     tout. Chaque nom garde les classes de son groupe (`t-zone actif`,
+     `t-fleche actif`) : la mise en couleur du coup choisi et l'estompage
+     des autres continuent de s'appliquer, sans qu'on ait à les redire.
+     La couche ne capte aucun clic : les zones et les flèches restent
+     seules à répondre, exactement comme avant. */
+  const etiquettes = [];
 
   const zonesSVG = zones(gaucher).map(z => {
     const n = compte[z.cle] || 0;
@@ -165,25 +186,33 @@ export function dessinerTerrain({ selection = [], gaucher = false, compte = {} }
     const by = petite || z.vertical ? z.y - 3 : z.y + 13;
     const r = petite || z.vertical ? 8 : 9;
 
+    etiquettes.push(`<g class="t-zone${choisi(z.cle)}">
+      ${nom}
+      ${n ? `<circle class="t-compte" cx="${bx}" cy="${by}" r="${r}"/>
+             <text class="t-compte-txt" x="${bx}" y="${by + 4}">${n}</text>` : ''}
+    </g>`);
+
     return `<g class="t-zone${choisi(z.cle)}" data-coup="${z.cle}"
                role="button" tabindex="0" aria-pressed="${selection.includes(z.cle)}">
       <title>${z.nom}${n ? ` — ${n} conseil(s)` : ''}</title>
       <rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="3"/>
-      ${nom}
-      ${n ? `<circle class="t-compte" cx="${bx}" cy="${by}" r="${r}"/>
-             <text class="t-compte-txt" x="${bx}" y="${by + 4}">${n}</text>` : ''}
     </g>`;
   }).join('');
 
   const flechesSVG = fleches(gaucher).map(f => {
     const n = compte[f.cle] || 0;
+    etiquettes.push(`<g class="t-fleche${choisi(f.cle)}">
+      <text x="${f.lx}" y="${f.ly}"${
+        f.vertical ? ` transform="rotate(-90 ${f.lx} ${f.ly})"` : ''
+      }>${f.nom}${n ? ` (${n})` : ''}</text>
+    </g>`);
+
     return `<g class="t-fleche${choisi(f.cle)}" data-coup="${f.cle}"
                role="button" tabindex="0" aria-pressed="${selection.includes(f.cle)}">
       <title>${f.nom}${n ? ` — ${n} conseil(s)` : ''}</title>
       <path class="t-fleche-cible" d="${f.d}"/>
       <path class="t-fleche-halo" d="${f.d}"/>
       <path class="t-fleche-trait" d="${f.d}" marker-end="url(#pointe)"/>
-      <text x="${f.lx}" y="${f.ly}">${f.nom}${n ? ` (${n})` : ''}</text>
     </g>`;
   }).join('');
 
@@ -218,6 +247,8 @@ export function dessinerTerrain({ selection = [], gaucher = false, compte = {} }
     </g>
 
     ${flechesSVG}
+
+    <g class="t-etiquettes" aria-hidden="true">${etiquettes.join('')}</g>
   </svg>`;
 }
 
@@ -343,18 +374,18 @@ export function dessinerProfil({ selection = [], compte = {} } = {}) {
       ${/* Le bras libre, qui équilibre. */''}
       <path class="p-membre" d="M 13.8 74 L 8.2 78.6"/>
       ${/* Le bras porteur, jusqu'au point de frappe. */''}
-      <path class="p-membre" d="M 13.8 73.6 L 21.6 66.4"/>
+      <path class="p-membre" d="M 13.8 73.6 L 23.4 68.6"/>
       ${/* La raquette : un cadre ovale et un manche, rien de plus. */''}
-      ${/* La rotation se fait autour du centre du cadre, lui-même posé au
-            point de frappe : c'est la seule façon que le tamis y tombe
-            vraiment, une rotation autour d'un autre point l'en éloignant
-            d'autant qu'elle tourne. Le manche part de là vers la main. */''}
-      <g transform="rotate(-38 ${P.FRAPPE_X} ${P.FRAPPE_Y})">
-        <line class="p-manche" x1="${P.FRAPPE_X}" y1="${P.FRAPPE_Y + 4.2}"
-              x2="${P.FRAPPE_X}" y2="${P.FRAPPE_Y + 9.4}"/>
-        <ellipse class="p-cadre" cx="${P.FRAPPE_X}" cy="${P.FRAPPE_Y}"
-                 rx="3.3" ry="4.2"/>
-      </g>
+      ${/* La raquette se tient. Le manche part de la main — le bout du
+            bras, et non un point voisin — et le tamis se trouve au-delà,
+            centré sur le point de frappe. Auparavant le cadre pivotait
+            autour de son centre sans que le manche rejoigne quoi que ce
+            soit : la raquette flottait à côté du joueur. */''}
+      <line class="p-manche" x1="23.4" y1="68.6"
+            x2="${P.FRAPPE_X - 2.4}" y2="${P.FRAPPE_Y + 2.6}"/>
+      <ellipse class="p-cadre" cx="${P.FRAPPE_X}" cy="${P.FRAPPE_Y}"
+               rx="3.2" ry="4.3"
+               transform="rotate(-46 ${P.FRAPPE_X} ${P.FRAPPE_Y})"/>
     </g>
     </g>
     ${traces}

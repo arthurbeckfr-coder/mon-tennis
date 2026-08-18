@@ -270,24 +270,6 @@ a.icon-btn { display: grid; place-items: center; text-decoration: none; }
 }
 body.mode-court .fab { display: none; }
 
-/* Le micro se pose à gauche du « + », sur la même ligne. Au-dessus, il
-   recouvrait le bas de l'écran sur deux étages et masquait souvent la
-   dernière ligne d'une liste ; côte à côte, les deux boutons n'en
-   occupent qu'un. Le pouce les atteint aussi bien, et rien ne se cache
-   derrière. */
-.fab-2 {
-  right: calc(16px + 56px + 12px);
-  bottom: calc(72px + env(safe-area-inset-bottom));
-  width: 48px;
-  height: 48px;
-  /* Aligné sur le centre du « + », qui est plus grand. */
-  margin-bottom: 4px;
-  background: var(--carte);
-  color: var(--texte);
-  border: 1px solid var(--bord);
-  font-size: 21px;
-}
-
 .btn-micro.ecoute {
   background: var(--defaite);
   border-color: var(--defaite);
@@ -1407,24 +1389,44 @@ body.mode-court .view { padding-top: 6px; }
 
 .t-surface { fill: var(--terrain-sol); }
 .t-lignes { pointer-events: none; }
+/* Les noms, peints en dernier pour passer au-dessus des flèches. Ils ne
+   répondent pas au doigt : ce sont les zones et les flèches, dessous,
+   qui gardent le clic. */
+.t-etiquettes { pointer-events: none; }
 .t-cadre  { fill: none; stroke: var(--terrain-ligne); stroke-width: 2; }
 .t-ligne  { stroke: var(--terrain-ligne); stroke-width: 1.4; }
 .t-filet  { stroke: var(--terrain-ligne); stroke-width: 3.4; stroke-dasharray: 3 2.2; }
 
 .t-zone { cursor: pointer; }
+/* Le liseré était en blanc translucide : lisible sur le court sombre,
+   invisible sur le court clair, où le fond est déjà presque blanc. Il
+   prend la couleur du texte du terrain, qui bascule avec le thème — la
+   seule qui soit contrastée dans les deux cas. */
 .t-zone rect {
   fill: rgba(255, 255, 255, .07);
-  stroke: rgba(255, 255, 255, .34);
+  stroke: var(--terrain-texte);
+  /* .55 : le pointillé atteint 3:1 sur le court clair comme sur le
+     sombre — la limite en deçà de laquelle un contour cesse de se voir. */
+  stroke-opacity: .55;
   stroke-width: 1;
   stroke-dasharray: 4 3;
   transition: fill .12s;
 }
+/* Les flèches passent au-dessus des zones — il le faut, elles traversent
+   le court. Sans liseré, elles hachaient les noms des zones qu'elles
+   croisent : « Son coup droit » et « Son revers » étaient illisibles. Le
+   même procédé que partout ailleurs ici : un contour de la couleur du
+   fond, tracé sous la lettre. */
 .t-zone text {
   fill: var(--terrain-texte);
   font-size: 11px;
   font-weight: 600;
   text-anchor: middle;
   pointer-events: none;
+  paint-order: stroke;
+  stroke: var(--terrain-sol);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
 }
 .t-zone:hover rect { fill: rgba(255, 255, 255, .22); }
 .t-zone.actif rect {
@@ -1506,6 +1508,25 @@ body.mode-court .view { padding-top: 6px; }
 
 .terrain-bloc { margin: 10px 0 14px; }
 .terrain-aide { text-align: center; margin-top: 8px; }
+
+/* La liste des coups, sous le dessin. Le compteur se pose dans la
+   pastille comme sur le plan : un chiffre qui dit s'il y a quelque chose
+   à lire, sans quoi l'on touche à l'aveugle. */
+.court-coups { margin-top: 14px; }
+.court-coups .etiquette { margin-top: 14px; }
+.pastille-nb {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--fond);
+  color: var(--muet);
+  font-size: .74rem;
+  font-weight: 600;
+}
+.pastille.actif .pastille-nb {
+  background: rgba(255, 255, 255, .24);
+  color: var(--accent-txt);
+}
 
 /* ===================================================================
    Clubs
@@ -2048,11 +2069,14 @@ body.mode-court .view { padding-top: 6px; }
    qui se lit le plus petit — ce qui compte, puisqu'il tient dans un
    timbre. Il n'a pas à attirer l'œil, ce sont les trajectoires qu'on vient
    lire, mais il doit se poser franchement sur le sol. */
-.p-tete { fill: var(--texte); fill-opacity: .62; }
+/* L'opacité est portée par le groupe et non par chaque pièce : posée
+   pièce par pièce, elle s'additionnait aux recouvrements — l'épaule
+   ressortait plus sombre que le bras, et le joueur semblait taché. */
+.p-joueur { opacity: .62; }
+.p-tete { fill: var(--texte); }
 .p-membre {
   fill: none;
   stroke: var(--texte);
-  stroke-opacity: .62;
   stroke-width: 3.4;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -2060,12 +2084,10 @@ body.mode-court .view { padding-top: 6px; }
 .p-cadre {
   fill: none;
   stroke: var(--texte);
-  stroke-opacity: .62;
   stroke-width: 1.8;
 }
 .p-manche {
   stroke: var(--texte);
-  stroke-opacity: .62;
   stroke-width: 2;
   stroke-linecap: round;
 }
@@ -2175,4 +2197,27 @@ body.mode-court .view { padding-top: 6px; }
 @media (min-width: 900px) {
   .terrain { max-width: 470px; }
   .terrain-profil { max-width: 760px; }
+}
+
+/* Les bandes d'année : une sur deux très légèrement teintée. La frontière
+   entre deux teintes est le 1er janvier, et cela se lit sans légende —
+   c'est le procédé des diagrammes de Gantt. Assez pâle pour ne jamais
+   concurrencer la courbe. */
+.courbe-annee { fill: transparent; }
+.courbe-annee.paire { fill: var(--texte); fill-opacity: .035; }
+
+.courbe-annees {
+  position: absolute;
+  left: 0; right: 0; bottom: 2px;
+  height: 1.1rem;
+  pointer-events: none;
+}
+.courbe-annee-nom {
+  position: absolute;
+  bottom: 0;
+  font-size: .68rem;
+  font-weight: 600;
+  color: var(--muet);
+  opacity: .8;
+  white-space: nowrap;
 }

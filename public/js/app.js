@@ -136,6 +136,11 @@ const RAPIDE = () => [
   ['📥', 'Importer',   'Mon palmarès depuis Ten\'Up',      () => importFFTForm()],
   ['🏟️', 'Un club',    'Adresse, surfaces, juge-arbitre',  () => clubForm()],
   ['🏅', 'Mon classement', 'Échelon et bilan',             () => profilForm()],
+  /* La dictée était un bouton flottant de plus, à côté du « + ». Deux
+     ronds pour une seule intention — ajouter quelque chose — et le
+     second mangeait le bas de l'écran sans qu'on sache ce qu'il faisait
+     avant de le toucher. Ici, il porte son nom. */
+  ['🎤', 'Dicter une note', "Parler plutôt qu'écrire",     () => dicterModal()],
 ];
 
 function ajoutRapide() {
@@ -173,7 +178,6 @@ rafraichirBoutonTheme();
 
 $('btn-donnees').addEventListener('click', donneesForm);
 $('fab').addEventListener('click', ajoutRapide);
-$('fab-micro').addEventListener('click', dicterModal);
 
 // =====================================================================
 //  Démarrage

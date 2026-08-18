@@ -601,6 +601,17 @@ export function brancherCarte(racine, ouvrirClub) {
   let bouge = false;
   let ecartDepart = 0;
 
+  /* Ce qui était sous le doigt au moment de l'appui.
+
+     La carte capture le pointeur pour suivre un glissement qui sort du
+     cadre. Or le navigateur redirige alors vers l'élément capturant non
+     seulement les événements de pointeur, mais aussi les `mousedown` et
+     `mouseup` de compatibilité — et le `click` qu'il en déduit. La cible
+     du clic devient donc le `<svg>` entier, jamais le disque touché : les
+     clubs avaient cessé de répondre le jour où la capture s'est mise à
+     réussir. On retient donc soi-même ce qu'on a touché. */
+  let appui = null;
+
   const ecart = () => {
     const [a, b] = [...doigts.values()];
     return Math.hypot(a.x - b.x, a.y - b.y);
@@ -615,6 +626,7 @@ export function brancherCarte(racine, ouvrirClub) {
     doigts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (doigts.size === 2) ecartDepart = ecart();
     bouge = false;
+    appui = e.target.closest('[data-club-carte]');
   });
 
   svg.addEventListener('pointermove', e => {
@@ -654,7 +666,10 @@ export function brancherCarte(racine, ouvrirClub) {
     // Un glissement n'est pas un clic : on ne veut pas ouvrir une bulle
     // parce qu'on a déplacé la carte en partant d'un club.
     if (bouge) { bouge = false; return; }
-    const g = e.target.closest('[data-club-carte]');
+    /* Clic redirigé par la capture : la cible annoncée est le fond de
+       carte, et seul l'appui dit la vérité. Hors de ce cas — bulle,
+       outils, clavier — on lit la cible normalement. */
+    const g = e.target === svg ? appui : e.target.closest('[data-club-carte]');
     if (g) ouvrirBulle(g);
     // Toucher le vide referme : c'est le geste qu'on essaie d'abord.
     else if (!e.target.closest('.carte-bulle, .carte-outils')) fermerBulle();

@@ -100,6 +100,19 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
   const x = i => (i / (points.length - 1)) * L;
   const y = v => marge.haut + zoneH - (v / max) * zoneH;
 
+  /* Les frontières d'année, en abscisses du dessin. Un point porte son
+     libellé « mois an » ; c'est le changement de millésime qui marque la
+     coupure. */
+  const annees = [];
+  points.forEach((p, i) => {
+    const an = (p.fin || '').slice(0, 4) || String(p.label).slice(-2);
+    const derniere = annees[annees.length - 1];
+    if (!derniere || derniere.an !== an) {
+      if (derniere) derniere.x1 = x(i);
+      annees.push({ an, x0: x(i), x1: L });
+    }
+  });
+
   const passe = points.filter(p => !p.futur);
   const iCoupe = Math.max(0, passe.length - 1);
   const futur = points.filter(p => p.futur);
@@ -111,7 +124,24 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
   return `<div class="courbe-bloc" data-courbe data-boite="0 0 ${L} ${H}">
     <svg viewBox="0 0 ${L} ${H}" preserveAspectRatio="none" role="img"
          aria-label="Bilan mois par mois, avec les paliers de classement">
-      ${/* Les paliers d'abord : ils sont le fond sur lequel on lit. */''}
+      ${/* ─── Les années, en bandes alternées ────────────────────────
+
+            Un axe qui ne dit que « août 23 » à gauche et « août 31 » à
+            droite laisse deviner huit ans entre les deux. On ne sait pas
+            où tombe 2027, ni si la chute qu'on regarde dure six mois ou
+            trois ans.
+
+            Des bandes alternées répondent sans rien ajouter à lire : une
+            année sur deux est très légèrement teintée, et la frontière
+            entre deux teintes est le 1er janvier. C'est le procédé des
+            diagrammes de Gantt, et il se lit sans légende.
+
+            L'année elle-même s'écrit en HTML par-dessus, comme les
+            paliers : dans le dessin, elle subirait l'étirement. */''}
+      ${annees.map((a, i) => `<rect class="courbe-annee${i % 2 ? ' paire' : ''}"
+          x="${a.x0.toFixed(1)}" y="0" width="${(a.x1 - a.x0).toFixed(1)}" height="${H}"/>`).join('')}
+
+      ${/* Les paliers ensuite : ils sont le fond sur lequel on lit. */''}
       ${/* Les lignes restent dans le dessin : horizontales, elles ne
             souffrent pas de l'étirement. Les noms, eux, en sortent — voir
             plus bas. */''}
@@ -150,6 +180,13 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
           Ils gardent leur taille de lecture à tous les zooms, ne se
           déforment pas, et restent au bord gauche sans qu'on ait à les y
           recoller à la main. */''}
+    ${/* Les années, écrites au bas du cadre. Comme les paliers, elles
+          vivent hors du dessin pour garder leur taille. */''}
+    <div class="courbe-annees">
+      ${annees.map(a => `<span class="courbe-annee-nom" data-x0="${a.x0.toFixed(1)}"
+          data-x1="${a.x1.toFixed(1)}">${h(a.an)}</span>`).join('')}
+    </div>
+
     <div class="courbe-paliers">
       ${paliers.map(p => `<span class="courbe-palier-nom${p.echelon === actuel ? ' courant' : ''}"
           data-y="${y(p.points).toFixed(2)}">${h(p.echelon)} · ${p.points} pts</span>`).join('')}
@@ -226,6 +263,58 @@ export function brancherCourbe(racine) {
   const etiquettes = [...bloc.querySelectorAll('.courbe-palier-nom')]
     .sort((a, b) => Number(a.dataset.y) - Number(b.dataset.y));
 
+  /* ─── L'échelle verticale suit le zoom ──────────────────────────────
+
+     Zoomer sur le temps sans toucher à l'axe des points laisse les paliers
+     aussi serrés qu'au départ : entre 305 et 335, quatre échelons tiennent
+     dans un centimètre, et l'on ne voit toujours pas où la courbe passe.
+
+     L'axe vertical se recadre donc sur ce qui est réellement à l'écran :
+     les valeurs de la période visible, et les deux paliers qui les
+     encadrent — sans ceux-là, on verrait la courbe sans la règle qui la
+     juge. En s'approchant, l'espace entre deux classements s'ouvre de
+     lui-même. C'est ce que fait tout graphique boursier quand on zoome sur
+     une semaine. */
+  const mesures = [...bloc.querySelectorAll('.courbe-point')]
+    .map(c => ({ x: Number(c.dataset.x), y: Number(c.dataset.y) }));
+  const niveaux = [...bloc.querySelectorAll('.courbe-palier-ligne')]
+    .map(l => Number(l.getAttribute('y1')));
+
+  const cadrerVertical = () => {
+    const dedans = mesures.filter(m => m.x >= vue[0] - 1 && m.x <= vue[0] + vue[2] + 1);
+    if (!dedans.length) return;
+
+    let haut = Math.min(...dedans.map(m => m.y));
+    let bas = Math.max(...dedans.map(m => m.y));
+
+    /* Les paliers qui encadrent la courbe entrent dans le cadre : une
+       courbe sans ses seuils ne dit rien de ce qu'elle coûte. */
+    const dessus = niveaux.filter(n => n <= haut);
+    const dessous = niveaux.filter(n => n >= bas);
+    if (dessus.length) haut = Math.max(...dessus);
+    if (dessous.length) bas = Math.min(...dessous);
+
+    const marge = Math.max((bas - haut) * 0.18, 18);
+    vue[1] = haut - marge;
+    vue[3] = (bas - haut) + marge * 2;
+  };
+
+  /* Les années, posées sous leur bande. Une bande trop étroite renonce à
+     son millésime plutôt que de le laisser déborder sur la voisine. */
+  const anneesDom = [...bloc.querySelectorAll('.courbe-annee-nom')];
+  const placerAnnees = () => {
+    const r = svg.getBoundingClientRect();
+    if (!r.width) return;
+    for (const el of anneesDom) {
+      const x0 = Number(el.dataset.x0), x1 = Number(el.dataset.x1);
+      const g = ((x0 - vue[0]) / vue[2]) * r.width;
+      const d = ((x1 - vue[0]) / vue[2]) * r.width;
+      const largeur = d - g;
+      el.hidden = largeur < el.offsetWidth + 10 || d < 0 || g > r.width;
+      if (!el.hidden) el.style.left = `${Math.max(2, g + largeur / 2 - el.offsetWidth / 2)}px`;
+    }
+  };
+
   const placerPaliers = () => {
     const r = svg.getBoundingClientRect();
     if (!r.height) return;
@@ -241,8 +330,10 @@ export function brancherCourbe(racine) {
   };
 
   const poser = () => {
+    cadrerVertical();
     svg.setAttribute('viewBox', vue.join(' '));
     placerPaliers();
+    placerAnnees();
     placerBulle();
   };
 

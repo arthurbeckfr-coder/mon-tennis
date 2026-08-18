@@ -371,7 +371,7 @@ function rendreCalendrier(reglages, cible, r) {
 
       return `${courbeBilan({
         points: etapes.map(e => ({
-          label: e.libelle, valeur: e.bilan, futur: e.futur, echelon: e.echelon,
+          label: e.libelle, valeur: e.bilan, futur: e.futur, echelon: e.echelon, fin: e.fin,
           detail: [
             e.echelon ? `échelon tenu : ${e.echelon}` : 'sous le plus bas seuil examiné',
             `${e.nbVictoires} victoire(s) dans la fenêtre`,
