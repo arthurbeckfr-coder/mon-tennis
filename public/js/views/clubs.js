@@ -1022,7 +1022,11 @@ export function wire(vue, rerendre) {
         });
         toast(`${p.mots.map(m => `« ${m} »`).join(', ')} ajouté à ${p.existant.nom}.`);
       } else {
-        ajouterClub({ ...p.connu, surfaces: [],
+        /* Les surfaces viennent avec le club quand on les connaît. Elles
+           étaient vidées d'office, par prudence — mais un club créé sans
+           surface n'apparaît dans aucun filtre, et personne ne va les
+           ressaisir à la main. */
+        ajouterClub({ ...p.connu, surfaces: [...(p.connu.surfaces || [])],
                       motsCles: [...p.connu.motsCles],
                       sources: [...(p.connu.sources || [])] });
         toast(`${p.connu.nom} créé — ${p.matchs} match(s) rattaché(s).`);

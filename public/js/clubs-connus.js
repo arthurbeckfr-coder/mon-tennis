@@ -25,9 +25,27 @@
 
 import { positionMot } from './store.js';
 
+/* ─── Les surfaces ─────────────────────────────────────────────────────
+ *
+ * Chaque liste ci-dessous vient d'une page du club ou d'un répertoire
+ * d'équipements sportifs, vérifiée au nom du club. Trois clubs n'en ont
+ * pas : Yerville, Petit-Couronne et le TC de Rouen ne publient pas
+ * l'information, et aucune source secondaire ne la donne sans se
+ * contredire. Un champ vide se remplit d'un coup d'œil sur place ; une
+ * surface inventée fausse une statistique pour toujours.
+ *
+ * Un club a presque toujours plusieurs surfaces — terre battue dehors,
+ * moquette ou résine sous bulle — et c'est bien la liste entière qu'on
+ * garde : le filtre de la page des clubs le fait apparaître sous chacune.
+ */
 export const CLUBS_CONNUS = [
   {
     nom: 'MONT SAINT AIGNAN TC',
+    /* Deux sites : les Coquets — six courts couverts en Green Set, deux
+       extérieurs de même, un couvert en gazon synthétique — et les
+       Cottes, quatre courts de terre battue ouverts l'été. Source : la
+       page « Nos infrastructures » du club. */
+    surfaces: ['Green-set', 'Terre battue traditionnelle', 'Gazon synthétique'],
     ville: 'MONT SAINT AIGNAN',
     adresse: 'Centre sportif des Coquets, 8 rue du Dr Fleury, 76130 MONT SAINT AIGNAN',
     // Les deux graphies rencontrées dans le palmarès, espacée et collée.
@@ -40,6 +58,10 @@ export const CLUBS_CONNUS = [
   },
   {
     nom: 'ASRUC TENNIS',
+    /* Dix courts : huit couverts — quatre en terre artificielle, deux en
+       terre battue, deux en résine — et deux extérieurs en terre
+       artificielle. Source : la page tennis de l'ASRUC. */
+    surfaces: ['Terre artificielle', 'Terre battue traditionnelle', 'Résine'],
     ville: 'MONT SAINT AIGNAN',
     adresse: '37 rue de la Croix-Vaubois, 76130 MONT SAINT AIGNAN',
     note: 'Association Sportive Rouen Université Club — section tennis.',
@@ -55,6 +77,9 @@ export const CLUBS_CONNUS = [
   },
   {
     nom: 'YVETOT TC',
+    /* Six courts : deux de terre battue extérieure, deux de terre
+       artificielle couverte, deux de résine en intérieur. */
+    surfaces: ['Terre battue traditionnelle', 'Terre artificielle', 'Résine'],
     ville: 'YVETOT',
     adresse: '11 rue Pierre de Coubertin, 76190 YVETOT',
     motsCles: ['YVETOT'],
@@ -69,6 +94,10 @@ export const CLUBS_CONNUS = [
   },
   {
     nom: 'USCB TENNIS',
+    /* Douze courts sur deux sites : six couverts en moquette, quatre de
+       terre battue et deux de résine à l'extérieur. Source : la page
+       « Nos infrastructures » du club. */
+    surfaces: ['Moquette', 'Terre battue traditionnelle', 'Résine'],
     ville: 'BOIS GUILLAUME',
     adresse: '1422 rue de la Haie, 76230 BOIS GUILLAUME',
     note: 'Union Sportive et Culturelle de Bois-Guillaume.',
