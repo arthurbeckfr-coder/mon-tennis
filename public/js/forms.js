@@ -1391,7 +1391,7 @@ export function donneesForm() {
     title: 'Sauvegarde et transfert',
     large: true,
     body: `<div class="form">
-      <h3>Synchroniser</h3>
+      <h3>Sur tous mes appareils</h3>
       <div id="bloc-sync"></div>
 
       <p class="tiny muted">Le carnet vit d'abord dans ce navigateur : c'est ce qui le rend
@@ -1452,12 +1452,19 @@ export function donneesForm() {
           return;
         }
         const quand = nuage.derniereSync();
+        /* Plus de bouton « Synchroniser maintenant ». Il ne servait qu'à
+           faire soi-même ce qui se fait tout seul — à chaque
+           modification, au retour sur l'écran, au retour du réseau,
+           toutes les dix minutes et en fermant la page. Un bouton qui
+           double un automatisme finit par faire douter de l'automatisme.
+           Reste la date du dernier tour, qui, elle, se lit. */
         bloc.innerHTML = `
           <p class="tiny muted">Connecté en tant que <strong>${h(nuage.courriel())}</strong>.
             ${quand ? `Dernière synchronisation le ${h(dateLongue(quand.slice(0, 10)))}.`
-                    : 'Jamais synchronisé depuis cet appareil.'}</p>
+                    : 'Jamais synchronisé depuis cet appareil.'}
+            Elle se fait toute seule : à chaque modification, au retour sur l'écran et
+            au retour du réseau.</p>
           <div class="rangee-boutons">
-            <button class="btn btn-primary" data-sync>Synchroniser maintenant</button>
             <button class="btn btn-ghost" data-deconnexion>Se déconnecter</button>
           </div>`;
       };
@@ -1481,12 +1488,6 @@ export function donneesForm() {
             err.textContent = /Invalid login/i.test(ex.message)
               ? 'Email ou mot de passe incorrect.' : ex.message;
           }
-          return;
-        }
-        if (e.target.closest('[data-sync]')) {
-          const r = await nuage.synchroniser();
-          toast(r.ok ? messageSync(r) : r.erreur);
-          dessinerSync();
           return;
         }
         if (e.target.closest('[data-deconnexion]')) {
