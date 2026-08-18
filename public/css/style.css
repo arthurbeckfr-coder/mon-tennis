@@ -1019,10 +1019,42 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
   vector-effect: non-scaling-stroke;
 }
 
+/* ─── Les clubs sont des balles ──────────────────────────────────────
+
+   Un disque gris ne dit pas de quoi la carte parle. Une balle, si — et
+   elle se reconnaît à douze pixels, ce qui est la seule taille dont on
+   dispose ici. Jaune de balle neuve par défaut : sur la carte de mes
+   clubs, la couleur n'a rien à dire, on regarde où l'on joue.
+
+   Sur la carte d'un adversaire, elle dit tout : vert là où je le bats,
+   rouge là où il me bat. La couleur ne porte pourtant jamais seule —
+   règle tenue partout dans ce carnet : le contour d'une balle perdante
+   est en pointillé, et la bulle donne le compte en toutes lettres. */
 .carte-halo { fill: var(--accent); opacity: .12; }
-.carte-point { fill: var(--muet); stroke: var(--carte); stroke-width: .0006; }
+.carte-point {
+  fill: #d8e04a;
+  stroke: var(--texte);
+  stroke-opacity: .55;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+/* La couture : le trait qui fait la balle. En épaisseur d'écran, sans
+   quoi elle s'épaissirait avec le zoom jusqu'à barrer la balle. */
+.carte-couture {
+  fill: none;
+  stroke: var(--texte);
+  stroke-opacity: .5;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
 .carte-club.gagnant .carte-point { fill: var(--victoire); }
 .carte-club.gagnant .carte-halo { fill: var(--victoire); }
+.carte-club.perdu .carte-point { fill: var(--defaite); stroke-dasharray: 3 2; }
+.carte-club.perdu .carte-halo { fill: var(--defaite); }
+/* Sur fond de couleur pleine, la couture se lit en clair. */
+.carte-club.gagnant .carte-couture,
+.carte-club.perdu .carte-couture { stroke: #fff; stroke-opacity: .8; }
 .carte-club { cursor: pointer; }
 .carte-club:hover .carte-halo, .carte-club:focus-visible .carte-halo { opacity: .34; }
 .carte-club:focus-visible { outline: none; }

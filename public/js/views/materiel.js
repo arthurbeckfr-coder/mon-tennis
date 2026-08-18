@@ -26,9 +26,12 @@ import { courseForm, raquetteForm, cordageForm, chaussureForm, depenseForm,
 
 let onglet = 'moi';
 
-/* La saison retenue pour l'estimation de la route. « Tout » par défaut :
-   le total de ce qu'on a roulé depuis toujours est le premier chiffre
-   qu'on veut, et la saison répond ensuite à « et cette année ? ». */
+/* La saison retenue sur la page Argent — dépenses comprises, et pas
+   seulement la route. Un filtre posé en haut d'une page gouverne ce
+   qu'il y a dessous : n'en faire suivre qu'un quart des chiffres serait
+   un piège. « Tout » par défaut, parce que le total depuis toujours est
+   le premier chiffre qu'on veut ; la saison répond ensuite à « et cette
+   année ? ». */
 let saisonRoute = 'tout';
 
 const ONGLETS = [
@@ -276,6 +279,7 @@ function detailRoute(clubId) {
  *  n'apprend rien tant qu'on ne sait pas de quoi il est fait. */
 function detailArgent(quoi) {
   const saisies = [...(store.depenses || [])]
+    .filter(d => saisonRoute === 'tout' || saisonDe(d.date) === Number(saisonRoute))
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const total = saisies.reduce((t, d) => t + (Number(d.montant) || 0), 0);
   const route = deplacements(saisonRoute);
@@ -349,8 +353,8 @@ function detailArgent(quoi) {
   const v = vues[quoi];
   if (v) openModal({ title: v.titre, body: v.corps });
 }
-/** Les saisons où l'on a joué dans un club situé : celles qui ont
- *  quelque chose à filtrer. */
+/** Les saisons où il s'est passé quelque chose qui coûte : un match dans
+ *  un club situé, ou une dépense notée. */
 function saisonsDeRoute() {
   const vues = new Set();
   for (const m of store.matchs) {
@@ -358,11 +362,16 @@ function saisonsDeRoute() {
     const s = saisonDe(m.date);
     if (s != null) vues.add(s);
   }
+  for (const d of store.depenses || []) {
+    const s = saisonDe(d.date);
+    if (s != null) vues.add(s);
+  }
   return [...vues].sort((a, b) => b - a);
 }
 
 function vueArgent() {
   const saisies = [...(store.depenses || [])]
+    .filter(d => saisonRoute === 'tout' || saisonDe(d.date) === Number(saisonRoute))
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const total = saisies.reduce((t, d) => t + (Number(d.montant) || 0), 0);
 
@@ -376,6 +385,21 @@ function vueArgent() {
   const saisons = saisonsDeRoute();
 
   return `
+    ${/* Le filtre en tête de page, et il gouverne tout ce qui suit. Une
+          saison sportive va de septembre à août : c'est la maille dans
+          laquelle on pense ses frais de tennis, là où l'année civile
+          couperait un championnat d'hiver en deux. */''}
+    ${saisons.length > 1 ? `<section class="choix-cible">
+      <span class="etiquette">Saison</span>
+      <div class="segments">
+        <button data-saison-route="tout"
+          class="${saisonRoute === 'tout' ? 'actif' : ''}">Tout</button>
+        ${saisons.slice(0, 5).map(s => `<button data-saison-route="${s}"
+          class="${String(saisonRoute) === String(s) ? 'actif' : ''}"
+          >${s}-${String(s + 1).slice(2)}</button>`).join('')}
+      </div>
+    </section>` : ''}
+
     ${/* Les quatre chiffres s'ouvrent : un total n'apprend rien tant
           qu'on ne sait pas de quoi il est fait. */''}
     <section class="chiffres">
@@ -421,16 +445,6 @@ function vueArgent() {
 
     ${route ? `<section class="carte">
       <h3>La route, estimée</h3>
-      ${/* Une saison sportive va de septembre à août : c'est la maille
-            dans laquelle on pense ses frais de tennis, et l'année civile
-            couperait un championnat d'hiver en deux. */''}
-      ${saisons.length > 1 ? `<div class="segments" style="margin-bottom:10px">
-        <button data-saison-route="tout"
-          class="${saisonRoute === 'tout' ? 'actif' : ''}">Tout</button>
-        ${saisons.slice(0, 5).map(s => `<button data-saison-route="${s}"
-          class="${String(saisonRoute) === String(s) ? 'actif' : ''}"
-          >${s}-${String(s + 1).slice(2)}</button>`).join('')}
-      </div>` : ''}
       <p class="tiny muted">${Math.round(route.kmTotal)} km pour aller jouer, tous clubs
         confondus${saisonRoute === 'tout' ? '' : `, sur la saison ${saisonRoute}-${
           String(Number(saisonRoute) + 1).slice(2)}`} : la distance de chez toi à chaque club, comptée aller-retour et

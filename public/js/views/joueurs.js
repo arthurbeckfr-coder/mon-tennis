@@ -307,7 +307,7 @@ function rendreOuVousAvezJoue(j) {
            <strong>${h(plusJoue.club.nom)}</strong> (${plusJoue.matchs.length})`}.${sansClub
       ? ` Les ${sansClub} autre${sansClub > 1 ? 's' : ''} n'ont pas de club — rencontres par
          équipes ou épreuves qui ne nomment personne — et ne figurent pas ici.` : ''}</p>
-    ${carteClubs(clubs)}
+    ${carteClubs(clubs, { couleur: 'bilan' })}
     <ul class="clubs-adverses" style="margin-top:10px">
       ${[...clubs].sort((a, b) => b.matchs.length - a.matchs.length).map(c => {
         const b = c.bilan;

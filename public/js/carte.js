@@ -72,6 +72,17 @@ const sansAccent = s => (s || '').toUpperCase()
 
 const INDEX = new Map(Object.keys(COMMUNES).map(k => [sansAccent(k), COMMUNES[k]]));
 
+/** La couture d'une balle de tennis, vue de face : une courbe en S d'un
+ *  bord à l'autre. Deux arcs symétriques seraient plus fidèles à l'objet
+ *  et illisibles à douze pixels — c'est le S que l'œil reconnaît sur les
+ *  petites tailles, et une carte n'affiche rien d'autre que de petites
+ *  tailles. */
+const couture = (x, y, r) =>
+  `M ${(x - r).toFixed(4)} ${y.toFixed(4)}`
+  + ` C ${(x - r * 0.42).toFixed(4)} ${(y - r * 0.82).toFixed(4)}`
+  + ` ${(x + r * 0.42).toFixed(4)} ${(y + r * 0.82).toFixed(4)}`
+  + ` ${(x + r).toFixed(4)} ${y.toFixed(4)}`;
+
 /** Le point d'un club : sa position saisie si elle existe, sinon celle de
  *  sa commune. Rien à défaut — on ne place pas un club au hasard. */
 export function pointDuClub(club) {
@@ -83,9 +94,16 @@ export function pointDuClub(club) {
  * La carte, en SVG et en un seul bloc de texte.
  *
  * @param {Array<{club, matchs, bilan}>} clubs — déjà comptés par l'appelant
+ * @param {object} [o]
+ * @param {'club'|'bilan'} [o.couleur] ce que dit la couleur des balles :
+ *        « club » — rien, elles sont jaunes comme une balle neuve ;
+ *        « bilan » — vert quand on gagne là-bas, rouge quand on perd.
+ *        Sur la carte de mes clubs, la couleur n'a rien à dire : on
+ *        regarde où l'on joue. Sur celle d'un adversaire, elle dit tout :
+ *        on regarde où l'on gagne contre lui.
  * @returns {string} le HTML de la carte, ou '' s'il n'y a rien à montrer
  */
-export function carteClubs(clubs) {
+export function carteClubs(clubs, { couleur = 'club' } = {}) {
   const places = clubs
     .map(c => ({ ...c, point: pointDuClub(c.club) }))
     .filter(c => c.point);
@@ -272,7 +290,12 @@ export function carteClubs(clubs) {
         const [x, y] = p.xy;
         const rpx = rayonPx(p.matchs.length);
         const r = rpx / echInitiale;
-        const gagne = p.bilan.total && p.bilan.v > p.bilan.d;
+        /* Vert, rouge, ou rien. L'égalité ne se tranche pas : deux
+           victoires pour deux défaites n'est ni un bon ni un mauvais
+           terrain, et lui donner une couleur serait mentir d'un match. */
+        const teinte = couleur !== 'bilan' || !p.bilan.total ? ''
+          : p.bilan.v > p.bilan.d ? 'gagnant'
+          : p.bilan.d > p.bilan.v ? 'perdu' : '';
         /* `data-club-carte` et non `data-club` : la liste des clubs
            utilise déjà `data-club`, et son gestionnaire attraperait le
            clic avant celui de la carte — court-circuitant le garde-fou
@@ -282,7 +305,7 @@ export function carteClubs(clubs) {
            finit par ne plus rien lire. Le nom vient au clic, dans une
            bulle en HTML — laquelle garde sa taille de lecture à tous les
            zooms, là où un texte SVG grossirait avec la carte. */
-        return `<g class="carte-club ${gagne ? 'gagnant' : ''}"
+        return `<g class="carte-club ${teinte}"
              data-club-carte="${h(p.club.id)}" role="button" tabindex="0"
              data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}"
              data-rpx="${rpx.toFixed(2)}"
@@ -299,10 +322,17 @@ export function carteClubs(clubs) {
              data-lon="${p.point[0]}" data-lat="${p.point[1]}"
              data-adresse="${h(adresseDuClub(p.club))}">
           <title>${h(p.club.nom)} — ${p.matchs.length} match(s), ${p.bilan.v}V–${p.bilan.d}D</title>
+          ${/* Une balle de tennis plutôt qu'un disque : sur une carte où
+                l'on cherche des courts, le sujet doit se reconnaître de
+                loin. La couture est une courbe en S — c'est ainsi que se
+                dessine une balle vue de face, et c'est ce qui reste
+                lisible à douze pixels. Elle est retracée à chaque zoom,
+                comme le rayon : voir `redimensionner`. */''}
           <circle class="carte-halo" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
                   r="${(r * 1.9).toFixed(4)}"/>
           <circle class="carte-point" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
                   r="${r.toFixed(4)}"/>
+          <path class="carte-couture" d="${couture(x, y, r)}"/>
         </g>`;
       }).join('')}
     </svg>
@@ -501,6 +531,8 @@ export function brancherCarte(racine, ouvrirClub) {
       const r = Number(g.dataset.rpx) / ech;
       g.querySelector('.carte-point').setAttribute('r', r.toFixed(5));
       g.querySelector('.carte-halo').setAttribute('r', (r * 1.9).toFixed(5));
+      g.querySelector('.carte-couture')?.setAttribute('d',
+        couture(Number(g.dataset.x), Number(g.dataset.y), r));
     }
     for (const g of ancresDom) {
       const x = Number(g.dataset.x), y = Number(g.dataset.y);
