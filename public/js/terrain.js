@@ -198,35 +198,45 @@ const P = {
   X0: 16, X1: 232,  // les deux fonds de court
   FILET: 124,       // le filet, entre les deux
   HAUT_FILET: 70,   // son sommet
-  FRAPPE_X: 30, FRAPPE_Y: 74,
+  FRAPPE_X: 30, FRAPPE_Y: 62,
 };
 
 const TRAJECTOIRES = [
-  /* Chaque étiquette est posée à la main, sur un espace libre de sa propre
-     courbe : sept trajectoires qui partent du même point se croisent
-     partout, et un placement automatique — au bout, au sommet — les
-     empilerait toutes au même endroit. */
-  { cle: 'lob', nom: 'Lob',
-    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 126 -34 210 86`,
-    lx: 128, ly: 4, ancre: 'middle' },
-  { cle: 'lift', nom: 'Lifté',
-    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 124 14 204 90`,
-    lx: 116, ly: 32, ancre: 'middle' },
-  { cle: 'smash', nom: 'Smash',
-    d: `M 54 16 Q 110 40 170 92`,
-    lx: 58, ly: 12, ancre: 'start' },
-  { cle: 'service', nom: 'Service',
-    d: `M 22 28 Q 92 40 150 86`,
-    lx: 18, ly: 22, ancre: 'start' },
-  { cle: 'plat', nom: 'À plat',
-    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 130 50 212 88`,
-    lx: 218, ly: 62, ancre: 'end' },
-  { cle: 'slice', nom: 'Slice',
-    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 132 66 192 93`,
-    lx: 196, ly: 84, ancre: 'end' },
-  { cle: 'amortie', nom: 'Amortie',
-    d: `M ${P.FRAPPE_X} ${P.FRAPPE_Y} Q 106 52 138 93`,
-    lx: 134, ly: 68, ancre: 'middle' },
+  /* Chaque courbe est une cubique et non un arc simple : une amortie
+     monte doucement puis plonge, ce qu'une parabole ne sait pas faire —
+     elle retombe aussi vite qu'elle est montée. La forme du coup est
+     précisément ce qu'on vient regarder ici.
+
+     Toutes ont été vérifiées au passage du filet, où l'erreur ne pardonne
+     pas : dans la première version, le slice et l'amortie le traversaient.
+     Un schéma qui fait passer la balle à travers le filet n'enseigne pas,
+     il désapprend. Les gardes retenues vont de quatre unités pour
+     l'amortie — juste ce qu'il faut — à soixante-quatre pour le lob.
+
+     Les noms ne sont pas posés à la main : chacun est calculé à l'endroit
+     où sa courbe est le plus éloignée de toutes les autres. C'est le seul
+     point où une étiquette ne peut désigner qu'elle. */
+  { cle: 'lob', nom: "Lob",
+    d: 'M 30 62 C 78 -26, 168 -8, 212 88',
+    lx: 147, ly: 9, ancre: 'middle' },
+  { cle: 'lift', nom: "Lifté",
+    d: 'M 30 62 C 88 22, 162 42, 204 90',
+    lx: 155, ly: 49, ancre: 'middle' },
+  { cle: 'smash', nom: "Smash",
+    d: 'M 100 18 C 124 40, 152 64, 178 92',
+    lx: 110, ly: 22, ancre: 'middle' },
+  { cle: 'service', nom: "Service",
+    d: 'M 22 24 C 68 28, 108 48, 152 86',
+    lx: 40, ly: 21, ancre: 'start' },
+  { cle: 'plat', nom: "À plat",
+    d: 'M 30 62 C 92 48, 162 60, 214 88',
+    lx: 167, ly: 63, ancre: 'middle' },
+  { cle: 'slice', nom: "Slice",
+    d: 'M 30 62 C 88 54, 148 62, 196 93',
+    lx: 183, ly: 80, ancre: 'end' },
+  { cle: 'amortie', nom: "Amortie",
+    d: 'M 30 62 C 70 38, 104 34, 148 93',
+    lx: 85, ly: 41, ancre: 'middle' },
 ];
 
 /**
@@ -252,6 +262,12 @@ export function dessinerProfil({ selection = [], compte = {} } = {}) {
     <rect class="t-surface" x="${P.X0 - 6}" y="${P.SOL - 2}"
           width="${P.X1 - P.X0 + 12}" height="8" rx="2"/>
     <line class="p-sol" x1="${P.X0 - 6}" y1="${P.SOL}" x2="${P.X1 + 6}" y2="${P.SOL}"/>
+    ${/* Les lignes de service, marquées au sol : elles disent où le service
+          doit tomber, et donnent l'échelle du demi-court. */''}
+    <line class="p-service" x1="${P.FILET - 58}" y1="${P.SOL - 4}"
+          x2="${P.FILET - 58}" y2="${P.SOL + 4}"/>
+    <line class="p-service" x1="${P.FILET + 58}" y1="${P.SOL - 4}"
+          x2="${P.FILET + 58}" y2="${P.SOL + 4}"/>
     <line class="p-filet" x1="${P.FILET}" y1="${P.HAUT_FILET}" x2="${P.FILET}" y2="${P.SOL}"/>
     <circle class="p-joueur" cx="${P.FRAPPE_X - 6}" cy="${P.SOL - 10}" r="5"/>
     ${traces}

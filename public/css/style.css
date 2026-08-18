@@ -2008,3 +2008,7 @@ body.mode-court .view { padding-top: 6px; }
   stroke-dasharray: none;
 }
 .p-trajet.actif text { fill: var(--accent); }
+
+/* Les lignes de service, marquées au sol : le service doit tomber entre
+   elles et le filet, ce qu'aucun texte ne dirait aussi vite. */
+.p-service { stroke: var(--muet); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
