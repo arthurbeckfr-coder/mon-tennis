@@ -1949,3 +1949,14 @@ body.mode-court .view { padding-top: 6px; }
 /* Une étiquette qui n'a pas la place se tait, mais son repère reste : le
    carré dit qu'il y a là une commune, et zoomer rendra son nom. */
 .carte-ville-nom.muette { opacity: 0; }
+
+/* La France en fond : un aplat sourd que la région recouvre. Elle sert à
+   se situer de loin, pas à être regardée de près. */
+.carte-france {
+  fill: var(--carte);
+  stroke: var(--muet);
+  stroke-width: 1;
+  stroke-opacity: .3;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}

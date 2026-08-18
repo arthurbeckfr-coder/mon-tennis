@@ -32,6 +32,7 @@ import { h } from './util.js';
 import { store } from './store.js';
 import { distanceKm, direDistance, lienItineraire } from './geocodage.js';
 import { CONTOURS } from './contours.js';
+import { FRANCE, VILLES_FRANCE } from './france.js';
 import { ROUTES, VILLES, COMMUNES_TRACE } from './reperes.js';
 
 /* Le centre officiel de chaque commune où l'on a joué, en [longitude,
@@ -157,7 +158,19 @@ export function carteClubs(clubs) {
       return `${i === 0 ? 'M' : 'L'}${x.toFixed(4)} ${y.toFixed(4)}`;
     }).join('') + 'Z';
 
-  const fond = Object.values(CONTOURS)
+  /* Deux fonds superposés, et l'ordre compte. La France d'abord, tracée
+     grossièrement : elle répond à « où est-ce dans le pays » et n'a pas
+     besoin de plus. Les deux départements où l'on joue par-dessus, au
+     trait fin : eux portent la côte qu'on reconnaît.
+
+     Le second redessine une partie du premier, et c'est voulu — la
+     précision régionale doit gagner là où elle existe. */
+  const fondFrance = FRANCE
+    .flatMap(d => d.anneaux)
+    .map(anneau => `<path class="carte-france" data-rang="0" d="${chemin(anneau)}"/>`)
+    .join('');
+
+  const fond = fondFrance + Object.values(CONTOURS)
     .flat()
     .map(anneau => `<path class="carte-terre" d="${chemin(anneau)}"/>`)
     .join('');
@@ -206,8 +219,19 @@ export function carteClubs(clubs) {
      marqueurs au même endroit se gênent. */
   const villesDeClubs = new Set(clubs.map(c => sansAccent(c.club?.ville)));
 
-  const villes = VILLES
-    .filter(v => !villesDeClubs.has(sansAccent(v.nom)))
+  /* Les villes de France et celles de la région ne font qu'une liste. Une
+     ville présente dans les deux — Rouen, Dieppe — garderait deux
+     étiquettes superposées : on ne retient que la première rencontrée,
+     et la nationale vient d'abord parce qu'elle porte le rang le plus
+     bas, donc la meilleure visibilité. */
+  const vues = new Set();
+  const villes = [...VILLES_FRANCE, ...VILLES]
+    .filter(v => {
+      const n = sansAccent(v.nom);
+      if (vues.has(n) || villesDeClubs.has(n)) return false;
+      vues.add(n);
+      return true;
+    })
     .map(v => {
       const [x, y] = projete(v.point);
       return `<g class="carte-ville" data-rang="${v.r}"
@@ -392,9 +416,10 @@ export function brancherCarte(racine, ouvrirClub) {
      arrivent. Sous un dixième, on est sur une commune : les villages et
      les limites administratives peuvent enfin se lire. */
   const rangVisible = largeur =>
-    largeur > 0.50 ? 1
-    : largeur > 0.16 ? 2
-    : 3;
+    largeur > 3.0 ? 0        // la France, ou une grande région
+    : largeur > 1.0 ? 1      // plusieurs départements
+    : largeur > 0.35 ? 2     // un département
+    : 3;                     // un canton, une commune
 
   /* Le rang ne suffit pas. Autour de Rouen, une douzaine de communes de
      plus de dix mille habitants se touchent : toutes de rang 1, toutes
@@ -415,10 +440,26 @@ export function brancherCarte(racine, ouvrirClub) {
       a.left < b.right + 3 && a.right + 3 > b.left &&
       a.top < b.bottom + 2 && a.bottom + 2 > b.top;
 
+    /* On écarte d'abord ce qui est hors du cadre. Sans cela, mille deux
+       cents villes de France seraient mesurées à chaque cran de zoom pour
+       décider du sort de la vingtaine qu'on regarde — et Marseille
+       compterait comme « affichée » alors qu'elle est à six cents
+       kilomètres du bord de l'écran. */
+    const marge = vue[2] * 0.08;
+    const seuil = rangVisible(vue[2]);
+    const dedans = g => {
+      const x = Number(g.dataset.x), y = Number(g.dataset.y);
+      return x > vue[0] - marge && x < vue[0] + vue[2] + marge
+          && y > vue[1] - marge && y < vue[1] + vue[3] + marge;
+    };
+
     for (const g of villes) {
       const nom = g.querySelector('text');
-      if (g.classList.contains('efface')) { nom.classList.remove('muette'); continue; }
       nom.classList.remove('muette');
+
+      if (!dedans(g) || Number(g.dataset.rang) > seuil) { g.classList.add('efface'); continue; }
+      g.classList.remove('efface');
+
       const boite = nom.getBoundingClientRect();
       if (boite.width === 0) continue;
       if (poses.some(b => chevauche(boite, b))) nom.classList.add('muette');
@@ -428,7 +469,12 @@ export function brancherCarte(racine, ouvrirClub) {
 
   const doserDetail = () => {
     const seuil = rangVisible(vue[2]);
-    for (const el of rangs) el.classList.toggle('efface', Number(el.dataset.rang) > seuil);
+    // Les villes sont traitées plus bas, qui ajoute le cadrage au rang :
+    // deux décisions concurrentes sur la même classe se contrediraient.
+    for (const el of rangs) {
+      if (el.closest('.carte-ville')) continue;
+      el.classList.toggle('efface', Number(el.dataset.rang) > seuil);
+    }
     degager();
   };
 
@@ -509,7 +555,11 @@ export function brancherCarte(racine, ouvrirClub) {
   /* Les limites du zoom sont relatives à la boîte de départ : on ne
      s'éloigne pas au point de perdre les clubs, et on ne s'approche pas
      au point de n'en voir qu'un. */
-  const bornes = { min: depart[2] / 12, max: depart[2] * 2.2 };
+  /* On peut désormais s'éloigner jusqu'à embrasser la France — c'est
+     pourquoi elle est dessinée. La borne est absolue et non relative au
+     cadrage de départ : celui-ci dépend des clubs, alors que le pays, lui,
+     ne change pas de taille. */
+  const bornes = { min: depart[2] / 12, max: 9 };
 
   const zoomer = (facteur, ancre) => {
     const w = Math.min(bornes.max, Math.max(bornes.min, vue[2] * facteur));
