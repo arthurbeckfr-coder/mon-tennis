@@ -321,57 +321,49 @@ export function brancherCourbe(racine) {
 
   /** ─── Où l'œil doit tomber en arrivant ───────────────────────────
  *
- *  Deux exigences se contredisent, et tout est dans leur équilibre.
+ *  Le cadre d'ouverture montre dix-huit mois de passé et les deux ans
+ *  qui viennent. Le graphique en contient soixante et un : les trois ans
+ *  d'archive servent à comprendre d'où l'on vient, pas à décider de
+ *  l'échelle — une saison faste d'il y a trois ans écrasait le reste, et
+ *  l'on ouvrait sur une courbe aplatie au bas du cadre.
  *
- *  Voir la courbe : c'est le sujet du dessin, et un cadre serré sur les
- *  deux traits n'en montrerait qu'une poignée de mois — le reste
- *  au-dessus et en dessous, hors champ.
+ *  Verticalement, tout ce qui est dans cette fenêtre entre dans le cadre,
+ *  sans exception : la courbe ne doit pas être coupée en haut — c'était
+ *  le défaut du réglage précédent, qui écartait les valeurs extrêmes pour
+ *  gagner de la place et rognait le sommet au passage. S'y ajoutent les
+ *  deux traits, sans quoi il n'y aurait rien pour juger la courbe, et une
+ *  marge de dix pour cent pour que rien ne touche le bord.
  *
- *  Voir les deux traits séparément : quinze points séparent un échelon
- *  du suivant, et sur une échelle de six cents cela fait six pixels.
- *  Les noms se marchent dessus et l'on ne sait plus lequel on lit.
- *
- *  D'où la règle : le cadre se cale sur la partie récente de la courbe
- *  — les douze derniers mois et la projection —, en écartant les valeurs
- *  extrêmes, car un pic d'il y a deux ans ne doit pas décider de
- *  l'échelle d'aujourd'hui. Les deux traits entrent toujours dedans.
- *
- *  Rien ne borne plus la hauteur du cadre : c'est la courbe qui décide,
- *  et deux traits proches ne se confondent plus depuis que leurs noms
- *  changent de côté au lieu de se pousser. Mieux vaut deux lignes serrées
- *  et une courbe lisible que l'inverse.
- *
- *  Ce qui dépasse n'est pas perdu : le dézoom va jusqu'au cadrage total,
- *  et le glissement vertical avec lui.
+ *  Le reste n'est pas perdu : le dézoom va jusqu'au cadrage total, et le
+ *  glissement le parcourt.
  */
+  const MOIS_DE_PASSE = 18;
+
   const cadrageEntier = () => {
     const total = cadrageTotal();
-    if (!mesures.length || !niveaux.length) return total;
+    if (!mesures.length) return total;
 
-    const hautP = Math.min(...niveaux), basP = Math.max(...niveaux);
+    /* La fenêtre de temps : dix-huit mois avant aujourd'hui, et tout ce
+       qui suit. Un point vaut un mois, d'où le pas. */
     const passes = mesures.filter(m => !m.futur);
-    const auj = passes.length ? passes[passes.length - 1].y : hautP;
+    const pas = mesures.length > 1 ? (mesures[1].x - mesures[0].x) : 0;
+    const xAuj = passes.length ? passes[passes.length - 1].x : mesures[0].x;
+    const x0 = Math.max(depart[0], xAuj - pas * MOIS_DE_PASSE);
+    const w = depart[0] + depart[2] - x0;
 
-    /* La partie récente : la projection, et l'année écoulée. */
-    const recents = [...mesures.filter(m => m.futur), ...passes.slice(-12)];
-    const ys = recents.map(m => m.y).sort((a, b) => a - b);
-    const q = p => ys[Math.min(ys.length - 1, Math.max(0, Math.round(p * (ys.length - 1))))];
+    const dedans = mesures.filter(m => m.x >= x0 - pas / 2);
+    if (!dedans.length) return total;
 
-    let haut = Math.min(hautP, auj, q(0.08));
-    let bas = Math.max(basP, auj, q(0.92));
+    let haut = Math.min(...dedans.map(m => m.y), ...niveaux);
+    let bas = Math.max(...dedans.map(m => m.y), ...niveaux);
 
-    const marge = Math.max((bas - haut) * 0.12, 8);
+    const marge = Math.max((bas - haut) * 0.1, 8);
     haut -= marge; bas += marge;
 
-    /* Pas de plafond sur la hauteur : la courbe doit se voir en entier sur
-       la période qui compte, et deux traits trop proches ne se confondent
-       plus depuis que leurs noms changent de côté au lieu de se pousser.
-       Mieux vaut deux lignes serrées et une courbe lisible que l'inverse. */
     const hh = bas - haut;
-
-    if (hh >= total[3]) return total;
+    if (hh >= total[3]) return [x0, total[1], w, total[3]];
     const y0 = Math.min(Math.max(haut, total[1]), total[1] + total[3] - hh);
-    return [total[0], y0, total[2], hh];
+    return [x0, y0, w, hh];
   };
   /** Les noms des paliers, chacun à la hauteur de sa ligne.
    *
