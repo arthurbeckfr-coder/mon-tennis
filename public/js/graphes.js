@@ -187,9 +187,15 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
           data-x1="${a.x1.toFixed(1)}">${h(a.an)}</span>`).join('')}
     </div>
 
+    ${/* Le nom seul, sans son chiffre. « 15/1 · 360 pts » répété six fois
+          faisait une colonne de texte au bord gauche, plus large que ce
+          qu'elle annotait ; or on lit ces lignes pour savoir quel
+          classement on tient, pas pour relire un barème qu'on a sous les
+          yeux ailleurs. Le nombre de points reste au survol. */''}
     <div class="courbe-paliers">
       ${paliers.map(p => `<span class="courbe-palier-nom${p.echelon === actuel ? ' courant' : ''}"
-          data-y="${y(p.points).toFixed(2)}">${h(p.echelon)} · ${p.points} pts</span>`).join('')}
+          title="${h(p.echelon)} — ${p.points} points"
+          data-y="${y(p.points).toFixed(2)}">${h(p.echelon)}</span>`).join('')}
     </div>
 
     <div class="courbe-bulle" hidden>
@@ -198,16 +204,30 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
       <span class="courbe-bulle-detail tiny muted"></span>
     </div>
 
-    <div class="carte-outils">
-      <button class="icon-btn" data-zoom-t="0.7" aria-label="Zoomer">＋</button>
-      <button class="icon-btn" data-zoom-t="1.43" aria-label="Dézoomer">−</button>
+    ${/* Les commandes tiennent dans un coin. Un bloc de trois grosses
+          touches au milieu du dessin cachait la courbe qu'il servait à
+          regarder — et ici, contrairement à la carte des clubs, le doigt
+          et la molette suffisent presque toujours. */''}
+    <div class="courbe-outils">
+      <button class="icon-btn" data-zoom-t="0.72" aria-label="Zoomer">＋</button>
+      <button class="icon-btn" data-zoom-t="1.4" aria-label="Dézoomer">−</button>
       <button class="icon-btn" data-recentrer-t aria-label="Tout revoir">⌖</button>
     </div>
   </div>
-  <div class="g-axe">
-    <span>${h(points[0].label)}</span>
-    ${futur.length ? '<span class="g-marque">aujourd\'hui</span>' : ''}
-    <span>${h(points[points.length - 1].label)}</span>
+
+  ${/* ─── Les dates, sous le cadre ────────────────────────────────
+
+        Deux libellés aux extrémités ne disent pas quand : « août 23 » à
+        gauche, « août 31 » à droite, et huit ans à deviner entre les
+        deux. On pose donc de vrais repères, comme sur un axe. Ils sont
+        tous écrits, et c'est le placement qui décide lesquels se voient
+        — un sur trois, un sur six, selon la place : en s'approchant, les
+        mois remplacent les années sans qu'on ait à redessiner. */''}
+  <div class="courbe-dates">
+    ${points.map((p, i) => `<span class="courbe-date" data-x="${x(i).toFixed(1)}"
+        hidden>${h(p.label)}</span>`).join('')}
+    ${futur.length ? `<span class="courbe-date courbe-jour"
+        data-x="${x(iCoupe).toFixed(1)}" hidden>aujourd'hui</span>` : ''}
   </div>`;
 }
 
@@ -263,41 +283,36 @@ export function brancherCourbe(racine) {
   const etiquettes = [...bloc.querySelectorAll('.courbe-palier-nom')]
     .sort((a, b) => Number(a.dataset.y) - Number(b.dataset.y));
 
-  /* ─── L'échelle verticale suit le zoom ──────────────────────────────
+  /* ─── Le zoom porte sur les deux axes ───────────────────────────────
 
-     Zoomer sur le temps sans toucher à l'axe des points laisse les paliers
-     aussi serrés qu'au départ : entre 305 et 335, quatre échelons tiennent
-     dans un centimètre, et l'on ne voit toujours pas où la courbe passe.
+     Zoomer sur le seul temps laissait les paliers aussi serrés qu'au
+     départ : entre 305 et 335 points, quatre échelons tiennent dans un
+     centimètre, et s'approcher n'y changeait rien — on voyait la courbe
+     s'allonger sans jamais voir où elle passe.
 
-     L'axe vertical se recadre donc sur ce qui est réellement à l'écran :
-     les valeurs de la période visible, et les deux paliers qui les
-     encadrent — sans ceux-là, on verrait la courbe sans la règle qui la
-     juge. En s'approchant, l'espace entre deux classements s'ouvre de
-     lui-même. C'est ce que fait tout graphique boursier quand on zoome sur
-     une semaine. */
+     Le cadre se resserre donc aussi en hauteur, du même facteur. C'est
+     ce que fait n'importe quel graphique qu'on pince : les deux axes
+     suivent le doigt, et l'écart entre deux classements s'ouvre avec le
+     reste. Le cadrage d'origine, lui, tient tout : les points et les
+     paliers qui les encadrent — une courbe sans ses seuils ne dirait
+     rien de ce qu'elle coûte. */
   const mesures = [...bloc.querySelectorAll('.courbe-point')]
     .map(c => ({ x: Number(c.dataset.x), y: Number(c.dataset.y) }));
   const niveaux = [...bloc.querySelectorAll('.courbe-palier-ligne')]
     .map(l => Number(l.getAttribute('y1')));
 
-  const cadrerVertical = () => {
-    const dedans = mesures.filter(m => m.x >= vue[0] - 1 && m.x <= vue[0] + vue[2] + 1);
-    if (!dedans.length) return;
-
-    let haut = Math.min(...dedans.map(m => m.y));
-    let bas = Math.max(...dedans.map(m => m.y));
-
-    /* Les paliers qui encadrent la courbe entrent dans le cadre : une
-       courbe sans ses seuils ne dit rien de ce qu'elle coûte. */
+  const cadrageEntier = () => {
+    if (!mesures.length) return [...depart];
+    let haut = Math.min(...mesures.map(m => m.y));
+    let bas = Math.max(...mesures.map(m => m.y));
     const dessus = niveaux.filter(n => n <= haut);
     const dessous = niveaux.filter(n => n >= bas);
     if (dessus.length) haut = Math.max(...dessus);
     if (dessous.length) bas = Math.min(...dessous);
-
-    const marge = Math.max((bas - haut) * 0.18, 18);
-    vue[1] = haut - marge;
-    vue[3] = (bas - haut) + marge * 2;
+    const marge = Math.max((bas - haut) * 0.12, 14);
+    return [depart[0], haut - marge, depart[2], (bas - haut) + marge * 2];
   };
+
 
   /* Les années, posées sous leur bande. Une bande trop étroite renonce à
      son millésime plutôt que de le laisser déborder sur la voisine. */
@@ -329,23 +344,67 @@ export function brancherCourbe(racine) {
     }
   };
 
+  /* Les dates, sous le cadre. Toutes sont écrites dans la page ; c'est
+     ici qu'on décide lesquelles se voient — la première, puis une tous
+     les tant de repères, l'écart choisi pour qu'aucune n'en touche une
+     autre. En s'approchant, l'intervalle se resserre tout seul et les
+     mois remplacent les années. */
+  /* La rangée des dates est sœur du cadre, et non dedans : elle se lit
+     sous le dessin, à la même largeur que lui. */
+  const rangeeDates = bloc.parentElement?.querySelector('.courbe-dates');
+  const datesDom = rangeeDates ? [...rangeeDates.querySelectorAll('.courbe-date')] : [];
+  const placerDates = () => {
+    const r = svg.getBoundingClientRect();
+    if (!r.width || !datesDom.length) return;
+
+    const px = el => ((Number(el.dataset.x) - vue[0]) / vue[2]) * r.width;
+    const jour = rangeeDates?.querySelector('.courbe-jour');
+
+    let derniere = -Infinity;
+    for (const el of datesDom) {
+      const p = px(el);
+      /* On mesure caché : `offsetWidth` vaut zéro sur un élément replié,
+         et toutes les dates se croiraient alors minuscules. */
+      el.hidden = false;
+      const large = el.offsetWidth;
+      const gauche = p - large / 2;
+      const dedans = gauche > -2 && gauche + large < r.width + 2;
+      /* « aujourd'hui » passe avant les autres : c'est le repère qu'on
+         cherche en premier, et il coupe déjà le dessin d'un trait. */
+      const prioritaire = el === jour;
+      if (!dedans || (!prioritaire && gauche < derniere + 12)) { el.hidden = true; continue; }
+      el.style.left = `${gauche}px`;
+      derniere = gauche + large;
+    }
+  };
+
   const poser = () => {
-    cadrerVertical();
     svg.setAttribute('viewBox', vue.join(' '));
     placerPaliers();
     placerAnnees();
+    placerDates();
     placerBulle();
   };
 
-  /* On ne zoome que le temps : la largeur change, la hauteur jamais. */
-  const bornes = { min: depart[2] / 14, max: depart[2] };
-  const zoomer = (facteur, ancreX) => {
+  const entier = cadrageEntier();
+  vue = [...entier];
+  const bornes = { min: depart[2] / 16, max: depart[2],
+                   minH: entier[3] / 16, maxH: entier[3] };
+
+  const zoomer = (facteur, ancreX, ancreY) => {
     const w = Math.min(bornes.max, Math.max(bornes.min, vue[2] * facteur));
-    const vrai = w / vue[2];
-    let x0 = ancreX - (ancreX - vue[0]) * vrai;
+    const hh = Math.min(bornes.maxH, Math.max(bornes.minH, vue[3] * facteur));
+    let x0 = ancreX - (ancreX - vue[0]) * (w / vue[2]);
     // On ne sort pas du temps connu : au-delà, il n'y a rien à regarder.
     x0 = Math.min(Math.max(x0, depart[0]), depart[0] + depart[2] - w);
-    vue = [x0, vue[1], w, vue[3]];
+
+    /* Verticalement, la borne est le cadrage d'origine : on ne s'échappe
+       pas au-dessus des paliers, où il n'y a rien de tracé. */
+    const cy = ancreY == null ? vue[1] + vue[3] / 2 : ancreY;
+    let y0 = cy - (cy - vue[1]) * (hh / vue[3]);
+    y0 = Math.min(Math.max(y0, entier[1]), entier[1] + entier[3] - hh);
+
+    vue = [x0, y0, w, hh];
     poser();
   };
 
@@ -353,19 +412,23 @@ export function brancherCourbe(racine) {
     const r = svg.getBoundingClientRect();
     return vue[0] + ((cx - r.left) / r.width) * vue[2];
   };
+  const versCourbeY = cy => {
+    const r = svg.getBoundingClientRect();
+    return vue[1] + ((cy - r.top) / r.height) * vue[3];
+  };
 
   bloc.addEventListener('wheel', e => {
     e.preventDefault();
-    zoomer(e.deltaY > 0 ? 1.15 : 0.87, versCourbe(e.clientX));
+    zoomer(e.deltaY > 0 ? 1.15 : 0.87, versCourbe(e.clientX), versCourbeY(e.clientY));
   }, { passive: false });
 
   bloc.querySelectorAll('[data-zoom-t]').forEach(b => b.addEventListener('click', e => {
     e.stopPropagation();
-    zoomer(Number(b.dataset.zoomT), vue[0] + vue[2] / 2);
+    zoomer(Number(b.dataset.zoomT), vue[0] + vue[2] / 2, vue[1] + vue[3] / 2);
   }));
   bloc.querySelector('[data-recentrer-t]')?.addEventListener('click', e => {
     e.stopPropagation();
-    vue = [...depart];
+    vue = [...entier];
     poser();
   });
 
@@ -378,7 +441,7 @@ export function brancherCourbe(racine) {
 
   svg.addEventListener('pointerdown', e => {
     try { svg.setPointerCapture(e.pointerId); } catch { /* tant pis */ }
-    doigts.set(e.pointerId, { x: e.clientX });
+    doigts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     bouge = false;
   });
 
@@ -389,21 +452,26 @@ export function brancherCourbe(racine) {
 
     if (doigts.size === 2) {
       const precedent = ecart();
-      doigts.set(e.pointerId, { x: e.clientX });
+      doigts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       const nouveau = ecart();
       if (precedent > 0 && nouveau > 0) {
         const c = [...doigts.values()];
-        zoomer(precedent / nouveau, versCourbe((c[0].x + c[1].x) / 2));
+        zoomer(precedent / nouveau, versCourbe((c[0].x + c[1].x) / 2),
+               versCourbeY((c[0].y + c[1].y) / 2));
         bouge = true;
       }
       return;
     }
 
     const dx = (e.clientX - avant.x) / r.width * vue[2];
-    if (Math.abs(e.clientX - avant.x) > 3) bouge = true;
+    const dy = (e.clientY - avant.y) / r.height * vue[3];
+    if (Math.abs(e.clientX - avant.x) + Math.abs(e.clientY - avant.y) > 3) bouge = true;
     const x0 = Math.min(Math.max(vue[0] - dx, depart[0]), depart[0] + depart[2] - vue[2]);
-    vue = [x0, vue[1], vue[2], vue[3]];
-    doigts.set(e.pointerId, { x: e.clientX });
+    /* Zoomé, on se déplace aussi de haut en bas — sans quoi on ne verrait
+       jamais ce qui sort du cadre en s'approchant. */
+    const y0 = Math.min(Math.max(vue[1] - dy, entier[1]), entier[1] + entier[3] - vue[3]);
+    vue = [x0, y0, vue[2], vue[3]];
+    doigts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     poser();
   });
 

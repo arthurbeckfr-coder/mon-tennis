@@ -1189,29 +1189,25 @@ a.carte-bulle-route {
   inset: 0;
   pointer-events: none;
 }
+/* Le nom seul, petit, sans cartouche. Le libellé complet — « 15/1 · 360
+   pts », sur fond plein — faisait au bord gauche une colonne de texte
+   plus large que ce qu'elle annotait, et six lignes de suite en
+   masquaient la courbe. Un liseré de la couleur du fond suffit à le
+   détacher du trait qu'il touche. */
 .courbe-palier-nom {
   position: absolute;
-  left: 8px;
-  font-size: .74rem;
+  left: 6px;
+  font-size: .68rem;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.2;
   color: var(--muet);
-  background: color-mix(in srgb, var(--carte-2) 82%, transparent);
-  padding: 0 4px;
-  border-radius: 4px;
   white-space: nowrap;
+  paint-order: stroke;
+  text-shadow:
+     0 0 3px var(--carte-2),  0 0 3px var(--carte-2),
+     1px 0 2px var(--carte-2), -1px 0 2px var(--carte-2);
 }
 .courbe-palier-nom.courant { color: var(--accent); }
-.courbe-palier-nom {
-  fill: var(--muet);
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  paint-order: stroke;
-  stroke: var(--carte-2);
-  stroke-width: 3;
-  stroke-linejoin: round;
-}
 
 /* Les points de chaque mois sont transparents : ils restent la cible du
    toucher, ils ne sont plus du décor. Seul celui qu'on a ouvert se
@@ -1269,6 +1265,45 @@ a.carte-bulle-route {
 .g-aujourdhui { stroke: var(--bord); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .g-point { fill: var(--serie-1); stroke: var(--carte); stroke-width: 1.5; }
 .g-point.futur { opacity: .5; }
+/* Les commandes de la courbe : petites, dans un coin, à peine posées.
+   Le bloc emprunté à la carte faisait trois touches de trente-six pixels
+   au milieu du dessin — sur une courbe haute de deux cents pixels, il en
+   cachait la moitié. */
+.courbe-outils {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  gap: 2px;
+  background: color-mix(in srgb, var(--carte) 72%, transparent);
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  padding: 1px;
+}
+.courbe-outils .icon-btn {
+  min-width: 26px;
+  height: 26px;
+  font-size: 13px;
+  opacity: .75;
+}
+.courbe-outils .icon-btn:hover { opacity: 1; }
+
+/* L'axe des dates : des repères posés à leur abscisse, pas trois mots
+   répartis à la règle. */
+.courbe-dates {
+  position: relative;
+  height: 15px;
+  margin-top: 3px;
+}
+.courbe-date {
+  position: absolute;
+  top: 0;
+  font-size: .66rem;
+  color: var(--muet);
+  white-space: nowrap;
+}
+.courbe-jour { font-style: italic; color: var(--texte); opacity: .8; }
+
 .g-axe {
   display: flex;
   justify-content: space-between;
