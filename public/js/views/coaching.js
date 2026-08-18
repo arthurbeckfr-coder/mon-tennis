@@ -116,6 +116,15 @@ export function renderCourt() {
   ].filter(Boolean);
 
   return `
+    ${/* Le « + » se pose en haut à droite, gros, avant même le dessin :
+          noter ne se cherche pas. Il descend le titre de rien du tout —
+          la ligne est celle du bandeau de l'écran, qui existait déjà. */''}
+    <div class="court-tete">
+      <span class="etiquette">Sur le court</span>
+      <button class="court-plus" data-noter aria-label="Noter un conseil"
+              title="Noter un conseil">＋</button>
+    </div>
+
     ${total === 0 ? amorce() : ''}
 
     <section class="court-choix">
@@ -179,23 +188,29 @@ export function renderCourt() {
         </div>
       </div>
 
+      ${/* Le titre seul, et le texte au doigt. Déplié, un conseil de six
+            lignes en cache trois autres ; en pleine partie on cherche
+            d'abord lequel, on lit ensuite. Un seul conseil affiché s'ouvre
+            tout seul : il n'y a rien à choisir. */''}
       ${affiches.length ? affiches.map(c => `
-        <article class="court-carte">
+        <details class="court-carte"${affiches.length === 1 ? ' open' : ''}>
+          <summary class="court-carte-tete">
+            <h2>${h(c.titre)}</h2>
+          </summary>
           <button class="etoile ${c.favori ? 'pleine' : ''}" data-favori="${h(c.id)}"
                   aria-label="${c.favori ? 'Retirer des essentiels' : 'Marquer comme essentiel'}"
                   title="Essentiel — montré ici par défaut">${c.favori ? '⭐' : '☆'}</button>
-          <div data-ouvrir="${h(c.id)}">
-            <h2>${h(c.titre)}</h2>
-            ${c.texte ? `<p>${hMulti(c.texte)}</p>` : ''}
-            <div class="court-bas">
-              ${(c.coups || []).map(x => puce(nomCoup(x), 'puce-coup')).join('')}
-              ${(c.profils || []).map(p => puce(nomProfil(p), 'puce-profil')).join('')}
-              ${(c.moments || []).map(m => puce(nomMoment(m), 'puce-moment')).join('')}
-              ${c.source ? `<span class="muted">— ${h(c.source)}</span>` : ''}
-              ${c.date ? `<span class="muted">${h(dateCourte(c.date))}</span>` : ''}
-            </div>
+          ${c.texte ? `<p>${hMulti(c.texte)}</p>` : ''}
+          <div class="court-bas">
+            ${(c.coups || []).map(x => puce(nomCoup(x), 'puce-coup')).join('')}
+            ${(c.profils || []).map(p => puce(nomProfil(p), 'puce-profil')).join('')}
+            ${(c.moments || []).map(m => puce(nomMoment(m), 'puce-moment')).join('')}
+            ${c.source ? `<span class="muted">— ${h(c.source)}</span>` : ''}
+            ${c.date ? `<span class="muted">${h(dateCourte(c.date))}</span>` : ''}
           </div>
-        </article>`).join('')
+          <button class="btn btn-ghost court-modifier" data-ouvrir="${h(c.id)}"
+            >✏️ Modifier</button>
+        </details>`).join('')
         : `<div class="vide"><span class="emoji">🎾</span>
             ${aucunFiltre
               ? `Aucun conseil marqué « essentiel ». Touche l'étoile d'un conseil pour

@@ -1347,6 +1347,29 @@ a.carte-bulle-route {
    Mode court — gros, contrasté, lisible en plein soleil
    =================================================================== */
 body.mode-court .view { padding-top: 6px; }
+/* Le bandeau de l'écran du court : son titre, et le « + » qui note. Gros,
+   à droite, avant le dessin — noter ne se cherche pas. */
+.court-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.court-tete .etiquette { margin: 0; }
+.court-plus {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-txt);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .court-choix { margin-bottom: 14px; }
 /* Le pli des filtres emprunte la pastille des groupes de coups : c'est
    le même geste, il n'a pas à se présenter autrement. */
@@ -1392,13 +1415,35 @@ body.mode-court .view { padding-top: 6px; }
    d'une largeur de pouce. */
 .court-carte .etoile {
   position: absolute;
-  top: 10px;
+  top: 12px;
   right: 10px;
   height: 34px;
   width: 34px;
 }
-.court-carte [data-ouvrir] { cursor: pointer; }
-.court-carte h2 { font-size: 1.32rem; line-height: 1.3; margin-bottom: 8px; padding-right: 34px; }
+
+/* Le titre est la poignée : on touche, le texte se déplie. Le chevron le
+   dit, à la place du triangle natif qui ne se met pas en forme pareil
+   d'un navigateur à l'autre. */
+.court-carte-tete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  list-style: none;
+  cursor: pointer;
+  padding-right: 40px;
+}
+.court-carte-tete::-webkit-details-marker { display: none; }
+.court-carte-tete::after {
+  content: '⌄';
+  margin-left: auto;
+  font-size: 1.1rem;
+  color: var(--muet);
+  transition: transform .15s;
+}
+.court-carte[open] > .court-carte-tete::after { transform: rotate(180deg); }
+.court-carte h2 { font-size: 1.32rem; line-height: 1.3; margin: 0; }
+.court-carte[open] h2 { margin-bottom: 8px; }
+.court-modifier { margin-top: 10px; }
 .court-carte p { font-size: 1.08rem; line-height: 1.55; margin: 0; }
 .court-bas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; font-size: .78rem; }
 
@@ -1580,7 +1625,18 @@ body.mode-court .view { padding-top: 6px; }
   outline: none;
 }
 .terrain-piste::-webkit-scrollbar { display: none; }
-.terrain-diapo { flex: 0 0 100%; scroll-snap-align: center; min-width: 0; }
+/* La vue de côté est deux fois moins haute que le plan. La piste prend
+   la hauteur de la plus grande des deux — sinon elle sauterait d'une
+   vue à l'autre — et la petite se retrouvait collée en haut, avec un
+   grand vide avant les filtres. Elle se centre. */
+.terrain-diapo {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 
 .terrain-points { display: flex; justify-content: center; gap: 9px; margin-top: 6px; }
 .terrain-points button {
