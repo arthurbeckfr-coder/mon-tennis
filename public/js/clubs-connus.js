@@ -23,29 +23,34 @@
    Une adresse peut vieillir. C'est pourquoi tout est modifiable après
    création : la fiche du club s'ouvre comme n'importe quelle autre. */
 
-import { positionMot } from './store.js';
+import { positionMot, store, modifierClub } from './store.js';
 
 /* ─── Les surfaces ─────────────────────────────────────────────────────
  *
- * Chaque liste ci-dessous vient d'une page du club ou d'un répertoire
- * d'équipements sportifs, vérifiée au nom du club. Trois clubs n'en ont
- * pas : Yerville, Petit-Couronne et le TC de Rouen ne publient pas
- * l'information, et aucune source secondaire ne la donne sans se
- * contredire. Un champ vide se remplit d'un coup d'œil sur place ; une
- * surface inventée fausse une statistique pour toujours.
+ * Relevées une par une sur Ten'Up, à la page « installations » de chaque
+ * club : c'est la fédération qui les déclare, et c'est le même
+ * vocabulaire que celui du carnet. Les sites des clubs disent parfois
+ * autre chose — Mont-Saint-Aignan annonce du Green Set là où Ten'Up
+ * classe de la résine, l'ASRUC parle de terre battue quand Ten'Up ne
+ * connaît que de la terre artificielle. En cas de désaccord on suit
+ * Ten'Up : c'est lui qui sert de référence au reste du carnet.
  *
  * Un club a presque toujours plusieurs surfaces — terre battue dehors,
- * moquette ou résine sous bulle — et c'est bien la liste entière qu'on
- * garde : le filtre de la page des clubs le fait apparaître sous chacune.
+ * moquette ou résine sous bulle — et c'est la liste entière qu'on garde :
+ * le filtre de la page des clubs le fait apparaître sous chacune.
+ *
+ * L'identifiant Ten'Up vient de la même visite. Il donne le lien direct
+ * vers la fiche officielle depuis la page du club.
  */
 export const CLUBS_CONNUS = [
   {
     nom: 'MONT SAINT AIGNAN TC',
-    /* Deux sites : les Coquets — six courts couverts en Green Set, deux
-       extérieurs de même, un couvert en gazon synthétique — et les
-       Cottes, quatre courts de terre battue ouverts l'été. Source : la
-       page « Nos infrastructures » du club. */
-    surfaces: ['Green-set', 'Terre battue traditionnelle', 'Gazon synthétique'],
+    tenupId: '58760140',
+    /* Deux sites. Les Coquets : sept courts de résine dont cinq couverts,
+       un de gazon synthétique couvert. Les Cottes : quatre de terre
+       battue et un d'enrobé poreux. */
+    surfaces: ['Résine', 'Gazon synthétique', 'Terre battue traditionnelle',
+               'Enrobé poreux'],
     ville: 'MONT SAINT AIGNAN',
     adresse: 'Centre sportif des Coquets, 8 rue du Dr Fleury, 76130 MONT SAINT AIGNAN',
     // Les deux graphies rencontrées dans le palmarès, espacée et collée.
@@ -58,10 +63,12 @@ export const CLUBS_CONNUS = [
   },
   {
     nom: 'ASRUC TENNIS',
-    /* Dix courts : huit couverts — quatre en terre artificielle, deux en
-       terre battue, deux en résine — et deux extérieurs en terre
-       artificielle. Source : la page tennis de l'ASRUC. */
-    surfaces: ['Terre artificielle', 'Terre battue traditionnelle', 'Résine'],
+    tenupId: '58760304',
+    /* Dix courts de tennis : six de terre artificielle dont quatre
+       couverts, deux de gazon synthétique couverts, deux de revêtement
+       plastique couverts. Les six courts de résine sont ceux du
+       pickleball, et n'ont rien à faire ici. */
+    surfaces: ['Terre artificielle', 'Gazon synthétique', 'Revêtement P.V.C. ou P.U.'],
     ville: 'MONT SAINT AIGNAN',
     adresse: '37 rue de la Croix-Vaubois, 76130 MONT SAINT AIGNAN',
     note: 'Association Sportive Rouen Université Club — section tennis.',
@@ -70,6 +77,9 @@ export const CLUBS_CONNUS = [
   },
   {
     nom: 'AA PETIT COURONNE',
+    tenupId: '58760121',
+    /* Trois courts de moquette couverts et un de résine. */
+    surfaces: ['Moquette', 'Résine'],
     ville: 'PETIT COURONNE',
     adresse: 'rue Camille Saint-Saëns, 76650 PETIT COURONNE',
     motsCles: ['PETIT COURONNE'],
@@ -77,9 +87,10 @@ export const CLUBS_CONNUS = [
   },
   {
     nom: 'YVETOT TC',
-    /* Six courts : deux de terre battue extérieure, deux de terre
-       artificielle couverte, deux de résine en intérieur. */
-    surfaces: ['Terre battue traditionnelle', 'Terre artificielle', 'Résine'],
+    tenupId: '58760134',
+    /* Huit courts : quatre de résine couverts, deux de terre artificielle
+       couverts, deux de terre battue en extérieur. */
+    surfaces: ['Résine', 'Terre artificielle', 'Terre battue traditionnelle'],
     ville: 'YVETOT',
     adresse: '11 rue Pierre de Coubertin, 76190 YVETOT',
     motsCles: ['YVETOT'],
@@ -87,6 +98,9 @@ export const CLUBS_CONNUS = [
   },
   {
     nom: 'YERVILLE TC',
+    tenupId: '58760399',
+    /* Deux courts de béton poreux et un de résine, couvert. */
+    surfaces: ['Béton poreux', 'Résine'],
     ville: 'YERVILLE',
     adresse: '1 rue des Acacias, 76760 YERVILLE',
     motsCles: ['YERVILLE'],
@@ -94,9 +108,9 @@ export const CLUBS_CONNUS = [
   },
   {
     nom: 'USCB TENNIS',
-    /* Douze courts sur deux sites : six couverts en moquette, quatre de
-       terre battue et deux de résine à l'extérieur. Source : la page
-       « Nos infrastructures » du club. */
+    tenupId: '58760097',
+    /* Cinq courts de moquette couverts, quatre de terre battue, deux de
+       résine — plus la salle Ariane, deux courts de moquette de plus. */
     surfaces: ['Moquette', 'Terre battue traditionnelle', 'Résine'],
     ville: 'BOIS GUILLAUME',
     adresse: '1422 rue de la Haie, 76230 BOIS GUILLAUME',
@@ -106,6 +120,11 @@ export const CLUBS_CONNUS = [
   },
   {
     nom: 'TENNIS CLUB DE ROUEN',
+    /* Aucun club de ce nom exact sur Ten'Up dans le rayon de Rouen : on
+       y trouve le Rouen Port AS, le comité de Seine-Maritime et une
+       dizaine d'autres, mais rien qui corresponde à coup sûr. Ni
+       identifiant, ni surfaces : deviner reviendrait à attribuer à ce
+       club les courts d'un autre. */
     ville: 'ROUEN',
     // L'adresse n'a pas été trouvée sur une source publique fiable : mieux
     // vaut un champ vide qu'une adresse inventée. À compléter d'un tour
@@ -182,4 +201,44 @@ export function clubConnuPour(libelle) {
     }
   }
   return gagnant;
+}
+
+/** Complète les clubs déjà créés avec ce qu'on vient d'apprendre.
+ *
+ *  Les surfaces et l'identifiant Ten'Up n'arrivaient jusqu'ici qu'à la
+ *  création du club. Les sept clubs du carnet ont été créés avant, et
+ *  seraient donc restés sans surface — c'est-à-dire absents du filtre —
+ *  alors que la réponse est juste au-dessus, dans cette table.
+ *
+ *  On ne remplit que le vide : un club qui porte déjà une surface garde
+ *  la sienne, même si Ten'Up en déclare une autre. Ce qui est saisi à la
+ *  main l'emporte sur ce qui est relevé — c'est lui qui a joué dessus.
+ */
+export function completerClubsConnus() {
+  const connuPour = club => CLUBS_CONNUS.find(k =>
+    k.nom.toUpperCase() === (club.nom || '').toUpperCase()
+    || (club.motsCles || []).some(m =>
+         k.motsCles.some(x => x.toUpperCase() === String(m).toUpperCase())));
+
+  const aCompleter = store.clubs.filter(c => {
+    const k = connuPour(c);
+    if (!k) return false;
+    return (!c.tenupId && k.tenupId)
+        || (!(c.surfaces || []).length && (k.surfaces || []).length);
+  });
+  if (!aCompleter.length) return 0;
+
+  /* On passe par `modifierClub` plutôt que d'écrire dans la liste : il
+     date chaque fiche touchée, et c'est cette date que la
+     synchronisation lit pour savoir qui, de deux appareils, a raison. */
+  for (const c of aCompleter) {
+    const k = connuPour(c);
+    const ajouts = {};
+    if (!c.tenupId && k.tenupId) ajouts.tenupId = k.tenupId;
+    if (!(c.surfaces || []).length && (k.surfaces || []).length) {
+      ajouts.surfaces = [...k.surfaces];
+    }
+    modifierClub(c.id, ajouts);
+  }
+  return aCompleter.length;
 }

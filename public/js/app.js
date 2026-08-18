@@ -1,6 +1,7 @@
 /* Point d'entrée : thème, chargement, routeur, ajout rapide. */
 
 import { charger, store } from './store.js';
+import { completerClubsConnus } from './clubs-connus.js';
 import { h, toast, openModal, closeModal } from './util.js';
 import { appliquerTheme, themeSuivant, themeActuel, ETIQUETTES } from './theme.js';
 import { matchForm, conseilForm, clubForm, profilForm,
@@ -181,6 +182,13 @@ $('fab').addEventListener('click', ajoutRapide);
 //  Démarrage
 // =====================================================================
 const etat = charger();
+
+/* Les surfaces relevées sur Ten'Up n'arrivaient qu'aux clubs créés
+   après coup. Ceux qui étaient déjà là restaient sans surface, donc
+   invisibles au filtre — pour une information qu'on possède. Le
+   rattrapage ne remplit que les cases vides, et ne se voit qu'une
+   fois : au second démarrage, il n'a plus rien à faire. */
+completerClubsConnus();
 window.__appReady = true;
 $('boot').hidden = true;
 $('shell').hidden = false;

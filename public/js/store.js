@@ -66,9 +66,15 @@ export const PLATEFORMES = [
 /* Le vocabulaire de la fédération, et non le vocabulaire courant : c'est
    celui qu'on lit sur les fiches de tournoi, donc celui qui permettra de
    recouper. « Dur » n'y existe pas, on y parle résine et béton poreux. */
+/* Les surfaces, dans les termes de la fédération. Ce sont ceux que Ten'Up
+   affiche sur la fiche d'installation de chaque club : les reprendre mot
+   pour mot évite d'avoir à traduire — et une traduction, ici, serait une
+   invention. « Enrobé poreux » et « Revêtement P.V.C. ou P.U. » sont
+   arrivés par là, relevés sur des courts où l'on a joué. */
 export const SURFACES = [
   'Terre battue traditionnelle', 'Terre artificielle', 'Résine',
-  'Béton poreux', 'Moquette', 'Green-set', 'Gazon synthétique', 'Autre',
+  'Béton poreux', 'Enrobé poreux', 'Moquette', 'Green-set',
+  'Gazon synthétique', 'Revêtement P.V.C. ou P.U.', 'Autre',
 ];
 
 export const nomProfil  = c => PROFILS.find(p => p.cle === c)?.nom || c;
