@@ -406,13 +406,17 @@ body.mode-court .fab { display: none; }
    pleine, et c'est le tiret qui s'efface. */
 .chiffre .moitie {
   display: inline-block;
-  padding: 1px 4px;
+  padding: 1px 3px;
   border-radius: 7px;
   cursor: pointer;
   font-size: 1.24rem;
   line-height: 1.2;
 }
+/* Le tiret est un span, et `.chiffre span` les met tous en bloc pour la
+   légende sous le chiffre : il passait donc à la ligne, et « 19–9 »
+   s'écrivait sur trois étages. Il redevient une lettre au milieu du mot. */
 .chiffre b .separateur {
+  display: inline;
   font-size: .8rem;
   color: var(--muet);
   font-weight: 400;
@@ -422,7 +426,11 @@ body.mode-court .fab { display: none; }
 .chiffre .moitie.actif { background: var(--accent); color: var(--accent-txt); }
 .chiffre .moitie.actif small { color: inherit; }
 
-.chiffre b { display: block; font-size: 1.24rem; line-height: 1.2; }
+/* Une seule ligne, quoi qu'il arrive : « 19–9 » est fait de trois
+   éléments — le nombre, le tiret, le nombre — et la tuile étant étroite,
+   ils passaient à la ligne l'un après l'autre. On lisait un 19, un tiret
+   et un 9 empilés, ce qui ne veut plus rien dire. */
+.chiffre b { display: block; font-size: 1.24rem; line-height: 1.2; white-space: nowrap; }
 .chiffre b small { font-size: .82rem; color: var(--muet); font-weight: 600; }
 .chiffre span { font-size: .66rem; color: var(--muet); line-height: 1.25; display: block; }
 
