@@ -1,9 +1,15 @@
-/* Le sac : ce qu'il faut acheter, et ce avec quoi on joue.
+/* Mon profil : qui je suis, et tout ce qui m'appartient.
 
-   Quatre sujets sous un même toit parce qu'ils se pensent au même moment —
-   la veille d'un tournoi, quand on prépare son sac. Un seul est affiché à
-   la fois : une liste de courses et un historique de cordages n'ont rien à
-   se dire, les empiler ne ferait que rallonger le défilement. */
+   La rubrique s'appelait « le sac » et ne parlait que de matériel. Elle
+   parle maintenant de son propriétaire, dont le sac n'est qu'un chapitre :
+   qui il est, d'où il part, ce qu'il porte, ce que ça lui coûte. Le
+   changement n'est pas cosmétique — un numéro de licence n'avait aucune
+   place dans un sac, et n'en avait nulle part ailleurs non plus.
+
+   Six sujets sous un même toit parce qu'ils se pensent au même moment, la
+   veille d'un tournoi. Un seul est affiché à la fois : une liste de
+   courses et un historique de cordages n'ont rien à se dire, les empiler
+   ne ferait que rallonger le défilement. */
 
 import { h, dateCourte, dateLongue, puce, confirmer, toast } from '../util.js';
 import { store, basculerAchat, rangerCourses, courses as coursesCRUD, raquetteDe,
@@ -14,11 +20,13 @@ import {
   CATEGORIES_COURSES, TROUSSE_TYPE, nomCause,
   statsCordages, ageCordage, dureesDeVie,
 } from '../materiel.js';
-import { courseForm, raquetteForm, cordageForm, chaussureForm, depenseForm } from '../forms.js';
+import { courseForm, raquetteForm, cordageForm, chaussureForm, depenseForm,
+         identiteForm, profilForm } from '../forms.js';
 
-let onglet = 'courses';
+let onglet = 'moi';
 
 const ONGLETS = [
+  { cle: 'moi',        emoji: '🪪', nom: 'Moi' },
   { cle: 'courses',    emoji: '🛒', nom: 'Courses' },
   { cle: 'argent',     emoji: '💶', nom: 'Argent' },
   { cle: 'raquettes',  emoji: '🎾', nom: 'Raquettes' },
@@ -27,15 +35,98 @@ const ONGLETS = [
 ];
 
 export function render() {
-  const barre = `<div class="segments" style="width:100%;margin-bottom:14px">
+  const barre = `<div class="segments segments-defile">
     ${ONGLETS.map(o => `<button data-onglet="${o.cle}" style="flex:1"
       class="${onglet === o.cle ? 'actif' : ''}">${o.emoji} ${h(o.nom)}</button>`).join('')}
   </div>`;
 
-  const corps = { courses: vueCourses, argent: vueArgent, raquettes: vueRaquettes,
+  const corps = { moi: vueMoi, courses: vueCourses, argent: vueArgent, raquettes: vueRaquettes,
                   cordages: vueCordages, chaussures: vueChaussures }[onglet]();
 
   return barre + corps;
+}
+
+/* ─── Moi ──────────────────────────────────────────────────────────────
+
+   Le sac est devenu un profil, et le sac n'en est qu'un onglet. Ce qui a
+   changé n'est pas l'organisation mais le sujet : la rubrique parlait de
+   matériel, elle parle maintenant de son propriétaire — qui il est, où il
+   habite, ce qu'il porte, ce que ça lui coûte.
+
+   Cet écran ne saisit rien lui-même : il montre, et renvoie aux
+   formulaires qui existent déjà. Deux endroits pour modifier la même
+   chose finiraient par diverger. */
+function ligneInfo(emoji, libelle, valeur, lien = '') {
+  if (!valeur) return '';
+  const contenu = lien
+    ? `<a href="${h(lien)}">${h(valeur)}</a>`
+    : h(valeur);
+  return `<li><span class="fiche-emoji">${emoji}</span>
+    <div><span class="tiny muted">${h(libelle)}</span><br>${contenu}</div></li>`;
+}
+
+function vueMoi() {
+  const p = store.profil;
+  const nomComplet = [p.prenom, p.nom].filter(Boolean).join(' ');
+  const infos = [
+    ligneInfo('🪪', 'Licence', p.licence),
+    ligneInfo('🏟️', 'Mon club', p.clubPrincipal),
+    ligneInfo('📞', 'Téléphone', p.telephone, p.telephone ? `tel:${p.telephone.replace(/\s/g, '')}` : ''),
+    ligneInfo('✉️', 'E-mail', p.mail, p.mail ? `mailto:${p.mail}` : ''),
+    ligneInfo('🎂', 'Naissance', p.naissance ? dateCourte(p.naissance) : ''),
+  ].filter(Boolean).join('');
+
+  const lieu = (emoji, libelle, l) => !l?.adresse ? '' :
+    `<li><span class="fiche-emoji">${emoji}</span>
+      <div><span class="tiny muted">${h(libelle)}</span><br>${h(l.libelle || l.adresse)}
+      ${l.point ? '' : ' <em class="tiny muted">(pas situé sur la carte)</em>'}</div></li>`;
+
+  const lieux = lieu('🏠', 'Domicile', p.domicile) + lieu('💼', 'Travail', p.bureau);
+
+  return `
+    <section class="carte">
+      <div class="fiche-tete">
+        <div>
+          <h2>${h(nomComplet || 'Moi')}</h2>
+          <p class="tiny muted">${h(p.echelon)}${p.gaucher ? ' · gaucher' : ''}${
+            p.sexe === 'f' ? ' · barème dames' : ''}</p>
+        </div>
+        <button class="btn btn-ghost" data-identite>Modifier</button>
+      </div>
+      ${infos ? `<ul class="fiche-infos">${infos}</ul>`
+        : `<p class="tiny muted">Rien de renseigné. Le numéro de licence est ce qu'on
+           cherche le plus souvent, debout au club, au moment de s'inscrire.</p>`}
+    </section>
+
+    <section class="carte">
+      <div class="fiche-tete">
+        <div><h3>D'où je pars</h3></div>
+        <button class="btn btn-ghost" data-profil>Régler</button>
+      </div>
+      ${lieux ? `<ul class="fiche-infos">${lieux}</ul>`
+        : `<p class="tiny muted">Aucune adresse. Renseigne ton domicile et le carnet saura
+           dire quels clubs sont à côté, et combien de kilomètres tu fais pour aller
+           jouer.</p>`}
+      ${p.coutKm ? `<p class="tiny muted">Coût du kilomètre réglé à ${p.coutKm} €.</p>` : ''}
+    </section>
+
+    <section class="carte">
+      <div class="fiche-tete">
+        <div><h3>Mon classement</h3></div>
+        <button class="btn btn-ghost" data-profil>Régler</button>
+      </div>
+      <ul class="fiche-infos">
+        <li><span class="fiche-emoji">🏅</span><div>
+          <span class="tiny muted">Échelon</span><br>${h(p.echelon)}</div></li>
+        ${p.bilanOfficiel != null ? `<li><span class="fiche-emoji">📊</span><div>
+          <span class="tiny muted">Bilan officiel Ten'Up</span><br>${p.bilanOfficiel} points</div></li>` : ''}
+        <li><span class="fiche-emoji">➕</span><div>
+          <span class="tiny muted">Bonus</span><br>${p.bonusVictoires || 0} victoire(s),
+          ${p.bonusPoints || 0} point(s)</div></li>
+      </ul>
+      <p class="tiny muted">Le détail du calcul et les projections se lisent dans l'onglet
+        Classement, en bas.</p>
+    </section>`;
 }
 
 /* ─── Ce que le tennis coûte ───────────────────────────────────────────
@@ -405,6 +496,8 @@ export function wire(vue, rerendre) {
     const o = e.target.closest('[data-onglet]');
     if (o) { onglet = o.dataset.onglet; rerendre(); return; }
 
+    if (e.target.closest('[data-identite]')) { identiteForm(); return; }
+    if (e.target.closest('[data-profil]')) { profilForm(); return; }
     if (e.target.closest('[data-depense]')) { depenseForm(); return; }
 
     const dep = e.target.closest('[data-depense-id]');

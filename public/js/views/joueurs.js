@@ -19,6 +19,7 @@ import { h, hMulti, dateCourte, puce, confirmer, toast } from '../util.js';
 import { store, bilanMatchs, clubDuMatch, nomProfil, PROFILS } from '../store.js';
 import { rang } from '../classement.js';
 import { joueurForm, matchForm } from '../forms.js';
+import { carteClubs, brancherCarte } from '../carte.js';
 
 let recherche = '';
 let tri = 'matchs';
@@ -259,6 +260,48 @@ export function render() {
 // =====================================================================
 //  La fiche
 // =====================================================================
+/* ─── Où l'on s'est croisés ────────────────────────────────────────────
+
+   La liste des matchs dit déjà le club de chacun, mais en toutes lettres
+   et un par un : pour savoir si l'on se croise toujours au même endroit ou
+   un peu partout, il faut les lire tous et les tenir de tête. Une carte
+   répond d'un coup d'œil.
+
+   Elle réutilise celle des clubs sans rien y changer : mêmes disques,
+   même taille selon le nombre de matchs — ici, le nombre de fois qu'on
+   s'est rencontrés là. Un adversaire croisé une seule fois donne donc une
+   carte à un point, ce qui reste une réponse : c'était là. */
+function rendreOuVousAvezJoue(j) {
+  const parClub = new Map();
+  for (const m of j.matchs) {
+    const club = clubDuMatch(m);
+    if (!club) continue;
+    if (!parClub.has(club.id)) parClub.set(club.id, { club, matchs: [] });
+    parClub.get(club.id).matchs.push(m);
+  }
+
+  const clubs = [...parClub.values()].map(x => ({ ...x, bilan: bilanMatchs(x.matchs) }));
+  const sansClub = j.matchs.length - clubs.reduce((t, c) => t + c.matchs.length, 0);
+
+  if (!clubs.length) {
+    return `<section class="carte">
+      <h3>Où vous vous êtes croisés</h3>
+      <p class="tiny muted">Aucun de vos matchs n'est rattaché à un club — c'est le cas des
+        rencontres par équipes, qui n'en ont pas, et des épreuves dont le libellé ne nomme
+        personne.</p>
+    </section>`;
+  }
+
+  return `<section class="carte">
+    <h3>Où vous vous êtes croisés</h3>
+    <p class="tiny muted">${clubs.length === 1
+      ? `Toujours au même endroit : ${h(clubs[0].club.nom)}.`
+      : `${clubs.length} clubs différents.`}${sansClub
+      ? ` ${sansClub} de vos matchs n'ont pas de club et ne figurent pas ici.` : ''}</p>
+    ${carteClubs(clubs)}
+  </section>`;
+}
+
 export function renderFiche(params) {
   const cle = decodeURIComponent(params[1] || '');
   const j = repertoire().find(x => x.cle === cle);
@@ -294,6 +337,8 @@ export function renderFiche(params) {
         jouer. Le jour où tu le retrouveras dans un tableau, tu regretteras de ne pas
         l'avoir fait.</p>` : ''}
     </section>
+
+    ${rendreOuVousAvezJoue(j)}
 
     <section class="carte">
       <h3>Vos matchs</h3>
@@ -358,6 +403,8 @@ export function wire(vue, rerendre) {
 }
 
 export function wireFiche(vue) {
+  brancherCarte(vue, id => { location.hash = `#/clubs/${id}`; });
+
   vue.addEventListener('click', e => {
     const cle = decodeURIComponent(location.hash.split('/')[2] || '');
     const j = repertoire().find(x => x.cle === cle);

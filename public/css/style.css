@@ -525,6 +525,41 @@ body.mode-court .fab { display: none; }
   .segments button { font-size: .74rem; padding: 10px 7px; }
 }
 .segments button + button { border-left: 1px solid var(--bord); }
+
+/* Six onglets ne tiennent pas dans la largeur d'un téléphone. Plutôt que
+   de les comprimer jusqu'à l'illisible, la barre défile — et le dégradé
+   du bord droit dit qu'il y en a d'autres, ce qu'une coupe nette laisse
+   deviner à tort comme une fin de liste. */
+.segments-defile {
+  display: flex;
+  width: 100%;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--bord);
+  border-radius: 11px;
+  background: var(--carte);
+}
+.segments-defile::-webkit-scrollbar { display: none; }
+.segments-defile button {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--muet);
+  font: inherit;
+  font-size: .82rem;
+  padding: 10px 14px;
+  min-height: 44px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.segments-defile button + button { border-left: 1px solid var(--bord); }
+.segments-defile button.actif {
+  background: var(--accent);
+  color: var(--accent-txt);
+  font-weight: 600;
+}
 .segments button.actif { background: var(--accent); color: var(--accent-txt); font-weight: 600; }
 
 .replis { margin: 8px 0; }

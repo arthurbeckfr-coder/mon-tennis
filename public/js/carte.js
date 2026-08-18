@@ -90,9 +90,13 @@ export function carteClubs(clubs) {
     .filter(c => c.point);
 
   const absents = clubs.length - places.length;
-  if (places.length < 2) {
-    return `<p class="tiny muted">Pas encore assez de clubs situés pour dessiner une
-      carte.${absents ? ` ${absents} club(s) n'ont pas de ville reconnue.` : ''}</p>`;
+  /* Un seul club suffit à faire une carte, et c'est le cas courant sur la
+     fiche d'un adversaire croisé une fois : le contour du département et
+     les villes autour disent déjà où c'était. C'est zéro qui ne se dessine
+     pas. */
+  if (!places.length) {
+    return `<p class="tiny muted">Aucun de ces clubs n'a de ville reconnue : rien à
+      placer sur une carte.${absents ? ` (${absents} club(s))` : ''}</p>`;
   }
 
   /* Un degré de longitude ne vaut pas un degré de latitude : sans cette
@@ -107,15 +111,22 @@ export function carteClubs(clubs) {
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
 
-  /* Une marge proportionnelle à l'étendue, jamais nulle : deux clubs de la
-     même ville donneraient une boîte de largeur zéro, donc une division
-     par zéro puis une carte vide. */
-  const etendue = Math.max(maxX - minX, maxY - minY, 0.02);
+  /* Le cadrage tient les clubs, et jamais moins d'une trentaine de
+     kilomètres. Ce plancher n'est pas un détail de présentation : sans
+     lui, un club seul — ou deux de la même ville — donnerait une boîte de
+     largeur nulle, donc une division par zéro, et au mieux un point au
+     milieu de rien. Avec lui, la côte et une ville restent dans le champ,
+     et l'on sait où l'on est. */
+  const etendue = Math.max(maxX - minX, maxY - minY, 0.30);
   const marge = etendue * 0.18;
-  const boite = {
-    x: minX - marge, y: minY - marge,
-    w: (maxX - minX) + marge * 2, h: (maxY - minY) + marge * 2,
+
+  const cadrer = (min, max) => {
+    const large = Math.max(max - min, etendue) + marge * 2;
+    const centre = (min + max) / 2;
+    return { debut: centre - large / 2, taille: large };
   };
+  const cx = cadrer(minX, maxX), cy = cadrer(minY, maxY);
+  const boite = { x: cx.debut, y: cy.debut, w: cx.taille, h: cy.taille };
 
   const maxMatchs = Math.max(1, ...pts.map(p => p.matchs.length));
 

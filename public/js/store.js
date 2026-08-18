@@ -85,8 +85,13 @@ function vide() {
        `bilanOfficiel` ne sert qu'à comparer avec le chiffre de Ten'Up —
        un écart signale des matchs manquants, pas une erreur de calcul. */
     profil: {
-      prenom: '', sexe: 'h', echelon: '15', gaucher: false,
+      prenom: '', nom: '', sexe: 'h', echelon: '15', gaucher: false,
       bilanOfficiel: null, bonusVictoires: 0, bonusPoints: 0,
+      /* L'identité et les coordonnées ne servent à aucun calcul : elles
+         servent à retrouver son numéro de licence au moment de s'inscrire
+         à un tournoi, debout au club, sans fouiller ses mails. C'est la
+         seule raison de leur présence, et elle suffit. */
+      licence: '', telephone: '', mail: '', clubPrincipal: '', naissance: '',
     },
     bareme: { ...BAREME_DEFAUT },
     matchs: [],

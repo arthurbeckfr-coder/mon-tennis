@@ -12,6 +12,7 @@ import * as coaching   from './views/coaching.js';
 import * as clubs      from './views/clubs.js';
 import * as materiel   from './views/materiel.js';
 import * as joueurs    from './views/joueurs.js';
+import { retourPour, oublierRetourSi } from './retour.js';
 import * as nuage      from './nuage.js';
 import { dicterModal } from './dictee.js';
 
@@ -40,7 +41,7 @@ const ROUTES = [
     render: () => clubs.render(),       wire: clubs.wire },
   { match: /^\/clubs\/(.+)$/, title: 'Club',         tab: '/clubs',
     render: p => clubs.renderFiche(p),  wire: clubs.wireFiche, retour: '#/clubs' },
-  { match: /^\/matos$/,       title: 'Mon sac',      tab: '/matos',
+  { match: /^\/matos$/,       title: 'Mon profil',   tab: '/matos',
     render: () => materiel.render(),    wire: materiel.wire },
   { match: /^\/joueurs$/,     title: 'Mes adversaires', tab: '/joueurs',
     render: () => joueurs.render(),     wire: joueurs.wire },
@@ -85,9 +86,17 @@ function afficher() {
      `data-cible` pour ses boutons d'objectif, et deux attributs de même
      nom sur un même document finissent par se confondre dans un
      sélecteur. */
+  /* Un détour ponctuel — la fenêtre d'un match qui envoie voir un
+     adversaire — se referme là où il s'est ouvert. La flèche garde son
+     dessin mais ne fait pas la même chose, et c'est bien ce qu'on attend
+     d'elle : revenir. */
+  oublierRetourSi(ecran);
+  const ponctuel = retourPour(ecran);
+
   const retour = $('btn-retour');
-  retour.hidden = !route.retour;
+  retour.hidden = !route.retour && !ponctuel;
   retour.dataset.retourCible = route.retour || '';
+  retour.title = ponctuel ? 'Revenir au match' : 'Revenir à la liste';
 
   // Le mode court se passe de tout le décorum : il doit tenir en un écran.
   document.body.classList.toggle('mode-court', !!route.nu);
@@ -187,6 +196,8 @@ if (etat.neuf) {
 afficher();
 
 $('btn-retour').addEventListener('click', () => {
+  const ponctuel = retourPour(location.hash || '#/');
+  if (ponctuel) { ponctuel(); return; }
   const cible = $('btn-retour').dataset.retourCible;
   if (cible) location.hash = cible;
 });

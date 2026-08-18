@@ -21,6 +21,7 @@ import { ICONES, CATEGORIES_COURSES, CAUSES_CORDAGE } from './materiel.js';
 import { analyser, EXEMPLE } from './import-fft.js';
 import { URL_TENUP } from './config.js';
 import { situer } from './geocodage.js';
+import { poserRetour } from './retour.js';
 import { blocTerrain, brancherTerrain } from './terrain.js';
 import * as nuage from './nuage.js';
 
@@ -96,6 +97,13 @@ function adversairesConnus(courant = '') {
   return [...noms].sort((a, b) => a.localeCompare(b, 'fr'));
 }
 
+/** La clé d'un adversaire, telle que le répertoire la calcule : sans
+ *  casse ni accents. La recopier plutôt que d'importer joueurs.js évite un
+ *  cycle d'imports entre les formulaires et les vues. */
+const cleAdversaire = nom => (nom || '')
+  .trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/s+/g, ' ');
+
 export function matchForm(existant = null) {
   const m = existant || {
     date: aujourdhui(), issue: 'V', adversaire: '', echelonAdverse: store.profil.echelon,
@@ -137,6 +145,14 @@ export function matchForm(existant = null) {
         <input name="adversaireNouveau" placeholder="Prénom NOM"
                autocomplete="off" autocapitalize="words">
       </label>
+      ${/* « Je l'ai déjà joué, ça avait donné quoi ? » se pose en
+            regardant un match, pas seulement en parcourant le répertoire.
+            Le bouton n'apparaît que s'il y a un historique à voir. */''}
+      ${existant && m.adversaire ? `<div class="rangee-lieu">
+        <button type="button" class="btn btn-ghost" data-historique>
+          Notre historique</button>
+        <span class="tiny muted">tous vos matchs, puis retour ici</span>
+      </div>` : ''}
       <div class="duo">
         <label>Son classement
           <select name="echelonAdverse">${opts(ECHELONS, m.echelonAdverse)}</select>
@@ -195,6 +211,27 @@ export function matchForm(existant = null) {
          ailleurs et revenir — ce qui se fait mal quand on note un match
          debout au bord du court —, le champ apparaît sur place. Le joueur
          entre bien au répertoire : c'est le même enregistrement. */
+      /* On note d'où l'on part avant de partir : la fiche de
+         l'adversaire se refermera sur ce match, et non sur le répertoire.
+         Rouvrir le formulaire au retour suppose de retrouver le match dans
+         le carnet — il a pu être modifié entre-temps, et c'est la version
+         enregistrée qu'on veut revoir, pas celle d'il y a trois écrans. */
+      racine.querySelector('[data-historique]')?.addEventListener('click', () => {
+        const cible = `#/joueurs/${encodeURIComponent(cleAdversaire(m.adversaire))}`;
+        /* On retient aussi l'écran d'où l'on partait. Rouvrir la fenêtre du
+           match par-dessus la fiche de l'adversaire la refermerait sur
+           cette fiche, et non là où l'on était : le détour ne serait pas
+           refermé, seulement déplacé. */
+        const origine = location.hash || '#/';
+        poserRetour(cible, () => {
+          const frais = store.matchs.find(x => x.id === existant.id);
+          location.hash = origine;
+          if (frais) matchForm(frais);
+        });
+        closeModal();
+        location.hash = cible;
+      });
+
       const choix = racine.querySelector('#choix-adversaire');
       const ligneNeuf = racine.querySelector('#ligne-nouvel-adversaire');
       const champNeuf = ligneNeuf.querySelector('input');
@@ -930,6 +967,58 @@ export function joueurForm(joueur) {
           club: (d.club || '').trim(),
           profils: valeurs(form, 'profils'),
         }), 'Noté.');
+      };
+    },
+  });
+}
+
+// =====================================================================
+//  Qui je suis
+// =====================================================================
+/* Ces champs ne servent à aucun calcul, et c'est assumé : ils servent à
+   retrouver son numéro de licence debout au club, au moment de s'inscrire
+   à un tournoi, sans fouiller ses mails. Le carnet est déjà l'endroit où
+   l'on range son tennis ; qu'il range aussi cela. */
+export function identiteForm() {
+  const p = store.profil;
+  openModal({
+    title: 'Mes informations',
+    body: `<form id="f-identite" class="form">
+      <div class="duo">
+        <label>Prénom<input name="prenom" value="${h(p.prenom || '')}" autocomplete="given-name"></label>
+        <label>Nom<input name="nom" value="${h(p.nom || '')}" autocomplete="family-name"></label>
+      </div>
+      <label>Numéro de licence
+        <input name="licence" value="${h(p.licence || '')}" inputmode="numeric"
+               placeholder="celui qu'on demande à chaque inscription">
+      </label>
+      <label>Mon club
+        <input name="clubPrincipal" list="mes-clubs" value="${h(p.clubPrincipal || '')}"
+               placeholder="celui où je suis licencié">
+      </label>
+      <datalist id="mes-clubs">
+        ${store.clubs.map(c => `<option value="${h(c.nom)}"></option>`).join('')}
+      </datalist>
+      <div class="duo">
+        <label>Téléphone
+          <input type="tel" name="telephone" value="${h(p.telephone || '')}" autocomplete="tel">
+        </label>
+        <label>Date de naissance
+          <input type="date" name="naissance" value="${h(p.naissance || '')}">
+        </label>
+      </div>
+      <label>Adresse e-mail
+        <input type="email" name="mail" value="${h(p.mail || '')}" autocomplete="email">
+      </label>
+      <p class="tiny muted">Rien de tout cela ne sort du carnet : ces informations restent
+        sur ton appareil, et ne partent en ligne que dans ta propre sauvegarde, si tu es
+        connecté. Aucun calcul ne s'en sert.</p>
+    </form>`,
+    footer: `<button class="btn btn-primary" data-ok>Enregistrer</button>`,
+    onMount: () => {
+      document.getElementById('modal-root').querySelector('[data-ok]').onclick = () => {
+        const d = Object.fromEntries(new FormData(document.getElementById('f-identite')));
+        conclure(maj(s => { s.profil = { ...s.profil, ...d }; }), 'Informations enregistrées.');
       };
     },
   });
