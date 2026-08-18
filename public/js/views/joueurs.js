@@ -292,13 +292,36 @@ function rendreOuVousAvezJoue(j) {
     </section>`;
   }
 
+  /* Le compte d'abord, la carte ensuite : « 7 matchs dans 6 clubs » se
+     lit plus vite qu'une carte, et la carte dit ce que le compte ne dit
+     pas — lesquels, et à quelle distance les uns des autres. */
+  const situes = clubs.reduce((t, c) => t + c.matchs.length, 0);
+  const plusJoue = [...clubs].sort((a, b) => b.matchs.length - a.matchs.length)[0];
+
   return `<section class="carte">
     <h3>Où vous vous êtes croisés</h3>
-    <p class="tiny muted">${clubs.length === 1
-      ? `Toujours au même endroit : ${h(clubs[0].club.nom)}.`
-      : `${clubs.length} clubs différents.`}${sansClub
-      ? ` ${sansClub} de vos matchs n'ont pas de club et ne figurent pas ici.` : ''}</p>
+    <p class="tiny muted">${situes} de vos ${j.matchs.length} match${j.matchs.length > 1 ? 's' : ''}
+      ${clubs.length === 1
+        ? `au même endroit : <strong>${h(clubs[0].club.nom)}</strong>`
+        : `dans <strong>${clubs.length} clubs</strong>, le plus souvent à
+           <strong>${h(plusJoue.club.nom)}</strong> (${plusJoue.matchs.length})`}.${sansClub
+      ? ` Les ${sansClub} autre${sansClub > 1 ? 's' : ''} n'ont pas de club — rencontres par
+         équipes ou épreuves qui ne nomment personne — et ne figurent pas ici.` : ''}</p>
     ${carteClubs(clubs)}
+    <ul class="clubs-adverses" style="margin-top:10px">
+      ${[...clubs].sort((a, b) => b.matchs.length - a.matchs.length).map(c => {
+        const b = c.bilan;
+        return `<li>
+          <div>
+            <strong>${h(c.club.nom)}</strong>
+            <div class="tiny muted">${c.matchs.map(m => h(dateCourte(m.date))).join(' · ')}</div>
+          </div>
+          <div class="joueur-bilan ${b.v > b.d ? 'positif' : b.v < b.d ? 'negatif' : ''}">
+            ${b.v}<span>–</span>${b.d}
+          </div>
+        </li>`;
+      }).join('')}
+    </ul>
   </section>`;
 }
 
