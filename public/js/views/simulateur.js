@@ -320,16 +320,24 @@ function rendreCalendrier(reglages) {
      qu'il me faut pour monter » mais « qu'est-ce que je perds si je ne
      joue plus ». Elle n'a qu'une réponse, celle de son propre échelon.
 
-     Trois ans en arrière, cinq devant. Cette asymétrie a une raison : la
-     descente est bridée à un échelon par douze mois, si bien qu'une chute
-     de plusieurs classements s'étale mécaniquement sur plusieurs années.
-     Sur deux ans on n'en voyait que le début, et le graphique laissait
-     croire que tout s'arrêtait là. */
+     Trois ans en arrière, deux devant. Cinq ans de projection avaient
+     été ouverts pour une raison qui a disparu : la descente est bridée à
+     un échelon par douze mois, et l'on voulait voir la chute entière —
+     jusqu'à trois ou quatre classements plus bas. Mais montrer ces cinq
+     ans écrasait l'échelle : les quinze points qui séparent deux
+     classements voisins ne faisaient plus que six pixels, et le
+     graphique devenait illisible pour montrer un lointain qui ne se
+     décide pas aujourd'hui.
+
+     Deux ans suffisent à la question posée : le premier franchissement,
+     et le suivant. Au-delà, la descente se lit en toutes lettres sous le
+     graphique, échelon par échelon et date par date — un texte est plus
+     précis qu'une courbe écrasée. */
   const mien = store.profil.echelon;
   if (seuil(mien, store.profil.sexe)?.points == null) return '';
 
   const etapes = projeter({ ...reglages, cible: mien,
-                            debut: -36, mois: 60, depuis: mien });
+                            debut: -36, mois: 24, depuis: mien });
   if (etapes.length < 2) return '';
 
   /* Le mois d'aujourd'hui se trouve, il ne se compte pas : son rang dans
