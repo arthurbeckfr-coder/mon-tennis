@@ -478,38 +478,109 @@ export function listeCoups({ selection = [], compte = {}, groupes = [] } = {}) {
     </details>`;
   }).join('');
 }
-export function blocTerrain({ selection = [], gaucher = false, compte = {} } = {}) {
-  /* Les deux vues d'un même court, l'une sous l'autre : du dessus pour
-     savoir où, de profil pour savoir comment. Elles partagent leur
-     sélection — toucher « amortie » en bas allume le même filtre que
-     toucher une zone en haut — parce que ce sont les mêmes conseils
-     qu'on cherche. */
-  /* Dès qu'un coup est retenu, le bloc entier le sait : le reste
+export function blocTerrain({ selection = [], gaucher = false, compte = {},
+                             listes = true } = {}) {
+  /* Les deux vues d'un même court, l'une à côté de l'autre et non l'une
+     sous l'autre : du dessus pour savoir où, de profil pour savoir
+     comment. Empilées, la seconde vivait sous la ligne de flottaison et
+     personne ne la voyait ; il fallait passer le plan entier pour
+     l'atteindre, et les conseils reculaient d'autant. Elles glissent donc
+     latéralement, comme les photos d'une annonce — le geste est connu, et
+     il ne coûte pas un pixel de hauteur.
+
+     Elles partagent leur sélection — toucher « amortie » sur la seconde
+     allume le même filtre que toucher une zone sur la première — parce
+     que ce sont les mêmes conseils qu'on cherche.
+
+     Dès qu'un coup est retenu, le bloc entier le sait : le reste
      s'estompe pour que le trait choisi se détache. Sept trajectoires qui
      se croisent, toutes de la même couleur, ne se distinguent que par
      l'extinction des autres — surligner la bonne ne suffit pas quand elle
      passe derrière trois voisines. */
   return `<div class="terrain-bloc${selection.length ? ' a-choix' : ''}">
-    ${/* Le plan et ce qui le commande, côte à côte dès que l'écran le
-          permet. En dessous de quoi la liste passe sous le plan : à trois
-          cent cinquante pixels de large, une colonne de pastilles à côté
-          d'un court n'est ni l'un ni l'autre. */''}
-    <div class="terrain-dessus">
-      <div class="terrain-vue">
-        ${dessinerTerrain({ selection, gaucher, compte })}
-        <p class="tiny muted terrain-aide">Vue de dessus : où la balle tombe.</p>
+    <div class="terrain-carrousel">
+      ${/* `tabindex` sur la piste : au clavier, on la fait défiler aux
+            flèches sans souris ni doigt. */''}
+      <div class="terrain-piste" tabindex="0">
+        <div class="terrain-diapo">
+          ${dessinerTerrain({ selection, gaucher, compte })}
+          <p class="tiny muted terrain-aide">Vue de dessus : où la balle tombe.</p>
+        </div>
+        <div class="terrain-diapo">
+          ${dessinerProfil({ selection, compte })}
+          <p class="tiny muted terrain-aide">Vue de côté : ce qu'elle fait en chemin.
+            Les hauteurs sont exagérées — un vrai court donnerait un trait plat.</p>
+        </div>
       </div>
-      <div class="terrain-cote">
-        ${listeCoups({ selection, compte,
-                       groupes: [['Sur le court', ['zone']], ['Directions', ['fleche']]] })}
+
+      ${/* Deux pastilles pour dire où l'on est et sauter à l'autre vue :
+            sur un ordinateur, rien n'indique qu'une bande se fait glisser
+            si on ne le montre pas. */''}
+      <div class="terrain-points">
+        <button type="button" data-diapo="0" class="actif"
+                aria-label="Vue de dessus"></button>
+        <button type="button" data-diapo="1" aria-label="Vue de côté"></button>
       </div>
     </div>
 
-    ${dessinerProfil({ selection, compte })}
-    <p class="tiny muted terrain-aide">Vue de côté : ce qu'elle fait en chemin.
-      Les hauteurs sont exagérées — un vrai court donnerait un trait plat.</p>
-    ${listeCoups({ selection, compte, groupes: [['Trajectoires', ['profil']]] })}
+    ${listes ? listeCoups({ selection, compte, groupes: [
+      ['Sur le court', ['zone']], ['Directions', ['fleche']],
+      ['Trajectoires', ['profil']]] }) : ''}
   </div>`;
+}
+
+/** Fait vivre le carrousel : la pastille suit le doigt, et la toucher
+ *  emmène à la vue voulue.
+ *
+ *  `vue` est l'index à montrer au premier affichage, `onVue` prévient de
+ *  chaque changement — sans quoi le moindre redessin (choisir un coup en
+ *  est un) ramènerait au plan alors qu'on regardait le profil.
+ */
+export function brancherCarrousel(racine, { vue = 0, onVue } = {}) {
+  const piste = racine.querySelector('.terrain-piste');
+  if (!piste) return;
+  const points = [...racine.querySelectorAll('[data-diapo]')];
+
+  const marquer = i => points.forEach((p, n) => p.classList.toggle('actif', n === i));
+
+  /* `auto` et non `smooth` : c'est une position à restaurer, pas un
+     mouvement à montrer. Une animation ici donnerait l'impression que la
+     page glisse toute seule à chaque choix. */
+  const aller = (i, doux) => {
+    const cible = i * piste.clientWidth;
+    piste.scrollTo({ left: cible, behavior: doux ? 'smooth' : 'auto' });
+    marquer(i);
+
+    /* Le glissement animé n'aboutit pas partout — mouvement réduit,
+       onglet qui ne compose pas ses images, moteur qui l'ignore dans un
+       conteneur aimanté. La pastille resterait allumée sur une vue qu'on
+       ne voit pas : on repose donc la position sans façon si rien n'a
+       bougé. */
+    if (doux) setTimeout(() => {
+      if (Math.abs(piste.scrollLeft - cible) > 4) piste.scrollLeft = cible;
+    }, 350);
+  };
+
+  aller(vue, false);
+  /* La largeur n'est pas toujours connue au moment où l'on branche —
+     une image qui arrive, une police qui se pose. On repasse au tour
+     suivant, sans quoi la restauration tombe à zéro. */
+  requestAnimationFrame(() => aller(vue, false));
+
+  points.forEach((p, i) => p.addEventListener('click', () => {
+    aller(i, true);
+    onVue?.(i);
+  }));
+
+  let attente;
+  piste.addEventListener('scroll', () => {
+    clearTimeout(attente);
+    attente = setTimeout(() => {
+      const i = Math.round(piste.scrollLeft / Math.max(1, piste.clientWidth));
+      marquer(i);
+      onVue?.(i);
+    }, 90);
+  });
 }
 /** Branche les clics d'un terrain déjà inséré dans la page.
  *  `onChoix(cle)` est appelé à chaque zone, flèche ou pastille touchée. */

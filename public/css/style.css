@@ -1348,6 +1348,12 @@ a.carte-bulle-route {
    =================================================================== */
 body.mode-court .view { padding-top: 6px; }
 .court-choix { margin-bottom: 14px; }
+/* Le pli des filtres emprunte la pastille des groupes de coups : c'est
+   le même geste, il n'a pas à se présenter autrement. */
+.court-filtres { margin-top: 12px; }
+.court-filtres > p { margin: 10px 0 4px; }
+.court-filtres .etiquette { margin-top: 14px; }
+.court-actifs { margin-top: 10px; }
 .pastilles-grosses .pastille {
   flex: 1 1 calc(50% - 7px);
   display: flex;
@@ -1554,10 +1560,48 @@ body.mode-court .view { padding-top: 6px; }
 .terrain-bloc { margin: 10px 0 14px; }
 .terrain-aide { text-align: center; margin-top: 8px; }
 
-/* Chaque liste de coups auprès de sa vue. Sur un téléphone les deux
-   colonnes n'en font qu'une, et la liste passe sous le plan : à trois
-   cent cinquante pixels de large, des pastilles à côté d'un court ne
-   laissent de place ni à l'un ni à l'autre. */
+/* ─── Les deux vues, côte à côte, qu'on fait glisser ────────────────
+
+   Empilées, la vue de profil vivait sous la ligne de flottaison : il
+   fallait passer le plan entier pour l'atteindre, et les conseils
+   reculaient d'autant. Elles glissent donc latéralement, comme les
+   photos d'une annonce.
+
+   `scroll-snap` fait tout le travail : le doigt, la molette, les flèches
+   du clavier et la barre de défilement sont ceux du navigateur, et la
+   bande s'arrête d'elle-même sur une vue entière. Rien à écrire pour le
+   geste lui-même — seulement les pastilles, qui disent où l'on est. */
+.terrain-carrousel { position: relative; }
+.terrain-piste {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  outline: none;
+}
+.terrain-piste::-webkit-scrollbar { display: none; }
+.terrain-diapo { flex: 0 0 100%; scroll-snap-align: center; min-width: 0; }
+
+.terrain-points { display: flex; justify-content: center; gap: 9px; margin-top: 6px; }
+.terrain-points button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--muet);
+  background: transparent;
+  cursor: pointer;
+}
+.terrain-points button.actif { background: var(--accent); border-color: var(--accent); }
+
+/* Sur l'écran du court, le dessin cède ce qu'il faut pour que le premier
+   conseil tienne dans le même écran : on vient lire un conseil, le plan
+   n'est que le chemin pour y arriver. */
+body.mode-court .terrain-diapo .terrain {
+  width: auto;
+  height: min(46vh, 430px);
+  max-width: 100%;
+}
 .terrain-dessus { display: flex; flex-direction: column; }
 .terrain-vue { flex: 0 0 auto; }
 .terrain-coups { margin-top: 12px; }

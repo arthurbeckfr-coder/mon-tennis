@@ -29,10 +29,10 @@ import {
   store, basculerFavori, PROFILS, MOMENTS,
   nomProfil, nomMoment,
 } from '../store.js';
-import { blocTerrain, nomCoup, COUPS } from '../terrain.js';
+import { blocTerrain, listeCoups, brancherCarrousel, nomCoup, COUPS } from '../terrain.js';
 import { conseilForm } from '../forms.js';
 
-let court = { profil: '', moment: '', coup: '', onglet: 'terrain', tous: false };
+let court = { profil: '', moment: '', coup: '', vue: 0, filtres: false, tous: false };
 
 function trouver(f) {
   return store.conseils.filter(c => {
@@ -119,45 +119,51 @@ export function renderCourt() {
     ${total === 0 ? amorce() : ''}
 
     <section class="court-choix">
-      <div class="segments" style="width:100%">
-        <button data-onglet="terrain" class="${court.onglet === 'terrain' ? 'actif' : ''}"
-                style="flex:1">🎾 Coup</button>
-        <button data-onglet="adversaire" class="${court.onglet === 'adversaire' ? 'actif' : ''}"
-                style="flex:1">👤 En face</button>
-        <button data-onglet="moment" class="${court.onglet === 'moment' ? 'actif' : ''}"
-                style="flex:1">⏱️ Moment</button>
-      </div>
+      ${/* Le dessin d'abord, et rien avant lui. Il y avait ici une barre
+            de trois onglets — le coup, l'adversaire, le moment — qui
+            repoussait le court d'une ligne à chaque visite, pour un choix
+            qu'on ne fait presque jamais : neuf fois sur dix on vient
+            toucher une zone. Les deux autres axes vivent maintenant sous
+            « Filtrer », replié, et le plan s'ouvre tout seul. */''}
+      ${blocTerrain({
+        selection: court.coup ? [court.coup] : [],
+        gaucher: !!store.profil.gaucher,
+        compte: compterParCoup(f),
+        listes: false,
+      })}
 
-      ${actifs.length ? `<div class="pastilles" style="margin-top:10px">
+      ${/* Ce qui est retenu reste visible, replié ou non : sans cela, on
+            lit trois conseils sur vingt sans savoir pourquoi. */''}
+      ${actifs.length ? `<div class="pastilles court-actifs">
         ${actifs.map(([axe, nom]) => `<button class="pastille actif" data-retirer="${axe}">
           ${h(nom)} ✕</button>`).join('')}
         <button class="pastille" data-court-raz>Tout enlever</button>
       </div>` : ''}
 
-      ${court.onglet === 'terrain' ? `
-        ${blocTerrain({
-          selection: court.coup ? [court.coup] : [],
-          gaucher: !!store.profil.gaucher,
-          compte: compterParCoup(f),
-        })}
-        <p class="tiny muted terrain-aide">Touche une zone, une direction ou une
-          trajectoire — celle qui correspond à ce que tu cherches.</p>` : ''}
+      <details class="court-filtres"${court.filtres ? ' open' : ''}>
+        <summary class="terrain-coups-titre">Filtrer autrement</summary>
+        <p class="tiny muted">Sur le dessin, touche une zone, une direction ou une
+          trajectoire. Ici, les mêmes coups par leur nom — et les deux autres façons
+          de chercher.</p>
 
-      ${court.onglet === 'adversaire' ? `
-        <div class="pastilles pastilles-grosses">
+        ${listeCoups({ selection: court.coup ? [court.coup] : [],
+                       compte: compterParCoup(f),
+                       groupes: [['Sur le court', ['zone']], ['Directions', ['fleche']],
+                                 ['Trajectoires', ['profil']]] })}
+
+        <span class="etiquette">En face</span>
+        <div class="pastilles">
           ${PROFILS.map(p => `<button data-court-profil="${p.cle}"
-            class="pastille ${court.profil === p.cle ? 'actif' : ''}">
-            <span class="gros-emoji">${p.emoji}</span>${h(p.nom)}</button>`).join('')}
-        </div>` : ''}
+            class="pastille ${court.profil === p.cle ? 'actif' : ''}">${p.emoji} ${h(p.nom)}</button>`).join('')}
+        </div>
 
-      ${court.onglet === 'moment' ? `
-        <div class="pastilles pastilles-grosses">
+        <span class="etiquette">Moment</span>
+        <div class="pastilles">
           ${MOMENTS.map(m => `<button data-court-moment="${m.cle}"
-            class="pastille ${court.moment === m.cle ? 'actif' : ''}">
-            <span class="gros-emoji">${m.emoji}</span>${h(m.nom)}</button>`).join('')}
-        </div>` : ''}
+            class="pastille ${court.moment === m.cle ? 'actif' : ''}">${m.emoji} ${h(m.nom)}</button>`).join('')}
+        </div>
+      </details>
     </section>
-
     <section class="court-liste">
       ${/* Écrire tient dans une fenêtre flottante : le « + » est ici, à
             côté de ce qu'on lit, et il emporte avec lui la situation en
@@ -201,9 +207,18 @@ export function renderCourt() {
 }
 
 export function wireCourt(vue, rerendre) {
+  /* Le carrousel se rouvre là où on l'avait laissé : choisir un coup
+     redessine l'écran, et sans cette mémoire on reviendrait au plan
+     chaque fois qu'on touche une trajectoire sur la vue de profil. */
+  brancherCarrousel(vue, { vue: court.vue, onVue: i => { court.vue = i; } });
+
+  /* Même raison pour le pli des filtres : on les ouvre pour choisir, le
+     choix redessine, et ils se refermeraient au nez. */
+  vue.querySelector('.court-filtres')?.addEventListener('toggle', e => {
+    court.filtres = e.target.open;
+  });
+
   vue.addEventListener('click', e => {
-    const o = e.target.closest('[data-onglet]');
-    if (o) { court.onglet = o.dataset.onglet; rerendre(); return; }
 
     /* Le conseil neuf hérite de la situation qu'on regarde : c'est
        presque toujours celle dont il parle. */
