@@ -193,11 +193,87 @@ export async function synchroniser() {
 
 /* Une modification locale ne déclenche pas un envoi immédiat : on saisit
    souvent trois choses d'affilée, et trois envois pour un seul geste de
-   l'utilisateur seraient du gaspillage. On attend quelques secondes de
-   calme. */
+   l'utilisateur seraient du gaspillage. On attend un moment de calme —
+   une seconde et demie, le temps de refermer une fenêtre et d'en rouvrir
+   une autre. Quatre secondes, c'était assez long pour qu'on range le
+   téléphone entre-temps, et l'envoi partait alors dans le vide.
+
+   Ce qui attend encore part de toute façon au moment où la page s'en va :
+   voir la fonction qui branche la synchronisation automatique. */
 let minuteur = null;
-export function planifierEnvoi(delai = 4000) {
+let attente = false;
+
+/** Y a-t-il une modification qui n'est pas encore partie ? */
+export const enAttente = () => attente;
+
+export function planifierEnvoi(delai = 1500) {
   if (!connecte()) return;
+  attente = true;
   clearTimeout(minuteur);
-  minuteur = setTimeout(() => { synchroniser(); }, delai);
+  minuteur = setTimeout(() => { attente = false; synchroniser(); }, delai);
+}
+
+/* ─── La synchronisation d'elle-même ───────────────────────────────────
+ *
+ * Toucher un bouton pour synchroniser, c'est se souvenir de le faire. Or
+ * ce carnet se tient d'une main au bord d'un court : on note un score, on
+ * range le téléphone, et l'on ne pense plus à rien. Le bouton reste — il
+ * dit où l'on en est et permet de forcer — mais il ne doit plus être la
+ * condition de quoi que ce soit.
+ *
+ * Quatre moments, et pas un de plus. Chacun répond à une façon de perdre
+ * ses données ou de rater celles d'ailleurs :
+ *
+ *   — au retour sur l'écran, parce qu'on a pu noter un match sur l'autre
+ *     appareil pendant qu'on regardait ailleurs ;
+ *   — au retour du réseau, parce qu'un envoi tenté sans réseau n'a rien
+ *     envoyé du tout ;
+ *   — toutes les dix minutes tant que l'écran est ouvert, pour l'appareil
+ *     posé sur la table pendant qu'on joue ;
+ *   — au moment où la page s'en va, pour ne pas emporter dans la
+ *     fermeture ce que le minuteur de quatre secondes n'a pas encore eu
+ *     le temps d'envoyer.
+ *
+ * Une garde commune à tous : rien ne part si l'on vient de synchroniser.
+ * Sans elle, changer d'onglet trois fois en dix secondes ferait trois
+ * tours complets pour rien.
+ */
+const REPOS = 30_000;          // le temps de calme minimal entre deux tours
+const RYTHME = 600_000;        // dix minutes
+
+const tropTot = () => {
+  const q = derniereSync();
+  return q ? (Date.now() - q.getTime()) < REPOS : false;
+};
+
+async function synchroSiUtile(force = false) {
+  if (!connecte() || enCours) return;
+  if (!force && tropTot()) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  await synchroniser();
+}
+
+/** Branche la synchronisation automatique. Appelée une fois au démarrage. */
+export function brancherSynchroAuto() {
+  /* Le premier tour, à l'ouverture : c'est celui qui rapporte ce qui a été
+     noté ailleurs, et il ne s'économise pas. */
+  synchroSiUtile(true);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') synchroSiUtile();
+  });
+  window.addEventListener('focus', () => synchroSiUtile());
+  window.addEventListener('online', () => synchroSiUtile(true));
+
+  setInterval(() => {
+    if (document.visibilityState === 'visible') synchroSiUtile();
+  }, RYTHME);
+
+  /* En partant, on envoie ce qui attend encore. `pagehide` plutôt que
+     `beforeunload` : c'est le seul que les navigateurs de téléphone
+     déclenchent vraiment quand on ferme l'onglet ou qu'on change
+     d'application. */
+  window.addEventListener('pagehide', () => {
+    if (connecte() && enAttente()) synchroniser();
+  });
 }

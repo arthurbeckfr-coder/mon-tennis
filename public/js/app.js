@@ -231,9 +231,7 @@ function rafraichirIndicateur() {
 document.addEventListener('sync-change', rafraichirIndicateur);
 rafraichirIndicateur();
 
-if (nuage.connecte()) {
-  nuage.synchroniser().then(r => {
-    rafraichirIndicateur();
-    if (!r.ok) toast(`Synchronisation impossible : ${r.erreur}`);
-  });
-}
+/* Plus de bouton à toucher : le carnet se synchronise au démarrage, au
+   retour sur l'écran, au retour du réseau, toutes les dix minutes, et en
+   partant. Le bouton reste pour dire où l'on en est et pour forcer. */
+nuage.brancherSynchroAuto();
