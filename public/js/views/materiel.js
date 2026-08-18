@@ -13,9 +13,9 @@
 
 import { h, dateCourte, dateLongue, puce, confirmer, toast } from '../util.js';
 import { store, basculerAchat, rangerCourses, courses as coursesCRUD, raquetteDe,
-         clubDuMatch, CATEGORIES_DEPENSE, nomCategorieDepense } from '../store.js';
+         clubDuMatch, CATEGORIES_DEPENSE, nomCategorieDepense, maj } from '../store.js';
 import { pointDuClub } from '../carte.js';
-import { distanceKm } from '../geocodage.js';
+import { distanceKm, situer } from '../geocodage.js';
 import {
   CATEGORIES_COURSES, TROUSSE_TYPE, nomCause,
   statsCordages, ageCordage, dureesDeVie,
@@ -83,6 +83,12 @@ function vueMoi() {
 
   const lieux = lieu('🏠', 'Domicile', p.domicile) + lieu('💼', 'Travail', p.bureau);
 
+  /* Une adresse écrite mais jamais situées n'apparaît sur aucune carte, et
+     rien ne le dit assez fort : on croit la fonction en panne alors qu'il
+     manque une recherche d'un dixième de seconde. Le bouton la lance ici,
+     sans rouvrir le formulaire. */
+  const aSituer = [p.domicile, p.bureau].filter(l => l?.adresse && !l.point).length;
+
   return `
     <section class="carte">
       <div class="fiche-tete">
@@ -107,6 +113,10 @@ function vueMoi() {
         : `<p class="tiny muted">Aucune adresse. Renseigne ton domicile et le carnet saura
            dire quels clubs sont à côté, et combien de kilomètres tu fais pour aller
            jouer.</p>`}
+      ${aSituer ? `<p class="tiny muted">${aSituer > 1
+          ? 'Ces adresses ne sont pas encore placées sur la carte.'
+          : "Cette adresse n'est pas encore placée sur la carte."}</p>
+        <button class="btn btn-ghost" data-situer-lieux>📍 Placer sur la carte</button>` : ''}
       ${p.coutKm ? `<p class="tiny muted">Coût du kilomètre réglé à ${p.coutKm} €.</p>` : ''}
     </section>
 
@@ -498,6 +508,28 @@ export function wire(vue, rerendre) {
 
     if (e.target.closest('[data-identite]')) { identiteForm(); return; }
     if (e.target.closest('[data-profil]')) { profilForm(); return; }
+
+    if (e.target.closest('[data-situer-lieux]')) {
+      const b = e.target.closest('[data-situer-lieux]');
+      b.disabled = true;
+      b.textContent = 'recherche…';
+      const trouve = {};
+      for (const cle of ['domicile', 'bureau']) {
+        const l = store.profil?.[cle];
+        if (!l?.adresse || l.point) continue;
+        const r = await situer(l.adresse);
+        if (r.ok) trouve[cle] = { ...l, point: r.point, libelle: r.libelle };
+      }
+      const n = Object.keys(trouve).length;
+      if (n) {
+        maj(s => { s.profil = { ...s.profil, ...trouve }; });
+        toast(n > 1 ? 'Les deux adresses sont sur la carte.' : 'Adresse placée sur la carte.');
+      } else {
+        toast('Adresse introuvable — ajoute la commune et le code postal.');
+      }
+      rerendre();
+      return;
+    }
     if (e.target.closest('[data-depense]')) { depenseForm(); return; }
 
     const dep = e.target.closest('[data-depense-id]');

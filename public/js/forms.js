@@ -492,9 +492,10 @@ export function profilForm() {
       <fieldset>
         <legend>D'où je pars</legend>
         <p class="tiny muted">Pour situer les clubs par rapport à chez toi et savoir
-          lesquels sont à côté. Ces adresses ne quittent ton carnet qu'au moment où tu
-          demandes à les situer, et rien n'est deviné : une adresse non reconnue reste
-          sans point plutôt que d'être placée au hasard.</p>
+          lesquels sont à côté. Ces adresses ne quittent ton carnet qu'au moment où elles
+          sont situées — au bouton, ou à l'enregistrement si tu ne l'as pas touché — et
+          rien n'est deviné : une adresse non reconnue reste sans point plutôt que d'être
+          placée au hasard.</p>
         ${/* Des exemples inventés, et c'est délibéré : ce dépôt est public,
               et le repère de saisie d'un formulaire n'est pas l'endroit où
               écrire l'adresse de quelqu'un. */''}
@@ -541,19 +542,36 @@ export function profilForm() {
         });
       });
 
-      racine.querySelector('[data-ok]').onclick = () => {
+      racine.querySelector('[data-ok]').onclick = async () => {
         const form = document.getElementById('f-profil');
         const d = Object.fromEntries(new FormData(form));
 
         /* Une adresse retouchée sans être resituée garderait l'ancien
            point, donc un domicile faux à l'autre bout du département. On
-           préfère perdre le point et le redemander. */
-        const lieu = cle => {
+           préfère perdre le point et le redemander.
+
+           Et on le redemande tout de suite, sans attendre un second geste :
+           le bouton « Situer » se manque, on enregistre, et l'adresse reste
+           dans le carnet sans jamais paraître sur une carte — ce qui donne
+           l'impression que la fonction ne marche pas. Enregistrer une
+           adresse, c'est demander qu'elle serve. */
+        const lieu = async cle => {
           const a = (d[cle] || '').trim();
           if (!a) return null;
           const s = situes[cle];
-          return s && s.adresse === a ? s : { adresse: a, point: null, libelle: '' };
+          if (s && s.adresse === a) return s;
+          const r = await situer(a);
+          /* Une adresse introuvable est gardée telle quelle, sans point :
+             on la relira, on la corrigera, et rien n'est placé au hasard
+             en attendant. */
+          return r.ok ? { adresse: a, point: r.point, libelle: r.libelle }
+                      : { adresse: a, point: null, libelle: '' };
         };
+
+        /* Les deux recherches d'abord, l'écriture ensuite : `maj` est
+           synchrone, et une promesse glissée dedans y déposerait un objet
+           en attente au lieu d'un lieu. */
+        const [dom, bur] = [await lieu('domicile'), await lieu('bureau')];
 
         conclure(maj(s => {
           s.profil = {
@@ -565,8 +583,8 @@ export function profilForm() {
             bonusVictoires: Number(d.bonusVictoires) || 0,
             bonusPoints: Number(d.bonusPoints) || 0,
             bilanOfficiel: d.bilanOfficiel === '' ? null : Number(d.bilanOfficiel),
-            domicile: lieu('domicile'),
-            bureau: lieu('bureau'),
+            domicile: dom,
+            bureau: bur,
             coutKm: d.coutKm === '' ? null : Number(d.coutKm),
           };
         }), 'Classement enregistré.');

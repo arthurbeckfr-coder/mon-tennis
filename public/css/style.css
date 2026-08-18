@@ -1529,11 +1529,64 @@ body.mode-court .view { padding-top: 6px; }
 .terrain-bloc { margin: 10px 0 14px; }
 .terrain-aide { text-align: center; margin-top: 8px; }
 
-/* La liste des coups, sous le dessin. Le compteur se pose dans la
-   pastille comme sur le plan : un chiffre qui dit s'il y a quelque chose
-   à lire, sans quoi l'on touche à l'aveugle. */
-.court-coups { margin-top: 14px; }
-.court-coups .etiquette { margin-top: 14px; }
+/* Chaque liste de coups auprès de sa vue. Sur un téléphone les deux
+   colonnes n'en font qu'une, et la liste passe sous le plan : à trois
+   cent cinquante pixels de large, des pastilles à côté d'un court ne
+   laissent de place ni à l'un ni à l'autre. */
+.terrain-dessus { display: flex; flex-direction: column; }
+.terrain-vue { flex: 0 0 auto; }
+.terrain-coups { margin-top: 12px; }
+.terrain-coups + .terrain-coups { margin-top: 10px; }
+.terrain-coups .pastilles { margin-top: 10px; }
+
+/* Le titre du groupe est lui-même une pastille : c'est le même geste que
+   choisir un coup, et rien n'annonce mieux ce qu'il y a dessous. Le
+   triangle natif est masqué au profit d'un chevron qui tourne — le
+   premier ne se met pas en forme de la même façon d'un navigateur à
+   l'autre. */
+.terrain-coups-titre {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  border: 1px solid var(--bord);
+  background: var(--carte);
+  color: var(--texte);
+  border-radius: 999px;
+  padding: 9px 14px;
+  min-height: 40px;
+  font-size: .84rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.terrain-coups-titre::-webkit-details-marker { display: none; }
+.terrain-coups-titre::after {
+  content: '⌄';
+  font-size: .9rem;
+  line-height: 1;
+  margin-top: -4px;
+  transition: transform .15s;
+}
+.terrain-coups[open] > .terrain-coups-titre::after { transform: rotate(180deg); }
+/* Le groupe qui porte le coup retenu se signale replié comme déplié. */
+.terrain-coups.choisi > .terrain-coups-titre {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@media (min-width: 760px) {
+  .terrain-dessus {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 22px;
+  }
+  /* Le court garde sa largeur, les pastilles prennent ce qui reste : on
+     vient sur cette page pour le dessin, pas pour la liste. */
+  .terrain-dessus .terrain { margin: 0; }
+  .terrain-cote { flex: 1 1 0; min-width: 190px; }
+  .terrain-cote .terrain-coups:first-child { margin-top: 0; }
+}
 .pastille-nb {
   margin-left: 6px;
   padding: 1px 6px;

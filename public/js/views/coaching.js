@@ -255,40 +255,6 @@ export function wire(vue, rerendre) {
 //  Le mode court
 // =====================================================================
 
-/** Les coups en toutes lettres, sous le dessin.
- *
- *  Le plan dit tout, à condition de savoir le lire : entre deux zones
- *  voisines et trois flèches qui partent du même coin, on cherche parfois
- *  ce qu'on nomme très bien. La liste dit les mêmes coups par leur nom, et
- *  se sélectionne pareil — le dessin s'allume quand on touche un nom, le
- *  nom s'allume quand on touche le dessin.
- *
- *  Elle vient après le dessin et non avant : l'écran s'ouvre en plein
- *  match, et ce qu'on veut voir en arrivant, c'est le court. */
-function listeCoups(f) {
-  const compte = compterParCoup(f);
-  const groupes = [
-    ['Sur le court', COUPS.filter(c => c.type === 'zone')],
-    ['Directions',   COUPS.filter(c => c.type === 'fleche')],
-    ['Trajectoires', COUPS.filter(c => c.type === 'profil')],
-  ];
-
-  return `<div class="court-coups">
-    ${groupes.map(([titre, liste]) => `
-      <span class="etiquette">${titre}</span>
-      <div class="pastilles">
-        ${liste.map(c => `<button data-coup="${c.cle}"
-          class="pastille ${court.coup === c.cle ? 'actif' : ''}">${
-            c.emoji ? c.emoji + ' ' : ''}${h(c.nom)}${
-            /* Le nombre de conseils rangés sous ce coup, comme sur le
-               dessin : sans lui, on touche au hasard des coups qui n'ont
-               rien à dire. */
-            compte[c.cle] ? `<span class="pastille-nb">${compte[c.cle]}</span>` : ''
-          }</button>`).join('')}
-      </div>`).join('')}
-  </div>`;
-}
-
 export function renderCourt() {
   const f = { profil: court.profil, moment: court.moment, coup: court.coup,
               categorie: '', texte: '', favoris: false };
@@ -330,8 +296,7 @@ export function renderCourt() {
           compte: compterParCoup(f),
         })}
         <p class="tiny muted terrain-aide">Touche une zone, une direction ou une
-          trajectoire — celle qui correspond à ce que tu cherches.</p>
-        ${listeCoups(f)}` : ''}
+          trajectoire — celle qui correspond à ce que tu cherches.</p>` : ''}
 
       ${court.onglet === 'adversaire' ? `
         <div class="pastilles pastilles-grosses">

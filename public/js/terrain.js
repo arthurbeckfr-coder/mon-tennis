@@ -435,6 +435,49 @@ export function dessinerProfil({ selection = [], compte = {} } = {}) {
 /** Le terrain et ses pastilles, d'un bloc. Les deux écrans qui s'en
  *  servent — noter un conseil, le retrouver en match — affichent
  *  exactement le même dessin : ce qui a servi à ranger sert à chercher. */
+/** Les coups en toutes lettres, à côté de leur dessin.
+ *
+ *  Le dessin dit tout, à condition de savoir le lire : entre deux zones
+ *  voisines et trois flèches parties du même coin, on cherche parfois ce
+ *  qu'on nomme très bien. La liste dit les mêmes coups par leur nom et se
+ *  sélectionne pareil — le dessin s'allume quand on touche un nom, le nom
+ *  s'allume quand on touche le dessin.
+ *
+ *  Chaque liste reste auprès de la vue qu'elle commande : ce qui se voit
+ *  d'en haut à côté du plan, les trajectoires sous la vue de profil. Une
+ *  liste unique en bas obligeait à chercher, pour chaque nom, laquelle des
+ *  deux vues allait s'allumer.
+ */
+export function listeCoups({ selection = [], compte = {}, groupes = [] } = {}) {
+  return groupes.map(([titre, types]) => {
+    const liste = COUPS.filter(c => types.includes(c.type));
+    if (!liste.length) return '';
+
+    /* Replié par défaut, et déplié tout seul quand il contient le coup
+       retenu : dix-huit pastilles étalées repoussaient le dessin hors de
+       l'écran, alors qu'on vient sur cette page pour le dessin. Un
+       `<details>` plutôt qu'un bouton et une classe : le navigateur sait
+       déjà ouvrir et fermer, annoncer l'état aux lecteurs d'écran, et
+       retrouver le contenu quand on cherche dans la page.
+
+       Le nombre de conseils du groupe est écrit sur le titre : replié, il
+       faut bien savoir s'il y a quelque chose dessous. */
+    const dedans = liste.some(c => selection.includes(c.cle));
+    const n = liste.reduce((t, c) => t + (compte[c.cle] || 0), 0);
+
+    return `<details class="terrain-coups${dedans ? ' choisi' : ''}"${dedans ? ' open' : ''}>
+      <summary class="terrain-coups-titre">${titre}${
+        n ? `<span class="pastille-nb">${n}</span>` : ''}</summary>
+      <div class="pastilles">
+        ${liste.map(c => `<button data-coup="${c.cle}"
+          class="pastille ${selection.includes(c.cle) ? 'actif' : ''}">${
+            c.emoji ? c.emoji + ' ' : ''}${c.nom}${
+            compte[c.cle] ? `<span class="pastille-nb">${compte[c.cle]}</span>` : ''
+          }</button>`).join('')}
+      </div>
+    </details>`;
+  }).join('');
+}
 export function blocTerrain({ selection = [], gaucher = false, compte = {} } = {}) {
   /* Les deux vues d'un même court, l'une sous l'autre : du dessus pour
      savoir où, de profil pour savoir comment. Elles partagent leur
@@ -447,14 +490,27 @@ export function blocTerrain({ selection = [], gaucher = false, compte = {} } = {
      l'extinction des autres — surligner la bonne ne suffit pas quand elle
      passe derrière trois voisines. */
   return `<div class="terrain-bloc${selection.length ? ' a-choix' : ''}">
-    ${dessinerTerrain({ selection, gaucher, compte })}
-    <p class="tiny muted terrain-aide">Vue de dessus : où la balle tombe.</p>
+    ${/* Le plan et ce qui le commande, côte à côte dès que l'écran le
+          permet. En dessous de quoi la liste passe sous le plan : à trois
+          cent cinquante pixels de large, une colonne de pastilles à côté
+          d'un court n'est ni l'un ni l'autre. */''}
+    <div class="terrain-dessus">
+      <div class="terrain-vue">
+        ${dessinerTerrain({ selection, gaucher, compte })}
+        <p class="tiny muted terrain-aide">Vue de dessus : où la balle tombe.</p>
+      </div>
+      <div class="terrain-cote">
+        ${listeCoups({ selection, compte,
+                       groupes: [['Sur le court', ['zone']], ['Directions', ['fleche']]] })}
+      </div>
+    </div>
+
     ${dessinerProfil({ selection, compte })}
     <p class="tiny muted terrain-aide">Vue de côté : ce qu'elle fait en chemin.
       Les hauteurs sont exagérées — un vrai court donnerait un trait plat.</p>
+    ${listeCoups({ selection, compte, groupes: [['Trajectoires', ['profil']]] })}
   </div>`;
 }
-
 /** Branche les clics d'un terrain déjà inséré dans la page.
  *  `onChoix(cle)` est appelé à chaque zone, flèche ou pastille touchée. */
 export function brancherTerrain(racine, onChoix) {
