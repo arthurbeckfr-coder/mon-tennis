@@ -983,8 +983,28 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
 /* Le domicile et le bureau : deux emoji plutôt que deux formes de plus.
    On les cherche du regard, et rien ne se repère plus vite qu'une maison
    dessinée au milieu de disques. */
-.carte-ancre-marque { text-anchor: middle; }
+/* La maison et le bureau : un jeton à eux, qui ne se confond avec aucun
+   club. Le disque porte le fond de la carte pour découper l'émoji du
+   décor, et le trait comme le liseré du nom sont en épaisseur d'écran —
+   sans quoi ils grossiraient avec le zoom. */
 .carte-ancre { pointer-events: none; }
+.carte-ancre-fond {
+  fill: var(--carte);
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+.carte-ancre-marque { text-anchor: middle; }
+.carte-ancre-nom {
+  fill: var(--texte);
+  text-anchor: middle;
+  font-family: inherit;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--carte);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
 
 .carte-ville-marque { fill: var(--muet); opacity: .75; }
 .carte-ville-nom {

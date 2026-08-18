@@ -100,6 +100,19 @@ export function carteClubs(clubs) {
       placer sur une carte.${absents ? ` (${absents} club(s))` : ''}</p>`;
   }
 
+  /* Le domicile et le bureau, s'ils ont été situés. Ils ne sont pas des
+     clubs et ne doivent pas s'y confondre : une forme à eux, et un nom
+     écrit à côté, parce qu'on les cherche du regard.
+
+     Ils sont lus avant le cadrage, et non après : ce sont des lieux à
+     voir, pas une décoration. Sur la fiche d'un club, la carte n'a qu'un
+     disque à montrer — la maison à côté est précisément ce qui dit à
+     quelle distance il est. */
+  const repereAncres = [
+    { cle: 'domicile', nom: 'Chez moi', emoji: '🏠', lieu: store?.profil?.domicile },
+    { cle: 'bureau', nom: 'Le bureau', emoji: '💼', lieu: store?.profil?.bureau },
+  ].filter(x => Array.isArray(x.lieu?.point));
+
   /* Un degré de longitude ne vaut pas un degré de latitude : sans cette
      correction, la région paraîtrait étirée d'est en ouest. */
   const latMoyenne = places.reduce((t, c) => t + c.point[1], 0) / places.length;
@@ -108,7 +121,10 @@ export function carteClubs(clubs) {
   const projete = ([lon, lat]) => [lon * k, -lat];
   const pts = places.map(c => ({ ...c, xy: projete(c.point) }));
 
-  const xs = pts.map(p => p.xy[0]), ys = pts.map(p => p.xy[1]);
+  /* Les clubs et les ancres, ensemble : une maison hors du cadre ne sert
+     à rien, et c'est en la voyant à côté du club qu'on lit la distance. */
+  const tousXY = [...pts.map(p => p.xy), ...repereAncres.map(a => projete(a.lieu.point))];
+  const xs = tousXY.map(p => p[0]), ys = tousXY.map(p => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
 
@@ -197,20 +213,21 @@ export function carteClubs(clubs) {
      Elles se distinguent des clubs par la forme autant que par la
      couleur : un carré gris n'est pas un disque vert, même en noir et
      blanc. */
-  /* Le domicile et le bureau, s'ils ont été situés. Ils ne sont pas des
-     clubs et ne doivent pas s'y confondre : une forme à eux, et un nom
-     écrit à côté, parce qu'on les cherche du regard. */
-  const repereAncres = [
-    { cle: 'domicile', nom: 'Chez moi', emoji: '🏠', lieu: store?.profil?.domicile },
-    { cle: 'bureau', nom: 'Le bureau', emoji: '💼', lieu: store?.profil?.bureau },
-  ].filter(x => Array.isArray(x.lieu?.point));
-
   const ancres = repereAncres.map(a => {
     const [x, y] = projete(a.lieu.point);
+    /* Trois pièces plutôt qu'un émoji seul : un disque qui découpe le
+       fond, l'émoji dedans, et le nom dessous. Un émoji posé nu sur une
+       carte se confond avec le relief dès qu'on dézoome — il n'a ni
+       contour ni fond, et à dix pixels il n'est plus qu'une tache. Les
+       trois pièces sont redimensionnées à chaque zoom pour garder leur
+       taille à l'écran, comme les clubs. */
     return `<g class="carte-ancre" data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}">
-      <title>${h(a.nom)} — ${h(a.lieu.libelle || a.lieu.adresse)}</title>
-      <text class="carte-ancre-marque" x="${x.toFixed(4)}" y="${y.toFixed(4)}"
+      <title>${h(a.nom)} — ${h(a.lieu.libelle || a.lieu.adresse || '')}</title>
+      <circle class="carte-ancre-fond" cx="${x.toFixed(5)}" cy="${y.toFixed(5)}"/>
+      <text class="carte-ancre-marque" x="${x.toFixed(5)}" y="${y.toFixed(5)}"
             >${a.emoji}</text>
+      <text class="carte-ancre-nom" x="${x.toFixed(5)}" y="${y.toFixed(5)}"
+            >${h(a.nom)}</text>
     </g>`;
   }).join('');
 
@@ -486,10 +503,17 @@ export function brancherCarte(racine, ouvrirClub) {
     }
     for (const g of ancresDom) {
       const x = Number(g.dataset.x), y = Number(g.dataset.y);
-      const t = g.querySelector('text');
-      t.setAttribute('font-size', (17 / ech).toFixed(5));
-      t.setAttribute('x', x.toFixed(5));
-      t.setAttribute('y', (y + 6 / ech).toFixed(5));
+      /* Comme les clubs : les tailles sont données en pixels d'écran et
+         redivisées par l'échelle. Sans quoi la maison enflerait avec le
+         zoom jusqu'à couvrir la commune. */
+      const rond = g.querySelector('.carte-ancre-fond');
+      rond.setAttribute('r', (11 / ech).toFixed(5));
+      const marque = g.querySelector('.carte-ancre-marque');
+      marque.setAttribute('font-size', (13 / ech).toFixed(5));
+      marque.setAttribute('y', (y + 4.6 / ech).toFixed(5));
+      const nom = g.querySelector('.carte-ancre-nom');
+      nom.setAttribute('font-size', (10 / ech).toFixed(5));
+      nom.setAttribute('y', (y + 24 / ech).toFixed(5));
     }
     for (const g of villes) {
       const x = Number(g.dataset.x), y = Number(g.dataset.y);

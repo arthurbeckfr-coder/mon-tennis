@@ -110,6 +110,37 @@ function zones(gaucher) {
   ];
 }
 
+/** Où poser le nom d'une flèche, et sous quel angle.
+ *
+ *  Écrit en travers, un nom occupe la largeur du court et croise tout ce
+ *  qui passe. Écrit dans le sens de la flèche, il tient dans la bande que
+ *  la flèche occupe déjà : c'est la règle des noms de rue sur un plan, et
+ *  elle ne coûte rien.
+ *
+ *  @param {number[]} pt     le point de la flèche où poser le nom
+ *  @param {number[]} sens   la direction de la flèche à cet endroit
+ *  @param {number}   ecart  de combien s'écarter du trait, à sa droite
+ *  @param {boolean}  gaucher pour un gaucher, le dessin est en miroir :
+ *                    la droite de la flèche devient sa gauche.
+ */
+function leLongDe([x, y], [dx, dy], ecart, gaucher) {
+  const norme = Math.hypot(dx, dy);
+  /* La perpendiculaire à droite du sens de marche. En SVG l'axe des y
+     descend, donc (-dy, dx) pointe bien à droite et non à gauche. */
+  const nx = -dy / norme, ny = dx / norme;
+  const e = gaucher ? -ecart : ecart;
+
+  /* L'angle, ramené entre -90 et 90 : au-delà, le texte se lirait la tête
+     en bas. Une flèche qui monte vers la gauche porte donc un nom qui se
+     lit vers le bas à droite — le long du même trait. */
+  let rot = Math.atan2(dy, dx) * 180 / Math.PI;
+  if (rot > 90) rot -= 180;
+  if (rot < -90) rot += 180;
+
+  return { lx: +(x + nx * e).toFixed(1), ly: +(y + ny * e).toFixed(1),
+           rot: +rot.toFixed(1) };
+}
+
 /** Les deux directions, tracées depuis le côté du coup droit — c'est de
  *  là qu'on les pense. */
 function fleches(gaucher) {
@@ -119,21 +150,30 @@ function fleches(gaucher) {
      c'est ce qui le distingue du croisé long, et ce qui sort l'adversaire
      du court. Sa flèche s'arrête donc là où la balle tombe. */
   const courtX = gaucher ? 186 : 54;
+
+  /* Le croisé court est une courbe : son sens change en chemin, et le nom
+     suit la tangente à l'endroit où il se pose plutôt que la corde. */
+  const milieuX = (depart + courtX) / 2;
+  const t = 0.72;
+  const bezier = (a, b, c) => (1 - t) * (1 - t) * a + 2 * (1 - t) * t * b + t * t * c;
+  const tangente = (a, b, c) => 2 * (1 - t) * (b - a) + 2 * t * (c - b);
+
   return [
     { cle: 'croise', nom: 'Croisé long',
       d: `M ${depart} 400 L ${arrivee} 68`,
-      /* Plus haut sur sa propre diagonale : à mi-hauteur, l'étiquette
-         tombait sur la flèche du croisé court, qui part du même coin. */
-      lx: gaucher ? 108 : 132, ly: 118 },
+      ...leLongDe([depart + (arrivee - depart) * 0.5, 234],
+                  [arrivee - depart, -332], 11, gaucher) },
     { cle: 'croise-court', nom: 'Croisé court',
-      d: `M ${depart} 400 Q ${(depart + courtX) / 2} 300 ${courtX} 190`,
-      lx: gaucher ? 196 : 44, ly: 176 },
-    /* Le long de ligne est vertical : son nom, écrit en travers, tombait
-       forcément sur son propre trait. Il se lit donc dans le sens de la
-       flèche, posé à côté d'elle — comme le nom d'une rue sur un plan. */
+      d: `M ${depart} 400 Q ${milieuX} 300 ${courtX} 190`,
+      ...leLongDe([bezier(depart, milieuX, courtX), bezier(400, 300, 190)],
+                  [tangente(depart, milieuX, courtX), tangente(400, 300, 190)],
+                  /* De l'autre côté du trait que le croisé long : les deux
+                     flèches partent du même coin, et un nom posé entre
+                     elles se fait traverser par l'autre. */
+                  -14, gaucher) },
     { cle: 'long-ligne', nom: 'Long de ligne',
       d: `M ${depart} 400 L ${depart} 68`,
-      lx: gaucher ? depart - 15 : depart + 15, ly: 150, vertical: true },
+      ...leLongDe([depart, 150], [0, -332], 15, gaucher) },
   ];
 }
 
@@ -202,9 +242,9 @@ export function dessinerTerrain({ selection = [], gaucher = false, compte = {} }
   const flechesSVG = fleches(gaucher).map(f => {
     const n = compte[f.cle] || 0;
     etiquettes.push(`<g class="t-fleche${choisi(f.cle)}">
-      <text x="${f.lx}" y="${f.ly}"${
-        f.vertical ? ` transform="rotate(-90 ${f.lx} ${f.ly})"` : ''
-      }>${f.nom}${n ? ` (${n})` : ''}</text>
+      <text x="${f.lx}" y="${f.ly}"
+            transform="rotate(${f.rot} ${f.lx} ${f.ly})">${f.nom}${
+        n ? ` (${n})` : ''}</text>
     </g>`);
 
     return `<g class="t-fleche${choisi(f.cle)}" data-coup="${f.cle}"

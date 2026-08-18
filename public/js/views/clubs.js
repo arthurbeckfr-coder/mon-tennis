@@ -454,6 +454,16 @@ export function renderFiche(params) {
         c'est à toi de l'ajouter une fois pour toutes.</p>` : ''}
     </section>
 
+    ${pointDuClub(club) ? `<section class="carte">
+      <h3>Où c'est</h3>
+      ${/* Un seul club sur la carte, et c'est bien le but : ce qu'on
+            cherche ici n'est pas de comparer des clubs entre eux mais de
+            savoir où celui-ci se trouve — quelle commune, quelle route,
+            et à quelle distance de la maison, que le cadrage garde
+            désormais dans le champ. */''}
+      ${carteClubs([{ club, matchs, bilan: b }])}
+    </section>` : ''}
+
     ${((club.sources || []).length || urlTenupClub(club)) ? `<section class="carte">
       <h3>Suivre ce club</h3>
       <ul class="comptes">
@@ -606,6 +616,11 @@ export function wire(vue, rerendre) {
 }
 
 export function wireFiche(vue, rerendre) {
+  /* La carte se déplace et se pince ici comme ailleurs. Toucher le disque
+     ouvre sa bulle ; « Voir la fiche » y renvoie à la page où l'on est
+     déjà, ce qui ne coûte rien et évite un cas particulier de plus. */
+  brancherCarte(vue, id => { location.hash = `#/clubs/${id}`; });
+
   vue.addEventListener('click', async e => {
     const club = store.clubs.find(c => c.id === location.hash.split('/')[2]);
     if (!club) return;
