@@ -252,15 +252,38 @@ function listeScenarios(scenarios) {
 function rendreChemins(reglages, p, cible, r) {
   const maintien = cible === p.echelon;
 
-  /* Le pire mois des douze qui viennent, et ce qu'il manquera ce jour-là. */
+  /* Les douze mois qui viennent, calculés à son propre échelon. Chaque
+     étape connaît les victoires qui sortent de la fenêtre ce mois-là :
+     c'est le mécanisme entier de la descente, et il n'y en a pas d'autre
+     — on ne perd pas son classement parce qu'on joue mal, on le perd
+     parce que les victoires de l'an dernier cessent de compter. */
   const etapes = projeter({ ...reglages, cible: p.echelon,
                             debut: 0, mois: 12, depuis: p.echelon });
-  const pire = etapes.reduce((a, b) =>
-    (b.manque ?? 0) > (a.manque ?? 0) ? b : a, etapes[0] || {});
-  const menace = pire && pire.manque > 0;
-  const rTenir = menace
-    ? simuler({ ...reglages, echelon: p.echelon, cible: p.echelon, finISO: pire.fin })
-    : null;
+
+  /* Les paliers de la chute : les mois où le manque augmente. Les autres
+     ne disent rien de neuf — entre deux sorties de victoire, le bilan ne
+     bouge pas. */
+  const marches = [];
+  let precedent = -1;
+  for (const e of etapes) {
+    const m = e.manque ?? 0;
+    if (m > precedent && m > 0) {
+      marches.push(e);
+      precedent = m;
+    }
+  }
+
+  const pire = marches[marches.length - 1] || null;
+  const menace = !!pire;
+
+  /* Ce qu'il faut trouver pour couvrir chaque marche. La date compte
+     autant que le nombre : une victoire d'aujourd'hui protège douze mois,
+     pas plus, et c'est bien pour cela que l'écart se reforme. */
+  const chemin = e => {
+    const rr = simuler({ ...reglages, echelon: p.echelon,
+                         cible: p.echelon, finISO: e.fin });
+    return rr?.scenarios?.[0] || null;
+  };
 
   return `<section class="carte">
     <h3>Les chemins possibles</h3>
@@ -275,19 +298,37 @@ function rendreChemins(reglages, p, cible, r) {
       ? `<p class="tiny muted">Rien à faire : aucun mois de l'année qui vient ne fait
          passer ton bilan sous le seuil de ${h(p.echelon)}. Ce que tu as gagné te
          couvre douze mois de plus.</p>`
-      : `<p class="tiny muted">Le mois le plus dur de l'année qui vient est
-         <strong>${h(pire.libelle)}</strong> : d'ici là des victoires sortent de la
-         fenêtre des douze mois, et il te manquera
-         <strong>${pire.manque} points</strong> pour tenir ${h(p.echelon)}. Voici de
-         quoi passer ce cap — une seule de ces lignes suffit.</p>
-        ${rTenir && rTenir.scenarios?.length ? listeScenarios(rTenir.scenarios)
-          : `<div class="avis">Aucun scénario réaliste ne comble cet écart en huit
-             victoires. Il faudra jouer plus, ou accepter le classement du dessous.</div>`}
+      : `<p class="tiny muted">Mois par mois, ce que le temps retire. À chaque date,
+          des victoires de l'an dernier sortent de la fenêtre des douze mois et
+          cessent de compter : l'écart se creuse sans qu'un match ait été joué.</p>
+
+        <ul class="marches">
+          ${marches.map(e => {
+            const sc = chemin(e);
+            const perdus = (e.sortants || []).reduce((t, x) => t + x.points, 0);
+            return `<li>
+              <div>
+                <strong>${h(e.libelle)}</strong>
+                <div class="tiny muted">${e.manque} points manquants${
+                  e.sortants?.length ? ` — ${e.sortants.length} victoire${
+                    e.sortants.length > 1 ? 's' : ''} sort${
+                    e.sortants.length > 1 ? 'ent' : ''}, ${perdus} points` : ''}</div>
+              </div>
+              <div class="club-score">
+                <b>${sc ? h(direScenario(sc)) : 'hors de portée'}</b>
+                ${sc ? `<span class="tiny muted">${sc.matchs} match(s)</span>` : ''}
+              </div>
+            </li>`;
+          }).join('')}
+        </ul>
+
+        <p class="tiny muted">La dernière ligne est celle qui compte si tu ne veux t'y
+          reprendre qu'une fois : elle couvre toute l'année. Les précédentes disent
+          jusqu'à quand il est encore temps d'en faire moins.</p>
         ${maintien ? '' : `<p class="tiny muted">Ces victoires-là comptent aussi pour
           monter : ce ne sont pas deux campagnes à mener, c'est la même.</p>`}`}
   </section>`;
 }
-
 /* ─── La descente ──────────────────────────────────────────────────────
 
    Le simulateur ne répondait qu'à « comment monter ». Or la question qui

@@ -2102,6 +2102,22 @@ body.mode-court .terrain-diapo .terrain {
 }
 .sous-titre:first-of-type { margin-top: 10px; }
 
+/* Les marches de la descente : une date, ce qu'elle retire, et ce qu'il
+   faudrait pour la passer. Même forme que les autres listes à deux
+   colonnes du carnet — le fait à gauche, le chiffre à droite. */
+.marches { list-style: none; margin: 10px 0 12px; padding: 0; }
+.marches li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--bord);
+}
+.marches li:first-child { border-top: 0; }
+.marches .club-score { text-align: right; flex: 0 0 auto; }
+.marches .club-score b { display: block; font-size: .88rem; }
+
 /* La proposition de rattachement : le bouton, et la raison à côté. Elle
    compte autant que lui — un carnet qui devine doit dire pourquoi. */
 .suggestion {
