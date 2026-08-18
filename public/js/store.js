@@ -96,6 +96,9 @@ function vide() {
          à un tournoi, debout au club, sans fouiller ses mails. C'est la
          seule raison de leur présence, et elle suffit. */
       licence: '', telephone: '', mail: '', clubPrincipal: '', naissance: '',
+      /* Deux prix qu'on ne peut pas deviner, et qui ne servent qu'à
+         estimer : le kilomètre, et la tournée d'après-match. */
+      coutKm: null, coutVictoire: null,
     },
     bareme: { ...BAREME_DEFAUT },
     matchs: [],

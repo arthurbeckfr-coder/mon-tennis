@@ -140,9 +140,9 @@ function brancherProfil(vue) {
       maj(s => { s.profil = { ...s.profil, gaucher: el.value === '1' }; });
       return;
     }
-    if (cle === 'coutKm') {
+    if (cle === 'coutKm' || cle === 'coutVictoire') {
       const v = el.value === '' ? null : Number(el.value);
-      maj(s => { s.profil = { ...s.profil, coutKm: v }; });
+      maj(s => { s.profil = { ...s.profil, [cle]: v }; });
       return;
     }
 
@@ -259,6 +259,18 @@ function vueMoi() {
         <p class="tiny muted">Sert à estimer ce que la route coûte, dans l'onglet Argent.
           Laissé vide, le carnet compte les kilomètres et s'arrête là plutôt que
           d'inventer un prix.</p>
+
+        ${/* La tournée d'après-match : une habitude, donc une dépense
+              régulière, donc quelque chose qui s'estime. Elle ne se saisit
+              pas match par match — personne ne note quatre euros trente
+              fois par saison —, mais elle se calcule très bien : une
+              victoire, une tournée. */''}
+        <label>La tournée d'après-match
+          <input name="coutVictoire" type="number" min="0" step="0.5" inputmode="decimal"
+            value="${p.coutVictoire ?? ''}" placeholder="par exemple 4"></label>
+        <p class="tiny muted">Ce qu'une victoire te coûte au bar : la canette de
+          l'adversaire et la tienne. Le carnet le compte pour chaque match gagné, dans
+          l'onglet Argent, du côté des estimations. Laissé vide, il ne compte rien.</p>
       </div>
     </section>
 
@@ -440,6 +452,34 @@ function detailArgent(quoi) {
     },
   };
 
+  if (quoi === 'tournees') {
+    const t = tournees(saisonRoute);
+    const parAn = {};
+    for (const x of t.liste) {
+      const s = saisonDe(x.date);
+      if (s != null) parAn[s] = (parAn[s] || 0) + 1;
+    }
+    openModal({
+      title: 'La tournée d\'après-match',
+      body: `<section class="chiffres">
+          <div class="chiffre"><b>${t.victoires}</b><span>victoires</span></div>
+          <div class="chiffre"><b>${euros(t.prix)}</b><span>la tournée</span></div>
+          <div class="chiffre"><b>${euros(t.total)}</b><span>en tout</span></div>
+        </section>
+        <p class="tiny muted">Une victoire, une tournée : ta canette et la sienne. Les
+          matchs gagnés par forfait n'y sont pas — il n'y a eu ni match ni bar.</p>
+        <span class="etiquette">Par saison</span>
+        <ul class="clubs-adverses">${Object.keys(parAn).sort((a, b) => b - a).map(a =>
+          `<li><div><strong>${a}-${String(Number(a) + 1).slice(2)}</strong>
+            <div class="tiny muted">${parAn[a]} victoire(s)</div></div>
+           <div class="club-score"><b>${euros(parAn[a] * t.prix)}</b></div></li>`).join('')}</ul>
+        <p class="tiny muted">C'est une estimation, comme la route : elle suppose que la
+          règle a toujours été tenue, et qu'elle valait déjà quatre euros il y a cinq
+          ans. Elle ne s'additionne donc pas aux dépenses notées.</p>`,
+    });
+    return;
+  }
+
   if (quoi === 'gains') {
     const g = gains(saisonRoute);
     openModal({
@@ -489,6 +529,20 @@ function detailArgent(quoi) {
   const v = vues[quoi];
   if (v) openModal({ title: v.titre, body: v.corps });
 }
+/** La tournée d'après-match, victoire par victoire.
+ *
+ *  C'est une estimation, et elle se range du côté des estimations : une
+ *  habitude n'est pas une facture. On la calcule pourtant sans rien
+ *  inventer — le nombre de victoires est connu à l'unité près, et le prix
+ *  de la tournée, c'est lui qui le donne.
+ */
+function tournees(saison = 'tout') {
+  const prix = Number(store.profil?.coutVictoire) || 0;
+  const gagnes = store.matchs.filter(m => m.issue === 'V' && !m.wo
+    && (saison === 'tout' || saisonDe(m.date) === Number(saison)));
+  return { prix, victoires: gagnes.length, total: gagnes.length * prix, liste: gagnes };
+}
+
 /** Ce que les tournois ont rapporté : l'argent d'un côté, les lots de
  *  l'autre. On ne convertit pas un cordage en euros — un prix inventé
  *  passerait pour une recette. */
@@ -534,6 +588,7 @@ function vueArgent() {
   const tarif = Number(store.profil?.coutKm) || 0;
   const saisons = saisonsDeRoute();
   const gagne = gains(saisonRoute);
+  const tour = tournees(saisonRoute);
 
   return `
     ${/* Le filtre en tête de page, et il gouverne tout ce qui suit. Une
@@ -566,6 +621,8 @@ function vueArgent() {
             coûte, sans jamais se soustraire : un lot n'est pas une
             recette, et une estimation de route n'est pas une dépense
             constatée. Trois natures de chiffres, trois cases. */''}
+      ${tour.total ? `<div class="chiffre" data-argent="tournees" title="Voir le détail"
+        ><b>${euros(tour.total)}</b><span>de tournées</span></div>` : ''}
       ${gagne.total || gagne.lots ? `<div class="chiffre" data-argent="gains"
         title="Voir le détail"><b>${gagne.total ? euros(gagne.total)
           : gagne.lots}</b><span>${gagne.total ? 'gagnés en tournoi'
