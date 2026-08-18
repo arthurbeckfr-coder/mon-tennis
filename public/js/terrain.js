@@ -23,13 +23,30 @@ const G = {
   SVH: 120, SVB: 353,     // lignes de service, haut et bas
   CX: 120,                // ligne médiane
   SERVICE_Y: 458, SERVICE_H: 34,
+  /* Le banc déborde du terrain : le cadrage s'élargit vers la gauche
+     plutôt que de le poser sur le court, où il n'a rien à faire. */
+  BANC_X: -34,
 };
 
 /* Les douze coups. Trois natures, parce qu'un coup n'est pas toujours un
    endroit : une zone se clique sur le terrain, une flèche décrit une
    direction, et ce qui n'a ni l'un ni l'autre reste une pastille. */
 export const COUPS = [
-  { cle: 'service',        nom: 'Service',        type: 'zone' },
+  /* Le service se joue deux fois, et pas de la même façon : le premier
+     cherche le point, le second cherche le carré. Deux zones, donc, parce
+     que ce sont deux moments dont on ne se dit pas les mêmes choses.
+
+     L'ancienne clé « service » reste dans le vocabulaire : elle n'a plus
+     de zone au dessin, mais les conseils déjà notés sous ce nom gardent
+     leur étiquette lisible au lieu d'afficher un code. */
+  { cle: 'service',        nom: 'Service',        type: 'ancien' },
+  { cle: 'service-1',      nom: '1er service',    type: 'zone' },
+  { cle: 'service-2',      nom: '2e service',     type: 'zone' },
+  /* Le banc n'est pas un coup, et c'est justement pourquoi il manquait.
+     Quatre-vingt-dix secondes assis décident souvent de la suite : boire,
+     souffler, décider d'une tactique. Un conseil sur le repos n'avait
+     nulle part où se ranger. */
+  { cle: 'banc',           nom: 'Le banc',        type: 'zone' },
   { cle: 'coup-droit',     nom: 'Coup droit',     type: 'zone' },
   { cle: 'revers',         nom: 'Revers',         type: 'zone' },
   { cle: 'montee',         nom: 'Montée',         type: 'zone' },
@@ -78,8 +95,18 @@ function zones(gaucher) {
       x: cd.x, y: G.SVB, w: cd.w, h: G.Y1 - G.SVB },
     { cle: 'revers', nom: 'Revers',
       x: rv.x, y: G.SVB, w: rv.w, h: G.Y1 - G.SVB },
-    { cle: 'service', nom: 'Service',
-      x: G.SX0, y: G.SERVICE_Y, w: G.SX1 - G.SX0, h: G.SERVICE_H },
+    /* Le bandeau du service coupé en deux : à gauche le premier, à droite
+       le second, dans l'ordre où ils se jouent. */
+    { cle: 'service-1', nom: '1er service', court: '1er',
+      x: G.SX0, y: G.SERVICE_Y, w: (G.SX1 - G.SX0) / 2 - 3, h: G.SERVICE_H },
+    { cle: 'service-2', nom: '2e service', court: '2e',
+      x: G.SX0 + (G.SX1 - G.SX0) / 2 + 3, y: G.SERVICE_Y,
+      w: (G.SX1 - G.SX0) / 2 - 3, h: G.SERVICE_H },
+    /* Le banc est à sa place réelle : sur le côté, au niveau du filet.
+       C'est là qu'on s'assoit au changement de côté, et le dessin ne
+       servirait à rien s'il le mettait ailleurs. */
+    { cle: 'banc', nom: 'Le banc',
+      x: G.BANC_X, y: G.NET - 34, w: 26, h: 68, vertical: true },
   ];
 }
 
@@ -120,13 +147,31 @@ export function dessinerTerrain({ selection = [], gaucher = false, compte = {} }
 
   const zonesSVG = zones(gaucher).map(z => {
     const n = compte[z.cle] || 0;
+    const cx = z.x + z.w / 2, cy = z.y + z.h / 2;
+    /* Une zone étroite ne peut pas porter son nom en travers : le banc
+       fait vingt-six unités de large pour sept lettres. On l'écrit dans
+       le sens de la zone, comme sur un plan. */
+    const nom = z.vertical
+      ? `<text x="${cx}" y="${cy}" transform="rotate(-90 ${cx} ${cy})">${z.nom}</text>`
+      : `<text x="${cx}" y="${cy + 4}">${z.court || z.nom}</text>`;
+
+    /* La pastille du compte se pose dans un coin où le nom ne passe pas.
+       Dans une grande zone, le coin haut-droit est libre ; dans une zone
+       basse — les deux bandeaux de service — le nom occupe toute la
+       hauteur et la pastille mordrait dessus. Elle se met alors dehors,
+       au-dessus, plutôt que de rendre le libellé illisible. */
+    const petite = z.h < 46;
+    const bx = z.vertical ? z.x + z.w - 9 : z.x + z.w - 11;
+    const by = petite || z.vertical ? z.y - 3 : z.y + 13;
+    const r = petite || z.vertical ? 8 : 9;
+
     return `<g class="t-zone${choisi(z.cle)}" data-coup="${z.cle}"
                role="button" tabindex="0" aria-pressed="${selection.includes(z.cle)}">
       <title>${z.nom}${n ? ` — ${n} conseil(s)` : ''}</title>
       <rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="3"/>
-      <text x="${z.x + z.w / 2}" y="${z.y + z.h / 2 + 4}">${z.nom}</text>
-      ${n ? `<circle class="t-compte" cx="${z.x + z.w - 13}" cy="${z.y + 13}" r="9"/>
-             <text class="t-compte-txt" x="${z.x + z.w - 13}" y="${z.y + 17}">${n}</text>` : ''}
+      ${nom}
+      ${n ? `<circle class="t-compte" cx="${bx}" cy="${by}" r="${r}"/>
+             <text class="t-compte-txt" x="${bx}" y="${by + 4}">${n}</text>` : ''}
     </g>`;
   }).join('');
 
@@ -141,7 +186,7 @@ export function dessinerTerrain({ selection = [], gaucher = false, compte = {} }
     </g>`;
   }).join('');
 
-  return `<svg class="terrain" viewBox="0 0 240 500" role="group"
+  return `<svg class="terrain" viewBox="-40 0 280 500" role="group"
                aria-label="Terrain de tennis cliquable">
     <defs>
       <marker id="pointe" viewBox="0 0 10 10" refX="9" refY="5"
