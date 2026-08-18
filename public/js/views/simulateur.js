@@ -319,13 +319,14 @@ function rendreDescente(reglages, p) {
 function rendreCalendrier(reglages, cible, r) {
   if (!r.seuil || r.seuil.points == null) return '';
 
-  /* Trois ans en arrière, deux devant : d'où l'on vient éclaire où l'on
-     va, et il faut aller assez loin pour voir une descente s'enchaîner.
-     Sur un an, on ne voyait qu'un premier palier franchi ; sur deux, on
-     voit les suivants. */
+  /* Trois ans en arrière, cinq devant. Cette asymétrie a une raison : la
+     descente est bridée à un échelon par douze mois, si bien qu'une chute
+     de plusieurs classements s'étale mécaniquement sur plusieurs années.
+     Sur deux ans on n'en voyait que le début, et le graphique laissait
+     croire que tout s'arrêtait là. */
   const etapes = projeter({ ...reglages, cible,
                             bonusVictoires: bonusVictoiresPour(cible),
-                            debut: -36, mois: 24, depuis: store.profil.echelon });
+                            debut: -36, mois: 60, depuis: store.profil.echelon });
   if (etapes.length < 2) return '';
 
   /* Le mois d'aujourd'hui se trouve, il ne se compte pas : son rang dans
@@ -385,16 +386,18 @@ function rendreCalendrier(reglages, cible, r) {
         à chaque échelon — voir la courbe passer dessous, c'est voir le classement se
         perdre. Touche un point pour le détail du mois ; glisse et pince pour parcourir le
         temps.</p>
-      ${descentes.length ? `<p class="tiny muted">Sans rejouer, tu passerais
+      ${descentes.length ? `<p class="tiny muted">Sans rejouer un match, tu passerais
         ${descentes.map(e => `<strong>${h(e.echelon)}</strong> en ${h(e.libelle)}`)
-          .join(', puis ')}.
-        <em>À prendre comme un ordre de grandeur.</em> Ce carnet connaît les règles de
-        <em>montée</em> — les points et le nombre de victoires exigés à chaque échelon —
-        et les applique ici à l'envers. Or ce qui fait plonger cette projection est
-        surtout le nombre de victoires restant dans la fenêtre, qui tombe vite quand on
-        ne joue plus ; la fédération, elle, applique des règles de descente propres que
-        ce carnet ne connaît pas, et qui sont plus douces. La date du premier palier est
-        solide, la profondeur de la chute l'est beaucoup moins.</p>` : ''}`;
+          .join(', puis ')}.</p>
+        <p class="tiny muted">Un échelon par an, et pas davantage : le règlement interdit
+        de descendre de deux échelons consécutifs en moins de douze mois, qu'on ait joué
+        ou non. C'est ce qui étale la chute — le bilan, lui, s'effondre bien plus vite.
+        La limitation saute dès qu'on remonte.</p>
+        <p class="tiny muted">Une chose que ce carnet ne modélise pas, et qui compte si
+        l'arrêt se prolonge : après environ trois ans sans licence ni compétition, la
+        fédération retire le classement et inscrit « ND ». Il faut alors demander un
+        reclassement, plafonné à son meilleur classement. Ce n'est plus une descente,
+        c'est une remise à zéro — et la courbe ci-dessus n'en sait rien.</p>` : ''}`;
     })()}
 
     ${tableauDouble(['Mois', 'Bilan', 'Écart'],

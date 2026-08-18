@@ -445,6 +445,12 @@ export function projeter({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAU
   const etapes = [];
   let precedentes = null;
 
+  /* L'échelon réellement porté, et depuis combien de mois on n'a pas
+     descendu. La projection marche dans le temps : chaque mois dépend de
+     ce que les précédents ont autorisé, et non du seul bilan du jour. */
+  let porte = depuis || cible;
+  let depuisDescente = 12;   // au départ, rien n'interdit de descendre
+
   for (let n = debut; n <= mois; n++) {
     const fin = finDeMois(n);
     const b = bilanA({ matchs, cible, sexe, bareme, bonusVictoires, bonusPoints, finISO: fin });
@@ -461,9 +467,41 @@ export function projeter({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAU
     const d = new Date(fin + 'T12:00:00');
     /* L'échelon tenu ne se calcule que si l'appelant dit d'où l'on part :
        c'est neuf calculs de bilan par mois, qu'on ne fait pas pour rien. */
-    const tenu = depuis
+    const brut = depuis
       ? echelonTenu({ matchs, depuis, sexe, bareme, bonusPoints, finISO: fin })
       : null;
+
+    /* ─── La descente est bridée par le règlement ───────────────────────
+       « Tout licencié classé, qu'il ait ou non participé à des
+       compétitions homologuées, ne peut pas descendre de 2 échelons
+       consécutifs en moins de 12 mois. »
+
+       Sans cette règle, la projection faisait plonger de trois ou quatre
+       échelons en un an — ce qui n'arrive jamais, et faisait dire au
+       graphique une chose fausse avec l'aplomb d'un calcul.
+
+       La limitation saute dès qu'on remonte : celui qui regagne son
+       échelon peut le reperdre sans attendre douze mois. */
+    let tenu = null;
+    if (depuis) {
+      /* Un bilan sous le plus bas seuil examiné rend null. Ce n'est pas
+         « plus de classement » : c'est « très en dessous », et la règle
+         des douze mois s'y applique comme ailleurs — on descend d'un cran,
+         pas dans le vide. */
+      const rCourant = rang(porte);
+      const rNaturel = brut?.echelon ? rang(brut.echelon) : -1;
+
+      if (rNaturel > rCourant) {
+        porte = brut.echelon;          // une montée lève la limitation
+        depuisDescente = 0;
+      } else if (rNaturel < rCourant && depuisDescente >= 12) {
+        porte = ECHELONS[Math.max(0, rCourant - 1)];   // un seul cran
+        depuisDescente = 0;
+      }
+      tenu = { echelon: porte, bilan: brut?.bilan ?? null,
+               naturel: brut?.echelon || 'sous le plancher examiné' };
+    }
+    depuisDescente++;
 
     etapes.push({
       fin,
@@ -473,6 +511,10 @@ export function projeter({ matchs = [], cible, sexe = 'h', bareme = BAREME_DEFAU
       futur: n > 0,
       sortants,
       echelon: tenu?.echelon || null,
+      /* L'échelon que le seul bilan donnerait, sans la limitation : c'est
+         lui qui dit à quel point on est descendu « en dessous de sa
+         protection », et donc ce qui tombera dès qu'elle sautera. */
+      echelonNaturel: tenu?.naturel || null,
       nbVictoires: b.nbVictoires,
     });
   }

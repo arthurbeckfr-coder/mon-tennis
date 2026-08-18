@@ -130,9 +130,14 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
             const decale = pose > yl - 4;
             return `<g class="courbe-palier${p.echelon === actuel ? ' courant' : ''}">
               <line x1="0" y1="${yl.toFixed(1)}" x2="${L}" y2="${yl.toFixed(1)}"/>
-              ${decale ? `<line class="courbe-palier-tige" x1="7" y1="${yl.toFixed(1)}"
-                    x2="7" y2="${(pose - 4).toFixed(1)}"/>` : ''}
-              <text class="courbe-palier-nom" x="${decale ? 13 : 8}" y="${pose.toFixed(1)}"
+              ${/* `data-colle` porte la marge à gauche du cadre : c'est
+                    `collerEtiquettes` qui replace ces éléments à chaque
+                    déplacement, pour que le nom d'un palier ne sorte
+                    jamais de l'écran. */''}
+              ${decale ? `<line class="courbe-palier-tige" data-colle="7"
+                    x1="7" y1="${yl.toFixed(1)}" x2="7" y2="${(pose - 4).toFixed(1)}"/>` : ''}
+              <text class="courbe-palier-nom" data-colle="${decale ? 13 : 8}"
+                    x="${decale ? 13 : 8}" y="${pose.toFixed(1)}"
                     >${h(p.echelon)} · ${p.points} pts</text>
             </g>`;
           }).join('');
@@ -145,11 +150,17 @@ export function courbeBilan({ points, paliers = [], actuel = '' }) {
       ${futur.length ? `<path class="g-trace g-trace-futur"
             d="${trace([passe[passe.length - 1], ...futur], iCoupe)}"/>` : ''}
 
+      ${/* Les points de chaque mois ne se voient plus. Soixante pastilles
+            sur une courbe qui descend n'apprenaient rien de plus que le
+            trait lui-même, et brouillaient les paliers qu'on vient
+            justement lire. Ils restent dans le dessin, invisibles, parce
+            que c'est encore eux qu'on ouvre au toucher : ce qu'on désigne
+            n'a pas à être ce qu'on voit. */''}
       ${points.map((p, i) => `<circle class="courbe-point ${p.futur ? 'futur' : ''}"
           data-i="${i}" data-x="${x(i).toFixed(2)}" data-y="${y(p.valeur).toFixed(2)}"
           data-label="${h(p.label)}" data-valeur="${p.valeur}"
           data-echelon="${h(p.echelon || '')}" data-detail="${h(p.detail || '')}"
-          cx="${x(i).toFixed(2)}" cy="${y(p.valeur).toFixed(2)}" r="4"/>`).join('')}
+          cx="${x(i).toFixed(2)}" cy="${y(p.valeur).toFixed(2)}" r="7"/>`).join('')}
     </svg>
 
     <div class="courbe-bulle" hidden>
@@ -215,7 +226,25 @@ export function brancherCourbe(racine) {
     }
   };
 
-  const poser = () => { svg.setAttribute('viewBox', vue.join(' ')); placerBulle(); };
+  /* Les noms des paliers restent collés au bord gauche de ce qu'on
+     regarde. Posés à une abscisse fixe, ils sortaient du cadre dès qu'on
+     se déplaçait vers la droite : les lignes continuaient, plus rien ne
+     disait à quel échelon elles correspondaient. Une échelle qu'on ne peut
+     plus lire ne sert à rien. */
+  const collerEtiquettes = () => {
+    for (const el of bloc.querySelectorAll('[data-colle]')) {
+      const marge = Number(el.dataset.colle) * (vue[2] / depart[2]);
+      const gx = vue[0] + marge;
+      if (el.tagName === 'text') el.setAttribute('x', gx.toFixed(1));
+      else { el.setAttribute('x1', gx.toFixed(1)); el.setAttribute('x2', gx.toFixed(1)); }
+    }
+  };
+
+  const poser = () => {
+    svg.setAttribute('viewBox', vue.join(' '));
+    collerEtiquettes();
+    placerBulle();
+  };
 
   /* On ne zoome que le temps : la largeur change, la hauteur jamais. */
   const bornes = { min: depart[2] / 14, max: depart[2] };

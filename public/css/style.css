@@ -1189,13 +1189,10 @@ a.carte-bulle-route {
   stroke-linejoin: round;
 }
 
-.courbe-point {
-  fill: var(--serie-1);
-  stroke: var(--carte-2);
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-}
-.courbe-point.futur { fill: var(--carte-2); stroke: var(--serie-1); }
+/* Les points de chaque mois sont transparents : ils restent la cible du
+   toucher, ils ne sont plus du décor. Seul celui qu'on a ouvert se
+   montre — c'est le repère de lecture, pas la donnée. */
+.courbe-point { fill: transparent; stroke: none; }
 .courbe-point.choisi { fill: var(--accent); stroke: var(--carte); stroke-width: 3; }
 
 .courbe-bulle {
