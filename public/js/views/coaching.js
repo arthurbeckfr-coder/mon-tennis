@@ -1,43 +1,38 @@
-/* Le carnet de conseils, et le mode qu'on ouvre sur le court.
+/* L'écran du court : ce qu'on relit entre deux jeux, et ce qu'on y note.
 
-   Deux onglets d'une même chose, pour deux moments qui n'ont rien à voir.
-   On note d'un côté, on relit de l'autre — et passer de l'un à l'autre est
-   le geste le plus naturel qui soit (« je viens de noter ça, à quoi ça
-   ressemble en match ? »). Ils partagent donc une barre d'onglets, au lieu
-   de s'ignorer depuis deux coins opposés de l'écran.
+   Il y avait deux onglets : un carnet pour ranger, un court pour relire.
+   Le carnet ne servait qu'à écrire — et écrire tient dans une fenêtre
+   flottante, qu'on ouvre d'un « + » depuis le court. Deux écrans pour un
+   formulaire, c'était un écran de trop, et l'onglet du haut coûtait sa
+   ligne à chaque visite.
 
-   Le court vient en premier, et c'est lui que la barre du bas ouvre. Le
-   rapport de force entre les deux est celui de l'usage : on note un
-   conseil une fois, on le relit vingt. Le carnet est du côté du réglage —
-   on y va quand on veut ranger, pas quand on veut jouer.
-
-   Le carnet sert après le cours, au calme : on note ce que le prof vient
-   de dire, on range, on relit. Il peut être dense.
-
-   Le mode court sert entre deux jeux, quatre-vingt-dix secondes, une main
-   sur la serviette et l'autre sur le téléphone. Là, tout ce qui n'est pas
-   immédiatement lisible est nuisible. D'où le terrain : viser une zone du
-   pouce va plus vite que lire douze libellés, et un conseil de tennis
-   parle presque toujours d'un endroit.
+   Reste donc le court, et lui seul. Il sert entre deux jeux, quatre-vingt-
+   dix secondes, une main sur la serviette et l'autre sur le téléphone.
+   Là, tout ce qui n'est pas immédiatement lisible est nuisible. D'où le
+   terrain : viser une zone du pouce va plus vite que lire douze libellés,
+   et un conseil de tennis parle presque toujours d'un endroit.
 
    Les trois façons de chercher — le coup, l'adversaire, le moment — ne
    s'empilent pas à l'écran : on en choisit une, et les autres attendent.
    Un écran qu'il faut faire défiler pour trouver son conseil a déjà perdu
    la partie.
 
+   Chaque conseil affiché se rouvre d'une touche pour être corrigé ou
+   supprimé, et son étoile se retire là où elle se lit : sans le carnet,
+   c'est ici que tout doit pouvoir se faire.
+
    Le carnet reste volontairement vide au premier lancement : ces conseils
    sont ceux de tes profs, pas des miens. */
 
 import { h, hMulti, dateCourte, puce } from '../util.js';
 import {
-  store, basculerFavori, PROFILS, MOMENTS, CATEGORIES,
+  store, basculerFavori, PROFILS, MOMENTS,
   nomProfil, nomMoment,
 } from '../store.js';
 import { blocTerrain, nomCoup, COUPS } from '../terrain.js';
 import { conseilForm } from '../forms.js';
 
-let filtre = { profil: '', moment: '', categorie: '', coup: '', texte: '', favoris: false };
-let court = { profil: '', moment: '', coup: '', onglet: 'terrain' };
+let court = { profil: '', moment: '', coup: '', onglet: 'terrain', tous: false };
 
 function trouver(f) {
   return store.conseils.filter(c => {
@@ -64,118 +59,6 @@ function compterParCoup(f) {
   return n;
 }
 
-const emojiCat = cle => CATEGORIES.find(x => x.cle === cle)?.emoji || '💡';
-
-/* ─── Les deux onglets ─────────────────────────────────────────────────
-
-   Le carnet et le court sont deux moments d'une même chose : on note
-   d'un côté, on relit de l'autre. Les séparer en deux entrées de la barre
-   du bas obligeait à redescendre tout en bas de l'écran pour passer de
-   l'un à l'autre — alors que c'est le geste le plus naturel qui soit
-   (« je viens de noter ça, à quoi ça ressemble en match ? »).
-
-   Les onglets restent deux adresses et non un état interne, et c'est
-   voulu : le mode court dépouille l'écran de son décorum, ce que seule la
-   route sait faire. Changer d'onglet change donc de route, et le
-   dépouillement suit tout seul.
-
-   Les deux entrées de la barre du bas restent, elles aussi : sur un
-   court, entre deux jeux, on a quatre-vingt-dix secondes et une main
-   libre. Ce n'est pas le moment de traverser un écran pour trouver un
-   onglet. */
-const barreOnglets = actif => `<div class="segments" style="width:100%;margin-bottom:12px">
-  <button data-onglet-page="#/court" class="${actif === 'court' ? 'actif' : ''}"
-          style="flex:1">🎯 Sur le court</button>
-  <button data-onglet-page="#/conseils" class="${actif === 'carnet' ? 'actif' : ''}"
-          style="flex:1">📓 Le carnet</button>
-</div>`;
-
-/** Le passage d'un onglet à l'autre, posé par les deux écrans. */
-function brancherOnglets(vue) {
-  vue.addEventListener('click', e => {
-    const o = e.target.closest('[data-onglet-page]');
-    if (o) location.hash = o.dataset.ongletPage;
-  });
-}
-
-function carteConseil(c) {
-  return `<li class="conseil" data-id="${h(c.id)}">
-    <button class="etoile ${c.favori ? 'pleine' : ''}" data-favori="${h(c.id)}"
-            aria-label="${c.favori ? 'Retirer des essentiels' : 'Marquer comme essentiel'}"
-            title="Essentiel — visible en mode court">${c.favori ? '⭐' : '☆'}</button>
-    <div class="conseil-corps" data-ouvrir="${h(c.id)}">
-      <div class="conseil-tete">
-        <span class="cat">${emojiCat(c.categorie)}</span>
-        <strong>${h(c.titre)}</strong>
-      </div>
-      ${c.texte ? `<p class="conseil-texte">${hMulti(c.texte)}</p>` : ''}
-      <div class="conseil-bas">
-        ${(c.coups || []).map(x => puce(nomCoup(x), 'puce-coup')).join('')}
-        ${(c.profils || []).map(p => puce(nomProfil(p), 'puce-profil')).join('')}
-        ${(c.moments || []).map(m => puce(nomMoment(m), 'puce-moment')).join('')}
-        ${c.source ? `<span class="muted">— ${h(c.source)}</span>` : ''}
-        ${c.date ? `<span class="muted">${h(dateCourte(c.date))}</span>` : ''}
-      </div>
-    </div>
-  </li>`;
-}
-
-// =====================================================================
-//  Le carnet
-// =====================================================================
-export function render() {
-  const liste = trouver(filtre);
-  const total = store.conseils.length;
-  const ouvert = filtre.profil || filtre.moment || filtre.categorie || filtre.coup;
-
-  return `
-    ${barreOnglets('carnet')}
-
-    ${total === 0 ? amorce() : ''}
-
-    <section class="barre-filtres">
-      <input id="q" class="recherche" placeholder="Chercher dans mes conseils…"
-             value="${h(filtre.texte)}">
-      <div class="segments">
-        <button data-fav="0" class="${!filtre.favoris ? 'actif' : ''}">Tous</button>
-        <button data-fav="1" class="${filtre.favoris ? 'actif' : ''}">⭐ Essentiels</button>
-      </div>
-    </section>
-
-    <details class="replis" ${ouvert ? 'open' : ''}>
-      <summary>Filtrer par situation</summary>
-      <div class="groupe-filtres">
-        <span class="etiquette">Sur le terrain</span>
-        ${blocTerrain({
-          selection: filtre.coup ? [filtre.coup] : [],
-          gaucher: !!store.profil.gaucher,
-          compte: compterParCoup(filtre),
-        })}
-        <span class="etiquette">Face à</span>
-        <div class="pastilles">
-          ${PROFILS.map(p => `<button data-f-profil="${p.cle}"
-            class="pastille ${filtre.profil === p.cle ? 'actif' : ''}">${p.emoji} ${h(p.nom)}</button>`).join('')}
-        </div>
-        <span class="etiquette">Moment</span>
-        <div class="pastilles">
-          ${MOMENTS.map(m => `<button data-f-moment="${m.cle}"
-            class="pastille ${filtre.moment === m.cle ? 'actif' : ''}">${m.emoji} ${h(m.nom)}</button>`).join('')}
-        </div>
-        <span class="etiquette">Catégorie</span>
-        <div class="pastilles">
-          ${CATEGORIES.map(x => `<button data-f-cat="${x.cle}"
-            class="pastille ${filtre.categorie === x.cle ? 'actif' : ''}">${x.emoji} ${h(x.nom)}</button>`).join('')}
-        </div>
-        <button class="btn btn-ghost" data-raz>Tout afficher</button>
-      </div>
-    </details>
-
-    ${liste.length
-      ? `<ul class="conseils">${liste.map(carteConseil).join('')}</ul>`
-      : total
-        ? `<div class="vide"><span class="emoji">🔍</span>Aucun conseil pour ce filtre.</div>`
-        : ''}`;
-}
 
 /** Au premier lancement : on ne meuble pas avec des conseils inventés, on
  *  montre les situations à remplir. */
@@ -204,53 +87,6 @@ const neuf = () => ({
   profils: [], moments: [], coups: [], source: '', favori: false,
 });
 
-export function wire(vue, rerendre) {
-  brancherOnglets(vue);
-  vue.querySelector('#q')?.addEventListener('input', e => {
-    filtre.texte = e.target.value;
-    const ul = vue.querySelector('.conseils');
-    if (ul) ul.innerHTML = trouver(filtre).map(carteConseil).join('');
-  });
-
-  vue.addEventListener('click', e => {
-    const fav = e.target.closest('[data-favori]');
-    if (fav) { basculerFavori(fav.dataset.favori); return; }
-
-    const ouvrir = e.target.closest('[data-ouvrir]');
-    if (ouvrir) {
-      const c = store.conseils.find(x => x.id === ouvrir.dataset.ouvrir);
-      if (c) conseilForm(c);
-      return;
-    }
-
-    const coup = e.target.closest('[data-coup]');
-    if (coup) { filtre.coup = filtre.coup === coup.dataset.coup ? '' : coup.dataset.coup; rerendre(); return; }
-
-    const bf = e.target.closest('[data-fav]');
-    if (bf) { filtre.favoris = bf.dataset.fav === '1'; rerendre(); return; }
-
-    const p = e.target.closest('[data-f-profil]');
-    if (p) { filtre.profil = filtre.profil === p.dataset.fProfil ? '' : p.dataset.fProfil; rerendre(); return; }
-
-    const m = e.target.closest('[data-f-moment]');
-    if (m) { filtre.moment = filtre.moment === m.dataset.fMoment ? '' : m.dataset.fMoment; rerendre(); return; }
-
-    const c = e.target.closest('[data-f-cat]');
-    if (c) { filtre.categorie = filtre.categorie === c.dataset.fCat ? '' : c.dataset.fCat; rerendre(); return; }
-
-    if (e.target.closest('[data-raz]')) {
-      filtre = { profil: '', moment: '', categorie: '', coup: '', texte: '', favoris: false };
-      rerendre();
-      return;
-    }
-
-    const ap = e.target.closest('[data-amorce-profil]');
-    if (ap) { conseilForm({ ...neuf(), profils: [ap.dataset.amorceProfil] }); return; }
-    const am = e.target.closest('[data-amorce-moment]');
-    if (am) { conseilForm({ ...neuf(), moments: [am.dataset.amorceMoment], categorie: 'mental' }); return; }
-  });
-}
-
 // =====================================================================
 //  Le mode court
 // =====================================================================
@@ -259,10 +95,19 @@ export function renderCourt() {
   const f = { profil: court.profil, moment: court.moment, coup: court.coup,
               categorie: '', texte: '', favoris: false };
   const aucunFiltre = !court.profil && !court.moment && !court.coup;
+  const total = store.conseils.length;
 
   /* Sans filtre, on montre les essentiels : c'est ce qu'on veut relire par
-     défaut quand on ouvre l'écran en pleine partie. */
-  const affiches = aucunFiltre ? store.conseils.filter(c => c.favori) : trouver(f);
+     défaut quand on ouvre l'écran en pleine partie.
+
+     Mais tout doit rester atteignable. Le carnet listait l'ensemble ; sans
+     lui, un conseil sans étoile et sans coup renseigné n'aurait plus
+     d'adresse — on le perdrait en lui retirant son étoile. D'où « Tout
+     voir », qui lève le tri des essentiels sans rien ajouter à l'écran
+     tant qu'on ne le demande pas. */
+  const affiches = aucunFiltre
+    ? (court.tous ? store.conseils : store.conseils.filter(c => c.favori))
+    : trouver(f);
 
   const actifs = [
     court.coup ? ['coup', nomCoup(court.coup)] : null,
@@ -271,7 +116,7 @@ export function renderCourt() {
   ].filter(Boolean);
 
   return `
-    ${barreOnglets('court')}
+    ${total === 0 ? amorce() : ''}
 
     <section class="court-choix">
       <div class="segments" style="width:100%">
@@ -314,32 +159,74 @@ export function renderCourt() {
     </section>
 
     <section class="court-liste">
+      ${/* Écrire tient dans une fenêtre flottante : le « + » est ici, à
+            côté de ce qu'on lit, et il emporte avec lui la situation en
+            cours — un conseil noté pendant qu'on regarde « Amortie »
+            arrive déjà rangé sous « Amortie ». */''}
+      <div class="court-liste-tete">
+        <span class="etiquette">${!aucunFiltre ? "Ce que j'ai noté"
+          : court.tous ? 'Tous mes conseils' : 'Mes essentiels'}</span>
+        <div class="court-liste-actions">
+          ${aucunFiltre && total ? `<button class="btn btn-ghost" data-tous>${
+            court.tous ? '⭐ Essentiels' : 'Tout voir'}</button>` : ''}
+          <button class="btn btn-ghost" data-noter>＋ Noter</button>
+        </div>
+      </div>
+
       ${affiches.length ? affiches.map(c => `
         <article class="court-carte">
-          <h2>${h(c.titre)}</h2>
-          ${c.texte ? `<p>${hMulti(c.texte)}</p>` : ''}
-          <div class="court-bas">
-            ${(c.coups || []).map(x => puce(nomCoup(x), 'puce-coup')).join('')}
-            ${(c.profils || []).map(p => puce(nomProfil(p), 'puce-profil')).join('')}
-            ${c.source ? `<span class="muted">— ${h(c.source)}</span>` : ''}
+          <button class="etoile ${c.favori ? 'pleine' : ''}" data-favori="${h(c.id)}"
+                  aria-label="${c.favori ? 'Retirer des essentiels' : 'Marquer comme essentiel'}"
+                  title="Essentiel — montré ici par défaut">${c.favori ? '⭐' : '☆'}</button>
+          <div data-ouvrir="${h(c.id)}">
+            <h2>${h(c.titre)}</h2>
+            ${c.texte ? `<p>${hMulti(c.texte)}</p>` : ''}
+            <div class="court-bas">
+              ${(c.coups || []).map(x => puce(nomCoup(x), 'puce-coup')).join('')}
+              ${(c.profils || []).map(p => puce(nomProfil(p), 'puce-profil')).join('')}
+              ${(c.moments || []).map(m => puce(nomMoment(m), 'puce-moment')).join('')}
+              ${c.source ? `<span class="muted">— ${h(c.source)}</span>` : ''}
+              ${c.date ? `<span class="muted">${h(dateCourte(c.date))}</span>` : ''}
+            </div>
           </div>
         </article>`).join('')
         : `<div class="vide"><span class="emoji">🎾</span>
             ${aucunFiltre
-              ? `Aucun conseil marqué « essentiel ». Dans le carnet, touche l'étoile
-                 des conseils que tu veux retrouver ici en plein match.`
+              ? `Aucun conseil marqué « essentiel ». Touche l'étoile d'un conseil pour
+                 le retrouver ici en plein match, sans rien chercher.`
               : `Rien de noté pour cette situation. C'est peut-être la question à
-                 poser au prochain cours.`}
+                 poser au prochain cours — ou le conseil à noter maintenant.`}
            </div>`}
     </section>`;
 }
 
 export function wireCourt(vue, rerendre) {
-  brancherOnglets(vue);
-
   vue.addEventListener('click', e => {
     const o = e.target.closest('[data-onglet]');
     if (o) { court.onglet = o.dataset.onglet; rerendre(); return; }
+
+    /* Le conseil neuf hérite de la situation qu'on regarde : c'est
+       presque toujours celle dont il parle. */
+    if (e.target.closest('[data-tous]')) { court.tous = !court.tous; rerendre(); return; }
+
+    if (e.target.closest('[data-noter]')) {
+      conseilForm({ ...neuf(),
+        coups: court.coup ? [court.coup] : [],
+        profils: court.profil ? [court.profil] : [],
+        moments: court.moment ? [court.moment] : [] });
+      return;
+    }
+
+    const fav = e.target.closest('[data-favori]');
+    if (fav) { basculerFavori(fav.dataset.favori); return; }
+
+    /* Sans carnet, c'est ici qu'un conseil se corrige et se supprime. */
+    const ouvrir = e.target.closest('[data-ouvrir]');
+    if (ouvrir) {
+      const c = store.conseils.find(x => x.id === ouvrir.dataset.ouvrir);
+      if (c) conseilForm(c);
+      return;
+    }
 
     const r = e.target.closest('[data-retirer]');
     if (r) { court[r.dataset.retirer] = ''; rerendre(); return; }
@@ -356,7 +243,14 @@ export function wireCourt(vue, rerendre) {
     if (e.target.closest('[data-court-raz]')) {
       court = { ...court, profil: '', moment: '', coup: '' };
       rerendre();
+      return;
     }
+
+    const ap = e.target.closest('[data-amorce-profil]');
+    if (ap) { conseilForm({ ...neuf(), profils: [ap.dataset.amorceProfil] }); return; }
+
+    const am = e.target.closest('[data-amorce-moment]');
+    if (am) { conseilForm({ ...neuf(), moments: [am.dataset.amorceMoment], categorie: 'mental' }); return; }
   });
 }
 

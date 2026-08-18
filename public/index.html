@@ -10,36 +10,36 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎾</text></svg>">
 <!-- Le ?v= force le navigateur à retélécharger la feuille de style :
      à incrémenter quand un correctif CSS doit arriver partout. -->
-<link rel="stylesheet" href="css/style.css?v=51">
+<link rel="stylesheet" href="css/style.css?v=53">
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=51",
-    "./js/carte.js": "./js/carte.js?v=51",
-    "./js/classement.js": "./js/classement.js?v=51",
-    "./js/clubs-connus.js": "./js/clubs-connus.js?v=51",
-    "./js/config.js": "./js/config.js?v=51",
-    "./js/contours.js": "./js/contours.js?v=51",
-    "./js/dictee.js": "./js/dictee.js?v=51",
-    "./js/forms.js": "./js/forms.js?v=51",
-    "./js/france.js": "./js/france.js?v=51",
-    "./js/geocodage.js": "./js/geocodage.js?v=51",
-    "./js/graphes.js": "./js/graphes.js?v=51",
-    "./js/import-fft.js": "./js/import-fft.js?v=51",
-    "./js/materiel.js": "./js/materiel.js?v=51",
-    "./js/nuage.js": "./js/nuage.js?v=51",
-    "./js/reperes.js": "./js/reperes.js?v=51",
-    "./js/retour.js": "./js/retour.js?v=51",
-    "./js/store.js": "./js/store.js?v=51",
-    "./js/terrain.js": "./js/terrain.js?v=51",
-    "./js/theme.js": "./js/theme.js?v=51",
-    "./js/util.js": "./js/util.js?v=51",
-    "./js/views/clubs.js": "./js/views/clubs.js?v=51",
-    "./js/views/coaching.js": "./js/views/coaching.js?v=51",
-    "./js/views/joueurs.js": "./js/views/joueurs.js?v=51",
-    "./js/views/matchs.js": "./js/views/matchs.js?v=51",
-    "./js/views/materiel.js": "./js/views/materiel.js?v=51",
-    "./js/views/simulateur.js": "./js/views/simulateur.js?v=51"
+    "./js/app.js": "./js/app.js?v=53",
+    "./js/carte.js": "./js/carte.js?v=53",
+    "./js/classement.js": "./js/classement.js?v=53",
+    "./js/clubs-connus.js": "./js/clubs-connus.js?v=53",
+    "./js/config.js": "./js/config.js?v=53",
+    "./js/contours.js": "./js/contours.js?v=53",
+    "./js/dictee.js": "./js/dictee.js?v=53",
+    "./js/forms.js": "./js/forms.js?v=53",
+    "./js/france.js": "./js/france.js?v=53",
+    "./js/geocodage.js": "./js/geocodage.js?v=53",
+    "./js/graphes.js": "./js/graphes.js?v=53",
+    "./js/import-fft.js": "./js/import-fft.js?v=53",
+    "./js/materiel.js": "./js/materiel.js?v=53",
+    "./js/nuage.js": "./js/nuage.js?v=53",
+    "./js/reperes.js": "./js/reperes.js?v=53",
+    "./js/retour.js": "./js/retour.js?v=53",
+    "./js/store.js": "./js/store.js?v=53",
+    "./js/terrain.js": "./js/terrain.js?v=53",
+    "./js/theme.js": "./js/theme.js?v=53",
+    "./js/util.js": "./js/util.js?v=53",
+    "./js/views/clubs.js": "./js/views/clubs.js?v=53",
+    "./js/views/coaching.js": "./js/views/coaching.js?v=53",
+    "./js/views/joueurs.js": "./js/views/joueurs.js?v=53",
+    "./js/views/matchs.js": "./js/views/matchs.js?v=53",
+    "./js/views/materiel.js": "./js/views/materiel.js?v=53",
+    "./js/views/simulateur.js": "./js/views/simulateur.js?v=53"
   }
 }
 </script>
@@ -83,13 +83,13 @@
   <!-- Quatre onglets pour les écrans du quotidien. Les deux répertoires
        (adversaires, clubs) vivent dans la barre du haut.
 
-       Le carnet de conseils et le mode court n'en occupent qu'un : ce sont
-       deux onglets d'un même écran, et leur donner deux entrées revenait à
-       demander de choisir en bas ce qui se choisit déjà en haut. -->
+       L'écran du court n'en occupe qu'un : le carnet qui l'accompagnait a
+       été absorbé — on y note désormais d'un « + », dans une fenêtre
+       flottante, sans quitter le dessin du court. -->
   <nav class="tabbar">
     <a href="#/"           data-tab="/"><span>🎾</span>Matchs</a>
     <a href="#/classement" data-tab="/classement"><span>🏅</span>Classement</a>
-    <a href="#/court"      data-tab="/conseils"><span>🎯</span>Sur le court</a>
+    <a href="#/court"      data-tab="/court"><span>🎯</span>Sur le court</a>
     <a href="#/matos"      data-tab="/matos"><span>🪪</span>Profil</a>
   </nav>
 </div>

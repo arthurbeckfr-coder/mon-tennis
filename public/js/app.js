@@ -30,12 +30,13 @@ const ROUTES = [
     render: () => matchs.render(),      wire: matchs.wire },
   { match: /^\/classement$/,  title: 'Mon classement', tab: '/classement',
     render: () => simulateur.render(),  wire: simulateur.wire },
-  { match: /^\/conseils$/,    title: 'Mes conseils', tab: '/conseils',
-    render: () => coaching.render(),    wire: coaching.wire },
-  /* Le mode court garde son adresse — il se met en raccourci d'écran
-     d'accueil, et l'onglet du haut y renvoie — mais il allume l'entrée
-     « Conseils » de la barre du bas, dont il est le second onglet. */
-  { match: /^\/court$/,       title: 'Sur le court', tab: '/conseils',
+  /* Le carnet a été absorbé par le court : écrire tient dans une fenêtre
+     flottante, et deux écrans pour un même formulaire, c'était un écran de
+     trop. L'ancienne adresse mène au court plutôt que nulle part — elle
+     traîne dans les raccourcis d'écran d'accueil et dans les favoris. */
+  { match: /^\/conseils$/,    title: 'Sur le court', tab: '/court',
+    render: () => { location.replace('#/court'); return ''; }, wire: () => {} },
+  { match: /^\/court$/,       title: 'Sur le court', tab: '/court',
     render: () => coaching.renderCourt(), wire: coaching.wireCourt, nu: true },
   { match: /^\/clubs$/,       title: 'Mes clubs',    tab: '/clubs',
     render: () => clubs.render(),       wire: clubs.wire },
