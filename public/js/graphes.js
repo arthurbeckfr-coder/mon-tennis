@@ -312,23 +312,67 @@ export function brancherCourbe(racine) {
      paliers qui les encadrent — une courbe sans ses seuils ne dirait
      rien de ce qu'elle coûte. */
   const mesures = [...bloc.querySelectorAll('.courbe-point')]
-    .map(c => ({ x: Number(c.dataset.x), y: Number(c.dataset.y) }));
+    .map(c => ({ x: Number(c.dataset.x), y: Number(c.dataset.y),
+                 futur: c.classList.contains('futur') }));
   const niveaux = [...bloc.querySelectorAll('.courbe-palier-ligne')]
     .map(l => Number(l.getAttribute('y1')));
 
-  const cadrageEntier = () => {
+  /** Tout ce qu'il y a à voir : la courbe entière et les paliers qui
+ *  l'encadrent. C'est la borne du dézoom — au-delà, il n'y a rien. */
+  const cadrageTotal = () => {
     if (!mesures.length) return [...depart];
-    let haut = Math.min(...mesures.map(m => m.y));
-    let bas = Math.max(...mesures.map(m => m.y));
-    const dessus = niveaux.filter(n => n <= haut);
-    const dessous = niveaux.filter(n => n >= bas);
-    if (dessus.length) haut = Math.max(...dessus);
-    if (dessous.length) bas = Math.min(...dessous);
+    /* La courbe et les trois traits, tous dedans. On ne retenait avant
+       que le palier immédiatement au-dessus et celui immédiatement en
+       dessous — une prudence utile quand on en dessinait vingt, absurde
+       depuis qu'il n'y en a plus que trois : un bilan resté sous ses trois
+       seuils les faisait tous sortir du cadre par le haut, et l'on voyait
+       une courbe sans aucune règle pour la juger. */
+    const haut = Math.min(...mesures.map(m => m.y), ...niveaux);
+    const bas = Math.max(...mesures.map(m => m.y), ...niveaux);
     const marge = Math.max((bas - haut) * 0.12, 14);
     return [depart[0], haut - marge, depart[2], (bas - haut) + marge * 2];
   };
 
+  /** ─── Où l'œil doit tomber en arrivant ───────────────────────────
+ *
+ *  Cadrer sur toute la courbe donne un graphique juste et inutile. Deux
+ *  choses l'écrasent : un bilan qui a culminé très haut il y a deux ans,
+ *  et une projection qui descend sur cinq ans jusqu'à trois classements
+ *  plus bas. Entre les deux, les quinze points qui séparent 15 de 5/6
+ *  font six pixels ; les traits se collent, leurs noms se poussent pour
+ *  ne pas se recouvrir, et l'on jurerait qu'ils sont mal placés.
+ *
+ *  Le cadre d'arrivée tient donc à la bande des trois paliers, plus le
+ *  bilan d'aujourd'hui — d'où l'on part — et un peu de mou sous le
+ *  dernier trait pour voir la courbe le franchir. Ce qui compte ici est
+ *  le passage : à quelle date la courbe croise la ligne. Ce qu'elle
+ *  devient trois ans plus bas se lit en toutes lettres sous le
+ *  graphique, échelon par échelon et date par date.
+ *
+ *  Le reste n'est pas perdu : le dézoom va jusqu'au cadrage total, et
+ *  le glissement vertical avec lui.
+ */
+  const cadrageEntier = () => {
+    const total = cadrageTotal();
+    if (!mesures.length || niveaux.length < 2) return total;
 
+    const hautP = Math.min(...niveaux), basP = Math.max(...niveaux);
+    const bande = basP - hautP;
+
+    /* Le dernier point mesuré : c'est « où j'en suis », et le cadre
+       n'aurait pas de sens sans lui. */
+    const passes = mesures.filter(m => !m.futur);
+    const auj = passes.length ? passes[passes.length - 1].y : hautP;
+
+    const marge = Math.max(bande * 0.18, 10);
+    const haut = Math.min(hautP, auj) - marge;
+    const bas = Math.max(basP, auj) + Math.max(bande * 0.6, marge);
+    const hh = bas - haut;
+
+    if (hh >= total[3]) return total;
+    const y0 = Math.min(Math.max(haut, total[1]), total[1] + total[3] - hh);
+    return [total[0], y0, total[2], hh];
+  };
   /* Les années, posées sous leur bande. Une bande trop étroite renonce à
      son millésime plutôt que de le laisser déborder sur la voisine. */
   const anneesDom = [...bloc.querySelectorAll('.courbe-annee-nom')];
@@ -408,10 +452,11 @@ export function brancherCourbe(racine) {
     placerBulle();
   };
 
+  const total = cadrageTotal();
   const entier = cadrageEntier();
   vue = [...entier];
   const bornes = { min: depart[2] / 16, max: depart[2],
-                   minH: entier[3] / 16, maxH: entier[3] };
+                   minH: entier[3] / 16, maxH: total[3] };
 
   const zoomer = (facteur, ancreX, ancreY) => {
     const w = Math.min(bornes.max, Math.max(bornes.min, vue[2] * facteur));
@@ -420,11 +465,11 @@ export function brancherCourbe(racine) {
     // On ne sort pas du temps connu : au-delà, il n'y a rien à regarder.
     x0 = Math.min(Math.max(x0, depart[0]), depart[0] + depart[2] - w);
 
-    /* Verticalement, la borne est le cadrage d'origine : on ne s'échappe
-       pas au-dessus des paliers, où il n'y a rien de tracé. */
+    /* Verticalement, la borne est tout ce qui est tracé : on s'échappe
+       jusqu'au sommet de la courbe, et pas au-delà. */
     const cy = ancreY == null ? vue[1] + vue[3] / 2 : ancreY;
     let y0 = cy - (cy - vue[1]) * (hh / vue[3]);
-    y0 = Math.min(Math.max(y0, entier[1]), entier[1] + entier[3] - hh);
+    y0 = Math.min(Math.max(y0, total[1]), total[1] + total[3] - hh);
 
     vue = [x0, y0, w, hh];
     poser();
@@ -490,8 +535,9 @@ export function brancherCourbe(racine) {
     if (Math.abs(e.clientX - avant.x) + Math.abs(e.clientY - avant.y) > 3) bouge = true;
     const x0 = Math.min(Math.max(vue[0] - dx, depart[0]), depart[0] + depart[2] - vue[2]);
     /* Zoomé, on se déplace aussi de haut en bas — sans quoi on ne verrait
-       jamais ce qui sort du cadre en s'approchant. */
-    const y0 = Math.min(Math.max(vue[1] - dy, entier[1]), entier[1] + entier[3] - vue[3]);
+       jamais ce qui sort du cadre, à commencer par le sommet de la courbe
+       quand le cadrage d'arrivée s'est resserré sur les paliers. */
+    const y0 = Math.min(Math.max(vue[1] - dy, total[1]), total[1] + total[3] - vue[3]);
     vue = [x0, y0, vue[2], vue[3]];
     doigts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     poser();
