@@ -103,8 +103,16 @@ function vide() {
          seule raison de leur présence, et elle suffit. */
       licence: '', telephone: '', mail: '', clubPrincipal: '', naissance: '',
       /* Deux prix qu'on ne peut pas deviner, et qui ne servent qu'à
-         estimer : le kilomètre, et la tournée d'après-match. */
-      coutKm: null, coutVictoire: null,
+         estimer : le kilomètre, et la tournée d'après-match. Celle-ci a
+         un prix connu — deux canettes, quatre euros — et part donc
+         remplie.
+
+         `tourneeReglee` retient qu'on a touché au champ, et il part à
+         faux : les valeurs par défaut se posent sous le profil chargé,
+         si bien qu'un témoin vrai par défaut prétendrait, dans les
+         carnets d'avant, qu'un choix a été fait alors que le champ n'y a
+         jamais existé. Le vidage, lui, le passe à vrai — et il tient. */
+      coutKm: null, coutVictoire: 4, tourneeReglee: false,
     },
     bareme: { ...BAREME_DEFAUT },
     matchs: [],
@@ -429,6 +437,21 @@ export function surfaceDuMatch(m) {
    La poule n'est pas un tour non plus au sens strict, mais elle se joue
    et se note : sans elle, la moitié des championnats jeunes et des
    tournois internes n'aurait rien à cocher. */
+/** Le prix de la tournée arrive dans les carnets ouverts avant lui.
+ *
+ *  Un carnet neuf le porte déjà ; celui qui existait déjà a le champ à
+ *  vide, et un champ vide ne compte rien — la règle serait entrée dans
+ *  le carnet sans jamais rien y changer. On le pose donc une fois, et
+ *  le témoin fait qu'on ne le repose pas : vider le champ, c'est dire
+ *  qu'on ne veut plus de ce calcul, et cela doit tenir.
+ */
+export function remplirTourneeUneFois() {
+  const p = store.profil || {};
+  if (p.tourneeReglee || p.coutVictoire != null) return false;
+  maj(x => { x.profil = { ...x.profil, coutVictoire: 4, tourneeReglee: true }; });
+  return true;
+}
+
 export const TOURS = [
   { cle: 'finale',   nom: 'Finale',           rang: 1 },
   { cle: 'demie',    nom: '1/2 finale',       rang: 2 },

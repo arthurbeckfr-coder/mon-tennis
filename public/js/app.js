@@ -1,6 +1,6 @@
 /* Point d'entrée : thème, chargement, routeur, ajout rapide. */
 
-import { charger, store } from './store.js';
+import { charger, store, remplirTourneeUneFois } from './store.js';
 import { completerClubsConnus } from './clubs-connus.js';
 import { h, toast, openModal, closeModal } from './util.js';
 import { appliquerTheme, themeSuivant, themeActuel, ETIQUETTES } from './theme.js';
@@ -189,6 +189,7 @@ const etat = charger();
    rattrapage ne remplit que les cases vides, et ne se voit qu'une
    fois : au second démarrage, il n'a plus rien à faire. */
 completerClubsConnus();
+remplirTourneeUneFois();
 window.__appReady = true;
 $('boot').hidden = true;
 $('shell').hidden = false;

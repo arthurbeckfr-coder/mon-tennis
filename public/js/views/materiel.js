@@ -142,7 +142,10 @@ function brancherProfil(vue) {
     }
     if (cle === 'coutKm' || cle === 'coutVictoire') {
       const v = el.value === '' ? null : Number(el.value);
-      maj(s => { s.profil = { ...s.profil, [cle]: v }; });
+      /* Toucher au prix de la tournée, fût-ce pour l'effacer, c'est en
+         décider : le carnet n'a plus à le remplir à ta place. */
+      maj(s => { s.profil = { ...s.profil, [cle]: v,
+        ...(cle === 'coutVictoire' ? { tourneeReglee: true } : {}) }; });
       return;
     }
 
@@ -269,8 +272,9 @@ function vueMoi() {
           <input name="coutVictoire" type="number" min="0" step="0.5" inputmode="decimal"
             value="${p.coutVictoire ?? ''}" placeholder="par exemple 4"></label>
         <p class="tiny muted">Ce qu'une victoire te coûte au bar : la canette de
-          l'adversaire et la tienne. Le carnet le compte pour chaque match gagné, dans
-          l'onglet Argent, du côté des estimations. Laissé vide, il ne compte rien.</p>
+          l'adversaire et la tienne. Le carnet le compte pour chaque match gagné sauf les
+          finales, dans l'onglet Argent, du côté des estimations. Laissé vide, il ne
+          compte rien.</p>
       </div>
     </section>
 
@@ -467,7 +471,8 @@ function detailArgent(quoi) {
           <div class="chiffre"><b>${euros(t.total)}</b><span>en tout</span></div>
         </section>
         <p class="tiny muted">Une victoire, une tournée : ta canette et la sienne. Les
-          matchs gagnés par forfait n'y sont pas — il n'y a eu ni match ni bar.</p>
+          finales n'y sont pas, ni les matchs gagnés par forfait — dans un cas la règle
+          ne s'applique pas, dans l'autre il n'y a eu ni match ni bar.</p>
         <span class="etiquette">Par saison</span>
         <ul class="clubs-adverses">${Object.keys(parAn).sort((a, b) => b - a).map(a =>
           `<li><div><strong>${a}-${String(Number(a) + 1).slice(2)}</strong>
@@ -538,7 +543,12 @@ function detailArgent(quoi) {
  */
 function tournees(saison = 'tout') {
   const prix = Number(store.profil?.coutVictoire) || 0;
+  /* Les finales gagnées n'y sont pas : c'est la règle telle qu'elle se
+     tient, et elle ne s'applique qu'aux tours qui précèdent. Une finale
+     perdue non plus, faute d'être une victoire — la question ne se pose
+     donc que pour celles qu'on gagne. */
   const gagnes = store.matchs.filter(m => m.issue === 'V' && !m.wo
+    && m.tour !== 'finale'
     && (saison === 'tout' || saisonDe(m.date) === Number(saison)));
   return { prix, victoires: gagnes.length, total: gagnes.length * prix, liste: gagnes };
 }
