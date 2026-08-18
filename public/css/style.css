@@ -2066,6 +2066,26 @@ body.mode-court .terrain-diapo .terrain {
 }
 .matchs-nus .issue-v { background: var(--victoire); }
 .matchs-nus .issue-d { background: var(--defaite); }
+/* Une tête de chapitre par année : le nom collé à gauche, son bilan à
+   droite, et un filet sous les deux. Assez marquée pour qu'on la repère
+   en faisant défiler, assez sobre pour ne pas concurrencer le titre de la
+   section. */
+.annee-bloc + .annee-bloc { margin-top: 18px; }
+.annee-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px 0 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--bord);
+}
+.annee-tete h4 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: .02em;
+}
+
 /* ===================================================================
    Adversaires
    =================================================================== */

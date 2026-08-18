@@ -684,22 +684,46 @@ export function renderFiche(params) {
       ${matchs.length ? `
         <p class="tiny muted">${matchs.length} match(s) — ${b.v} victoire(s),
            ${b.d} défaite(s), ${b.ratio}% de réussite.</p>
-        <ul class="matchs" style="margin-top:10px">
-          ${matchs.map(m => `<li class="match ${m.issue === 'V' ? 'gagne' : 'perdu'}"
-                                data-match="${h(m.id)}">
-            <div class="match-issue">${m.issue}</div>
-            <div class="match-corps">
-              <div class="match-tete">
-                <strong>${h(m.adversaire || '—')}</strong>${puce(m.echelonAdverse)}
+        ${/* Une tête de chapitre par année. Quatorze matchs à la file, on
+              ne sait plus où l'on en est ; l'année est le repère qu'on
+              cherche en premier — « la fois où j'ai gagné ici, c'était en
+              2019 ou en 2022 ? ». Elle porte son bilan, parce qu'un club
+              se juge aussi année par année : trois défaites une saison,
+              trois victoires la suivante, ce n'est pas la même chose que
+              cinquante pour cent tout du long. */''}
+        ${(() => {
+          const annees = {};
+          for (const m of matchs) {
+            const a = (m.date || '').slice(0, 4) || '?';
+            (annees[a] = annees[a] || []).push(m);
+          }
+          return Object.keys(annees).sort((x, y) => y.localeCompare(x)).map(a => {
+            const ba = bilanMatchs(annees[a]);
+            return `<div class="annee-bloc">
+              <div class="annee-tete">
+                <h4>${h(a)}</h4>
+                <span class="tiny muted">${annees[a].length} match(s) —
+                  ${ba.v}V–${ba.d}D</span>
               </div>
-              <div class="match-bas">
-                <span>${h(dateCourte(m.date))}</span>
-                ${m.score ? `<span>${h(m.score)}</span>` : ''}
-                ${m.tournoi ? `<span class="muted">${h(m.tournoi)}</span>` : ''}
-              </div>
-            </div>
-          </li>`).join('')}
-        </ul>`
+              <ul class="matchs">
+                ${annees[a].map(m => `<li class="match ${m.issue === 'V' ? 'gagne' : 'perdu'}"
+                                        data-match="${h(m.id)}">
+                  <div class="match-issue">${m.issue}</div>
+                  <div class="match-corps">
+                    <div class="match-tete">
+                      <strong>${h(m.adversaire || '—')}</strong>${puce(m.echelonAdverse)}
+                    </div>
+                    <div class="match-bas">
+                      <span>${h(dateCourte(m.date))}</span>
+                      ${m.score ? `<span>${h(m.score)}</span>` : ''}
+                      ${m.tournoi ? `<span class="muted">${h(m.tournoi)}</span>` : ''}
+                    </div>
+                  </div>
+                </li>`).join('')}
+              </ul>
+            </div>`;
+          }).join('');
+        })()}`
         : `<p class="tiny muted">Aucun match rattaché. Vérifie les mots-clés du club :
            ils sont comparés au libellé de l'épreuve.</p>`}
     </section>
