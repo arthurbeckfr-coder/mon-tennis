@@ -6,7 +6,7 @@ import { veillerAuClassement } from './montee.js';
 import { h, toast, openModal, closeModal } from './util.js';
 import { appliquerTheme, themeSuivant, themeActuel, ETIQUETTES } from './theme.js';
 import { matchForm, conseilForm, profilForm,
-         nouvelAdversaireForm, courseForm } from './forms.js';
+         nouvelAdversaireForm, courseForm, cordageForm } from './forms.js';
 
 import * as matchs     from './views/matchs.js';
 import * as simulateur from './views/simulateur.js';
@@ -166,20 +166,72 @@ const RAPIDE = () => [
      avant d'avoir joué. */
   ['👥', 'Un adversaire', 'Sa façon de jouer, avant le match', () => nouvelAdversaireForm()],
   ['🛒', 'Une course',  'À racheter : cordage, grip, balles', () => courseForm()],
+  /* Un cordage se casse trois fois par an et se change plus souvent
+     encore. C'est le geste le plus répété du carnet après le match
+     lui-même, et il se faisait par le profil, deux onglets plus loin. */
+  ['🪢', 'Un cordage', 'Cassé, ou changé', () => cordageForm()],
 ];
+
+/** Le lien qui écrit le message, adresse et contexte compris.
+ *
+ *  L'adresse ne vit pas dans le code : elle est lue dans le profil, où
+ *  elle a été saisie. Le dépôt est public, et une adresse écrite en clair
+ *  dans une page publiée est une adresse récoltée dans la semaine — pour
+ *  un carnet qui n'a qu'un seul lecteur, ce serait payer cher un lien.
+ *
+ *  Le contexte part avec : version du site, appareil, taille du carnet.
+ *  Ce sont les trois questions qu'on se pose devant un défaut, et les
+ *  trois qu'on ne pense jamais à donner en le racontant.
+ */
+function lienMessage() {
+  const adresse = (store.profil?.mail || '').trim();
+  if (!adresse) return '';
+  const version = (document.querySelector('script[type="module"]')?.getAttribute('src')
+    || '').match(/v=(\d+)/)?.[1] || '?';
+  const corps = [
+    '',
+    '',
+    '— — —',
+    `Version du site : ${version}`,
+    `Appareil : ${navigator.userAgent}`,
+    `Carnet : ${store.matchs.length} match(s), ${store.clubs.length} club(s)`,
+  ].join('\n');
+  /* L'arobase reste elle-même : encodée en %40, elle passe partout en
+     théorie, et se retrouve écrite telle quelle dans le champ « À » de
+     quelques clients de messagerie. */
+  return `mailto:${encodeURIComponent(adresse).replace(/%40/g, '@')}`
+    + `?subject=${encodeURIComponent('Mon tennis — remarque')}`
+    + `&body=${encodeURIComponent(corps)}`;
+}
 
 function ajoutRapide() {
   const liste = RAPIDE();
+  const mail = lienMessage();
   openModal({
     title: 'Ajouter',
     body: `<div class="grille-rapide">
       ${liste.map((q, i) => `<button class="bouton-rapide${q[4] ? ' large' : ''}" data-q="${i}">
         <span class="qi">${q[0]}</span><b>${h(q[1])}</b>
         <span class="tiny muted">${h(q[2])}</span></button>`).join('')}
+    </div>
+    ${/* Séparé de la grille, et sans cadre : ce n'est pas une chose de
+          plus à ajouter au carnet, c'est une porte de sortie. La mettre
+          au même rang que les autres, c'était la proposer à chaque fois
+          qu'on vient noter un match. */''}
+    <div class="rangee-message">
+      ${mail ? `<a class="btn btn-ghost" href="${h(mail)}">✉️ Un bug, une question…</a>`
+        : `<button class="btn btn-ghost" data-sans-mail>✉️ Un bug, une question…</button>`}
     </div>`,
     onMount: el => el.addEventListener('click', e => {
       const b = e.target.closest('[data-q]');
-      if (b) { closeModal(); liste[+b.dataset.q][3](); }
+      if (b) { closeModal(); liste[+b.dataset.q][3](); return; }
+      /* Sans adresse dans le profil, on ne devine pas : on dit où la
+         mettre, et le bouton marchera la fois d'après. */
+      if (e.target.closest('[data-sans-mail]')) {
+        closeModal();
+        toast('Renseigne ton e-mail dans ton profil : c\'est là que ce bouton va le chercher.');
+        location.hash = '#/matos';
+      }
     }),
   });
 }

@@ -2651,6 +2651,16 @@ body.mode-court .terrain-diapo .terrain {
   min-height: 88px;
 }
 .bouton-rapide:hover { background: var(--carte-2); border-color: var(--accent); }
+/* La porte de sortie de la fenêtre « Ajouter » : détachée de la grille
+   par un filet, et discrète — on ne signale pas un défaut tous les
+   jours, mais le jour où l'on en trouve un, il faut savoir où aller. */
+.rangee-message {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bord);
+}
 .bouton-rapide .qi { font-size: 22px; line-height: 1.3; }
 .bouton-rapide b { font-size: .92rem; }
 
