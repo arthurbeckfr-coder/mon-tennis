@@ -9,8 +9,8 @@
    bilans officiels de Ten'Up (voir l'en-tête de classement.js). Le bilan
    n'est donc plus saisi à la main, il est calculé depuis l'historique. */
 
-import { h, puce, dateCourte } from '../util.js';
-import { store, reglagesCalcul } from '../store.js';
+import { h, puce, dateCourte, openModal, closeModal, toast } from '../util.js';
+import { store, reglagesCalcul, maj } from '../store.js';
 import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang, seuil,
          projeter, echeance, rendementParEchelon, moisAVenir } from '../classement.js';
 
@@ -180,14 +180,34 @@ function rendreResultat(r) {
   const maintien = r.cible === store.profil.echelon;
 
   if (r.manque === 0) {
+    /* Tout est réuni : les points, le nombre de victoires, et la victoire
+       contre un joueur de l'échelon visé quand elle est exigée. Il n'y a
+       plus rien à faire pour monter — autant le dire comme tel, plutôt
+       que de laisser lire « les points y sont » à quelqu'un qui vient de
+       gagner son échelon.
+
+       Et proposer de l'inscrire : le classement du profil commande tout
+       le reste du carnet — les points de chaque victoire, l'écart avec
+       l'adversaire, les projections — et il se corrigeait dans un autre
+       écran, au moment où l'on y pense, c'est-à-dire jamais. */
+    const acquis = !maintien && !manqueMatchs
+      && (!r.montee?.requise || r.montee.satisfaite)
+      && rang(r.cible) > rang(store.profil.echelon);
+
     return `<section class="carte carte-verte">
-      <h3>${maintien ? 'Ton échelon est tenu.' : 'Les points y sont.'}</h3>
+      <h3>${maintien ? 'Ton échelon est tenu.'
+        : acquis ? `🎉 Tu as de quoi passer ${h(r.cible)}.` : 'Les points y sont.'}</h3>
       <p>Ton bilan à ${h(r.cible)} atteint ${r.bilan} points, pour ${r.seuil.points} demandés.</p>
       ${manqueMatchs
         ? `<p class="alerte">Il manque encore ${r.matchsManquants} victoire(s) :
            ${h(r.cible)} en exige ${r.seuil.victoires}, tu en as ${r.nbVictoires}.</p>`
         : `<p>Le nombre de victoires exigé est également atteint.</p>`}
       ${rendreMontee(r)}
+      ${acquis ? `<p class="tiny muted">C'est la fédération qui publie les classements :
+        ce carnet calcule, il ne décide pas. Le jour où ce sera officiel, dis-le-lui —
+        tout le reste s'ajustera tout seul.</p>
+        <button class="btn btn-primary" data-monter="${h(r.cible)}">Je suis
+          ${h(r.cible)} — mettre à jour mon profil</button>` : ''}
     </section>`;
   }
 
@@ -691,11 +711,50 @@ function replier(vue) {
     });
   }
 }
+/** Inscrire un nouvel échelon dans le profil.
+ *
+ *  On demande confirmation, non par cérémonie mais parce que le geste
+ *  refait tous les calculs du carnet : monté trop tôt, le simulateur
+ *  répondrait à une question qu'on ne se pose pas encore. Rien n'est
+ *  perdu pour autant — l'échelon se rechoisit dans le profil.
+ */
+function acterMontee(cible) {
+  const avant = store.profil.echelon;
+  openModal({
+    title: `Passer à ${cible} ?`,
+    body: `<p>Ton profil dira <strong>${h(cible)}</strong> au lieu de ${h(avant)}. Tout le
+        carnet suit : les points que rapporte chaque victoire, l'écart avec tes
+        adversaires, les projections.</p>
+      <p class="tiny muted">À faire une fois le classement publié — d'ici là, le calcul
+        reste juste tant que le profil dit ce que dit ta licence. Et cela se défait :
+        l'échelon se choisit dans ton profil.</p>`,
+    footer: `<button class="btn" data-non>Pas encore</button>
+             <button class="btn btn-primary" data-oui>Oui, je suis ${h(cible)}</button>`,
+    onMount: () => {
+      const racine = document.getElementById('modal-root');
+      racine.querySelector('[data-non]')?.addEventListener('click', closeModal);
+      racine.querySelector('[data-oui]')?.addEventListener('click', () => {
+        maj(s => { s.profil = { ...s.profil, echelon: cible }; });
+        /* L'objectif repart de zéro : viser l'échelon qu'on vient
+           d'atteindre n'a plus de sens, c'est le suivant qu'on regarde. */
+        cibleChoisie = null;
+        closeModal();
+        toast(`Te voilà ${cible}. Bravo.`);
+        /* Pas de redessin ici : `maj` annonce le changement, et l'écran
+           se refait de lui-même. */
+      });
+    },
+  });
+}
+
 export function wire(vue, rerendre) {
   replier(vue);
   brancherCourbe(vue);
 
   vue.addEventListener('click', e => {
+
+    const mo = e.target.closest('[data-monter]');
+    if (mo) { acterMontee(mo.dataset.monter); return; }
 
     const c = e.target.closest('[data-cible]');
     if (c) { cibleChoisie = c.dataset.cible; rerendre(); return; }
