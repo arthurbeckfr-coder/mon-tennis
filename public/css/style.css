@@ -2574,8 +2574,19 @@ body.mode-court .terrain-diapo .terrain {
    =================================================================== */
 .grille-rapide { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 /* Une entrée peut tenir la ligne entière. La dictée est la seule : elle
-   ouvre le menu, et une demi-case l'aurait rangée parmi les autres. */
-.bouton-rapide.large { grid-column: 1 / -1; min-height: 0; }
+   ouvre le menu, et une demi-case l'aurait rangée parmi les autres.
+
+   Son texte se centre, lui aussi. Les cases de la grille s'alignent à
+   gauche parce qu'elles se lisent en colonne, l'œil descendant le long
+   d'un même bord ; celle-ci n'a pas de voisine, et son texte serré contre
+   le bord gauche d'une case deux fois plus large donnait un grand vide à
+   droite qu'on prenait pour un oubli. */
+.bouton-rapide.large {
+  grid-column: 1 / -1;
+  min-height: 0;
+  align-items: center;
+  text-align: center;
+}
 .bouton-rapide {
   display: flex;
   flex-direction: column;
