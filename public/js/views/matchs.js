@@ -81,6 +81,12 @@ function filtrer() {
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 }
 
+/** Les matchs que l'écran regarde, filtre compris. Les statistiques s'en
+ *  servent comme la liste : c'est ce qui fait qu'une saison choisie vaut
+ *  pour les deux, et qu'un chiffre lu sous un graphique se retrouve tel
+ *  quel dans la liste d'à côté. */
+const matchsVus = () => filtrer();
+
 /* ─── Les compteurs cliquables ─────────────────────────────────────────
 
    Un chiffre qu'on ne peut pas ouvrir est une affirmation qu'il faut
@@ -242,7 +248,10 @@ const AXES = {
  *  tournoi : c'est le même contenu, présenté à deux endroits. */
 function matchsDeLAxe(axe, cle) {
   const a = AXES[axe];
-  const liste = store.matchs
+  /* Le filtre vaut ici aussi : une colonne haute de trois qui ouvre sur
+     huit matchs ferait douter du graphique, et c'est le graphique qui
+     aurait raison. */
+  const liste = matchsVus()
     .filter(m => a.porte(m, cle))
     .sort((x, y) => (y.date || '').localeCompare(x.date || ''));
   return { liste, bilan: bilanMatchs(liste), titre: a.titre(cle) };
@@ -332,22 +341,28 @@ function vueStats() {
       Aucun match : rien à représenter pour l'instant.</div>`;
   }
 
+  const vus = matchsVus();
+  if (!vus.length) {
+    return `<div class="vide"><span class="emoji">📊</span>
+      Aucun match ne correspond à ce filtre.</div>`;
+  }
+
   const series = [{ nom: 'Victoires' }, { nom: 'Défaites' }];
 
-  const parAn = grouper(store.matchs, m => (m.date || '').slice(0, 4));
+  const parAn = grouper(vus, m => (m.date || '').slice(0, 4));
   const annees = Object.keys(parAn).sort();
 
-  const parEchelon = grouper(store.matchs, m => m.echelonAdverse);
+  const parEchelon = grouper(vus, m => m.echelonAdverse);
   /* Rangés du plus faible au plus fort, et non par nombre de matchs :
      c'est la progression du niveau qui fait sens ici. */
   const echelons = Object.keys(parEchelon).sort((a, b) => rang(a) - rang(b));
   const meilleur = [...echelons].reverse().find(e => parEchelon[e].v > 0);
 
-  const parSurface = grouper(store.matchs, m => surfaceDuMatch(m).surface || '?');
+  const parSurface = grouper(vus, m => surfaceDuMatch(m).surface || '?');
   const surfaces = Object.keys(parSurface)
     .sort((a, b) => (parSurface[b].v + parSurface[b].d) - (parSurface[a].v + parSurface[a].d));
 
-  const parEpreuve = grouper(store.matchs, m => estParEquipes(m) ? 'equipes' : 'tournoi');
+  const parEpreuve = grouper(vus, m => estParEquipes(m) ? 'equipes' : 'tournoi');
   const epreuves = Object.keys(parEpreuve);
 
   return `
@@ -395,7 +410,7 @@ function vueStats() {
    moyenne sur trois matchs n'est pas une moyenne, et laisser croire le
    contraire serait la seule vraie faute ici. */
 function rendreDurees() {
-  const avec = store.matchs.filter(m => Number(m.duree) > 0);
+  const avec = matchsVus().filter(m => Number(m.duree) > 0);
   if (avec.length < 3) return '';
 
   const total = avec.reduce((t, m) => t + Number(m.duree), 0);
@@ -545,7 +560,7 @@ function rendreEpreuves(parEpreuve, epreuves, series) {
    libellé de la fédération porte l'année et la saison, ce qui suffit à
    les reconstituer sans rien saisir. */
 function rendreEquipes(series) {
-  const matchs = store.matchs.filter(estParEquipes);
+  const matchs = matchsVus().filter(estParEquipes);
   if (!matchs.length) return '';
 
   const parSaison = grouper(matchs, m => saisonEquipe(m).libelle);
@@ -579,45 +594,19 @@ function rendreEquipes(series) {
   `);
 }
 
-const barreVue = () => `<div class="segments" style="width:100%;margin-bottom:14px">
-    <button data-vue="liste" class="${ongletVue === 'liste' ? 'actif' : ''}" style="flex:1">Liste</button>
-    <button data-vue="stats" class="${ongletVue === 'stats' ? 'actif' : ''}" style="flex:1">Statistiques</button>
-  </div>`;
-
-export function render() {
-  if (ongletVue === 'stats') return barreVue() + vueStats();
-
-  const liste = filtrer();
-  /* Les compteurs comptent la période choisie, et non douze mois figés :
-     choisir la saison 2019-20 pour ne lire ensuite qu'un bilan de l'année
-     en cours n'aurait aucun sens. */
-  const dansPeriode = store.matchs.filter(dansLaPeriode);
-  const b = bilanMatchs(dansPeriode);
-
-  /* Les victoires contre plus fort que soi sont le vrai marqueur de
-     progression : elles rapportent le plus, et ce sont celles dont on se
-     souvient. Elles méritent leur compteur. */
-  const exploits = dansPeriode.filter(estExploit).length;
+/* ─── Les filtres, communs aux deux vues ───────────────────────────────
+ *
+ * Ils ne servaient que la liste, et les statistiques regardaient tout
+ * l'historique quoi qu'on ait choisi. C'était deux réponses à la même
+ * question : « et cette saison ? » se pose autant devant un graphique
+ * que devant une liste, et il fallait compter à la main.
+ *
+ * Filtrer sur les victoires vide évidemment la moitié des barres. Ce
+ * n'est pas un défaut à corriger : le filtre reste affiché au-dessus, et
+ * l'écran dit alors ce qu'on lui a demandé de dire. */
+const barreFiltres = () => {
   const saisons = saisonsJouees();
-
-  return `
-    ${barreVue()}
-    <section class="chiffres">
-      <div class="chiffre ${filtreActif('tout') ? 'actif' : ''}" data-filtre="tout"
-        title="Voir ces matchs"><b>${b.total}</b><span>matchs ${h(direPeriode())}</span></div>
-      <div class="chiffre"><b><span class="moitie ${filtreActif('V') ? 'actif' : ''}"
-          data-filtre="V" title="Voir les victoires">${b.v}</span><span
-          class="separateur">–</span><span
-          class="moitie ${filtreActif('D') ? 'actif' : ''}"
-          data-filtre="D" title="Voir les défaites">${b.d}</span></b>
-        <span>victoires–défaites</span></div>
-      <div class="chiffre ${filtreActif('V') ? 'actif' : ''}" data-filtre="V"
-        title="Voir les victoires"><b>${b.ratio}%</b><span>de victoires</span></div>
-      <div class="chiffre ${filtreActif('exploit') ? 'actif' : ''}" data-filtre="exploit"
-        title="Voir ces victoires"><b>${exploits}</b><span>contre plus fort</span></div>
-    </section>
-
-    <section class="barre-filtres">
+  return `<section class="barre-filtres">
       <input id="q" class="recherche" placeholder="Chercher un nom, un tournoi…"
              value="${h(filtre.texte)}">
       <label class="tri">
@@ -639,6 +628,47 @@ export function render() {
     ${filtre.exploit ? `<p class="tiny muted" style="margin:0 4px 10px">
       🔥 Seulement les victoires contre mieux classé que toi.
       <button class="lien" data-vider-exploit>Tout revoir</button></p>` : ''}
+`;
+};
+
+const barreVue = () => `<div class="segments" style="width:100%;margin-bottom:14px">
+    <button data-vue="liste" class="${ongletVue === 'liste' ? 'actif' : ''}" style="flex:1">Liste</button>
+    <button data-vue="stats" class="${ongletVue === 'stats' ? 'actif' : ''}" style="flex:1">Statistiques</button>
+  </div>`;
+
+export function render() {
+  if (ongletVue === 'stats') return barreVue() + barreFiltres() + vueStats();
+
+  const liste = filtrer();
+  /* Les compteurs comptent la période choisie, et non douze mois figés :
+     choisir la saison 2019-20 pour ne lire ensuite qu'un bilan de l'année
+     en cours n'aurait aucun sens. */
+  const dansPeriode = store.matchs.filter(dansLaPeriode);
+  const b = bilanMatchs(dansPeriode);
+
+  /* Les victoires contre plus fort que soi sont le vrai marqueur de
+     progression : elles rapportent le plus, et ce sont celles dont on se
+     souvient. Elles méritent leur compteur. */
+  const exploits = dansPeriode.filter(estExploit).length;
+
+  return `
+    ${barreVue()}
+    <section class="chiffres">
+      <div class="chiffre ${filtreActif('tout') ? 'actif' : ''}" data-filtre="tout"
+        title="Voir ces matchs"><b>${b.total}</b><span>matchs ${h(direPeriode())}</span></div>
+      <div class="chiffre"><b><span class="moitie ${filtreActif('V') ? 'actif' : ''}"
+          data-filtre="V" title="Voir les victoires">${b.v}</span><span
+          class="separateur">–</span><span
+          class="moitie ${filtreActif('D') ? 'actif' : ''}"
+          data-filtre="D" title="Voir les défaites">${b.d}</span></b>
+        <span>victoires–défaites</span></div>
+      <div class="chiffre ${filtreActif('V') ? 'actif' : ''}" data-filtre="V"
+        title="Voir les victoires"><b>${b.ratio}%</b><span>de victoires</span></div>
+      <div class="chiffre ${filtreActif('exploit') ? 'actif' : ''}" data-filtre="exploit"
+        title="Voir ces victoires"><b>${exploits}</b><span>contre plus fort</span></div>
+    </section>
+
+    ${barreFiltres()}
 
     ${liste.length ? `<ul class="matchs">${liste.map(ligneMatch).join('')}</ul>` : `
       <div class="vide">
@@ -666,10 +696,21 @@ export function wire(vue, rerendre) {
 
   vue.querySelector('#q')?.addEventListener('input', e => {
     filtre.texte = e.target.value;
-    // On ne redessine que la liste : redessiner tout ferait perdre le curseur.
-    const liste = vue.querySelector('.matchs');
-    const trouves = filtrer();
-    if (liste) liste.innerHTML = trouves.map(ligneMatch).join('');
+    if (ongletVue === 'liste') {
+      // On ne redessine que la liste : redessiner tout ferait perdre le curseur.
+      const liste = vue.querySelector('.matchs');
+      const trouves = filtrer();
+      if (liste) liste.innerHTML = trouves.map(ligneMatch).join('');
+      return;
+    }
+    /* Les graphiques se refont en entier — il n'y a pas de moitié d'écran
+       à remplacer. Le champ disparaît donc avec le reste, et on le
+       retrouve avec son curseur là où il était : sans cela, taper trois
+       lettres en laisserait deux derrière. */
+    const pos = e.target.selectionStart;
+    rerendre();
+    const q = document.getElementById('q');
+    if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch { /* champ sans curseur */ } }
   });
 
   /* Une colonne annoncée cliquable doit l'être au clavier aussi : elle
