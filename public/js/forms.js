@@ -278,6 +278,10 @@ export function matchForm(existant = null) {
             <button type="button" class="btn" data-ajout-photo>📷 Ajouter une photo</button>
             <span class="tiny muted" data-poids-photos></span>
           </div>
+          <p class="tiny muted">Tu peux aussi coller une image (Ctrl+V) ou la faire glisser
+            ici. Quel que soit son poids d'origine, elle est réduite avant d'entrer :
+            une photo de téléphone de six méga-octets pèse ensuite cent cinquante
+            kilo-octets.</p>
           ${/* `capture` absent volontairement : le laisser force l'appareil
                 photo sur certains téléphones, alors que la photo d'une
                 remise des prix est déjà dans la pellicule. */''}
@@ -412,18 +416,62 @@ export function matchForm(existant = null) {
         photos.splice(Number(b.dataset.retirer), 1);
         dessinerPhotos();
       });
-      fichier.addEventListener('change', async () => {
-        const liste = [...fichier.files];
-        fichier.value = '';
-        if (!liste.length) return;
+      /* Trois chemins pour une même chose : le sélecteur de fichiers, le
+         collage et le dépôt. Le premier suffit sur un téléphone, où la
+         pellicule est à un appui ; les deux autres sont pour l'ordinateur,
+         où l'image trouvée en ligne demandait sinon d'être enregistrée
+         quelque part avant d'être reprise — deux gestes et un fichier de
+         plus dans le dossier des téléchargements. */
+      const avaler = async liste => {
+        const images = [...liste].filter(x => x && /^image\//.test(x.type || ''));
+        if (!images.length) return false;
         poids.textContent = 'réduction…';
         let refusees = 0;
-        for (const x of liste) {
+        for (const x of images) {
           const p = await reduire(x);
           if (p) photos.push(p); else refusees++;
         }
         dessinerPhotos();
-        if (refusees) toast(`${refusees} fichier(s) ignoré(s) : ce n'était pas une image.`);
+        if (refusees) toast(`${refusees} image(s) illisible(s), ignorée(s).`);
+        return true;
+      };
+
+      fichier.addEventListener('change', async () => {
+        const liste = [...fichier.files];
+        fichier.value = '';
+        if (!liste.length) return;
+        const nonImages = liste.length - liste.filter(x => /^image\//.test(x.type || '')).length;
+        await avaler(liste);
+        if (nonImages) toast(`${nonImages} fichier(s) ignoré(s) : ce n'était pas une image.`);
+      });
+
+      /* Le collage écoute la fenêtre entière : personne ne pense à
+         cliquer dans le cadre des photos avant de faire Ctrl+V, et le
+         presse-papiers ne contient de toute façon qu'une chose. */
+      racine.addEventListener('paste', e => {
+        const fichiers = [...(e.clipboardData?.files || [])];
+        if (!fichiers.some(x => /^image\//.test(x.type || ''))) return;
+        e.preventDefault();
+        avaler(fichiers);
+      });
+
+      /* Le dépôt, sur le cadre des photos. `dragover` doit être arrêté,
+         sans quoi le navigateur ouvre l'image à la place et l'on perd le
+         formulaire à moitié rempli. */
+      const cadre = racine.querySelector('.bloc-photos');
+      const survol = e => {
+        if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
+        e.preventDefault();
+        cadre.classList.toggle('survole', e.type === 'dragover');
+      };
+      cadre.addEventListener('dragover', survol);
+      cadre.addEventListener('dragleave', survol);
+      cadre.addEventListener('drop', e => {
+        const fichiers = [...(e.dataTransfer?.files || [])];
+        if (!fichiers.length) return;
+        e.preventDefault();
+        cadre.classList.remove('survole');
+        avaler(fichiers);
       });
 
       const choix = racine.querySelector('#choix-adversaire');
