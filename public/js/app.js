@@ -5,7 +5,8 @@ import { completerClubsConnus } from './clubs-connus.js';
 import { veillerAuClassement } from './montee.js';
 import { h, toast, openModal, closeModal } from './util.js';
 import { appliquerTheme, themeSuivant, themeActuel, ETIQUETTES } from './theme.js';
-import { matchForm, conseilForm, clubForm, profilForm } from './forms.js';
+import { matchForm, conseilForm, clubForm, profilForm,
+         nouvelAdversaireForm } from './forms.js';
 
 import * as matchs     from './views/matchs.js';
 import * as simulateur from './views/simulateur.js';
@@ -140,13 +141,24 @@ function afficher() {
    L'import de Ten'Up quitte cette liste. Il ne s'y faisait qu'une fois,
    au premier jour, et occupait ensuite une case sur six dans un menu
    qu'on ouvre pour noter un match. Il reste où il sert : au bas de la
-   liste des matchs, et sur l'écran vide qui l'accueille au départ. */
+   liste des matchs, et sur l'écran vide qui l'accueille au départ.
+
+   Le classement s'en va pour la même raison, et une de plus : ce n'est
+   rien à ajouter, c'est un réglage. Il vit dans le profil, où l'échelon
+   se choisit dans une liste, et il continue de s'ouvrir tout seul le
+   premier jour — un carnet sans classement ne sait rien calculer.
+
+   Ne restent ici que des gestes d'ajout, et rien d'autre. */
 const RAPIDE = () => [
   ['🎤', 'Dicter une note', "Parler plutôt qu'écrire",     () => dicterModal(), true],
   ['🎾', 'Un match',   'Résultat, score, ressenti',       () => matchForm()],
   ['💡', 'Un conseil', 'Ce que le prof vient de dire',     () => conseilForm()],
   ['🏟️', 'Un club',    'Adresse, surfaces, juge-arbitre',  () => clubForm()],
-  ['🏅', 'Mon classement', 'Échelon et bilan',             () => profilForm()],
+  /* Le répertoire des adversaires se remplit tout seul avec les matchs.
+     Celui-ci est pour l'avant : le tableau de dimanche est sorti, on
+     sait contre qui l'on joue, et il n'y avait nulle part où le noter
+     avant d'avoir joué. */
+  ['👥', 'Un adversaire', 'Sa façon de jouer, avant le match', () => nouvelAdversaireForm()],
 ];
 
 function ajoutRapide() {

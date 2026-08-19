@@ -66,6 +66,17 @@ export function repertoire() {
     parCle.get(cle).matchs.push(m);
   }
 
+  /* Les fiches sans match : un adversaire noté avant de l'avoir joué —
+     celui du tableau de dimanche, celui dont un partenaire vient de
+     parler. Le répertoire se remplit tout seul avec les matchs, mais il
+     ne doit pas faire disparaître ce qu'on y a mis à la main : ajouté
+     puis introuvable, c'est pire que pas d'ajout du tout. */
+  for (const f of store.joueurs || []) {
+    const cle = cleJoueur(f.nom);
+    if (!cle || parCle.has(cle)) continue;
+    parCle.set(cle, { cle, nom: (f.nom || '').trim(), matchs: [] });
+  }
+
   return [...parCle.values()].map(j => {
     j.matchs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const b = bilanMatchs(j.matchs);

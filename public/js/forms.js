@@ -103,7 +103,7 @@ function adversairesConnus(courant = '') {
  *  cycle d'imports entre les formulaires et les vues. */
 const cleAdversaire = nom => (nom || '')
   .trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .replace(/s+/g, ' ');
+  .replace(/\s+/g, ' ');
 
 /** Les options d'une molette de durée. `vide` place un tiret en tête,
  *  pour que « non renseigné » se distingue de « zéro ». */
@@ -1049,6 +1049,61 @@ export function importFFTForm() {
 /* Les mêmes profils que le carnet de conseils, et ce n'est pas un hasard :
    noter « chipeur » ici et chercher « chipeur » là-bas, c'est le même
    geste. Le vocabulaire commun est ce qui relie les deux écrans. */
+/* Un adversaire qu'on n'a pas encore joué.
+ *
+ *  Le répertoire se remplit tout seul avec les matchs, et c'est le bon
+ *  ordre : on n'invente pas des adversaires, on les rencontre. Reste le
+ *  cas d'avant — le tableau de dimanche est sorti, un partenaire a
+ *  raconté comment celui-là joue, et il n'y a nulle part où l'écrire
+ *  jusqu'au match.
+ *
+ *  La fiche est créée dès le nom validé, avant même de la remplir : on
+ *  a demandé d'ajouter un adversaire, il doit exister ensuite, même si
+ *  l'on referme la fenêtre suivante sans rien y écrire.
+ */
+export function nouvelAdversaireForm() {
+  const connus = adversairesConnus();
+  openModal({
+    title: 'Un adversaire',
+    body: `<form id="f-nouvel-adversaire" class="form">
+      <label>Son nom
+        <input name="nom" required autocomplete="off" list="adversaires-connus"
+               placeholder="DUPONT Jean">
+      </label>
+      <datalist id="adversaires-connus">
+        ${connus.map(n => `<option value="${h(n)}"></option>`).join('')}
+      </datalist>
+      <p class="tiny muted">À n'utiliser que pour un adversaire que tu n'as pas encore
+        joué : ceux que tu as rencontrés sont déjà dans le répertoire, tirés de tes
+        matchs. Si le nom existe déjà, c'est sa fiche qui s'ouvre.</p>
+    </form>`,
+    footer: `<button class="btn btn-primary" data-ok>Continuer</button>`,
+    onMount: () => {
+      const racine = document.getElementById('modal-root');
+      const form = racine.querySelector('#f-nouvel-adversaire');
+      const champ = form.querySelector('[name="nom"]');
+      champ.focus();
+      const valider = () => {
+        if (!form.reportValidity()) return;
+        const nom = champ.value.trim();
+        if (!nom) return;
+        /* Le nom déjà connu ne fait pas un second adversaire : on rouvre
+           le sien. Deux orthographes de la même personne couperaient son
+           bilan en deux sans que rien ne le signale. */
+        const deja = connus.find(n => cleAdversaire(n) === cleAdversaire(nom));
+        const retenu = deja || nom;
+        const fiche = (store.joueurs || []).find(j => cleAdversaire(j.nom) === cleAdversaire(retenu));
+        if (!fiche) noterJoueur(retenu, { note: '', club: '', profils: [] });
+        closeModal();
+        toast(deja ? `${retenu} est déjà dans le répertoire.` : 'Adversaire ajouté.');
+        joueurForm({ nom: retenu, fiche: fiche || null });
+      };
+      racine.querySelector('[data-ok]').onclick = valider;
+      form.addEventListener('submit', e => { e.preventDefault(); valider(); });
+    },
+  });
+}
+
 export function joueurForm(joueur) {
   const f = joueur.fiche || { profils: [], note: '', club: '' };
 
