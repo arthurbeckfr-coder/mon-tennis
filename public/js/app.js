@@ -5,7 +5,7 @@ import { completerClubsConnus } from './clubs-connus.js';
 import { veillerAuClassement } from './montee.js';
 import { h, toast, openModal, closeModal } from './util.js';
 import { appliquerTheme, themeSuivant, themeActuel, ETIQUETTES } from './theme.js';
-import { matchForm, conseilForm, profilForm,
+import { matchForm, conseilForm, profilForm, clubForm,
          nouvelAdversaireForm, courseForm, cordageForm } from './forms.js';
 
 import * as matchs     from './views/matchs.js';
@@ -148,14 +148,12 @@ function afficher() {
    se choisit dans une liste, et il continue de s'ouvrir tout seul le
    premier jour — un carnet sans classement ne sait rien calculer.
 
-   Le club s'en va aussi, et par le même raisonnement : on n'ajoute pas
-   un club, on en rencontre un — le rattachement d'une épreuve le crée
-   déjà tout seul, et le bouton « Ajouter un club » attend sur sa page.
-   À sa place, la liste de courses : cordage à racheter, grip, tube de
-   balles. Ça, ça se note debout, entre deux gestes, et c'est ce qu'on
-   demande à ce bouton.
-
-   Ne restent ici que des gestes d'ajout, et rien d'autre. */
+   Ne restent ici que des gestes d'ajout, et rien d'autre — mais leur
+   ordre compte. La grille a deux colonnes, et deux cases côte à côte se
+   lisent comme une paire, qu'on l'ait voulu ou non : autant que les
+   paires disent quelque chose. Les gens ensemble — un adversaire, un
+   club —, puis le matériel — un cordage, une course. On cherche alors
+   la ligne avant la case, ce qui fait un geste de moins. */
 const RAPIDE = () => [
   ['🎤', 'Dicter une note', "Parler plutôt qu'écrire",     () => dicterModal(), true],
   ['🎾', 'Un match',   'Résultat, score, ressenti',       () => matchForm()],
@@ -165,11 +163,12 @@ const RAPIDE = () => [
      sait contre qui l'on joue, et il n'y avait nulle part où le noter
      avant d'avoir joué. */
   ['👥', 'Un adversaire', 'Sa façon de jouer, avant le match', () => nouvelAdversaireForm()],
-  ['🛒', 'Une course',  'À racheter : cordage, grip, balles', () => courseForm()],
+  ['🏟️', 'Un club',    'Adresse, surfaces, juge-arbitre',  () => clubForm()],
   /* Un cordage se casse trois fois par an et se change plus souvent
      encore. C'est le geste le plus répété du carnet après le match
      lui-même, et il se faisait par le profil, deux onglets plus loin. */
   ['🪢', 'Un cordage', 'Cassé, ou changé', () => cordageForm()],
+  ['🛒', 'Une course',  'À racheter : cordage, grip, balles', () => courseForm()],
 ];
 
 /** Le lien qui écrit le message, adresse et contexte compris.
