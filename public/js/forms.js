@@ -22,6 +22,7 @@ import { analyser, EXEMPLE } from './import-fft.js';
 import { URL_TENUP } from './config.js';
 import { situer } from './geocodage.js';
 import { poserRetour } from './retour.js';
+import { avantMatch, feterSiMerite } from './montee.js';
 import { blocTerrain, brancherTerrain } from './terrain.js';
 import * as nuage from './nuage.js';
 
@@ -170,7 +171,8 @@ export function matchForm(existant = null) {
           <select name="echelonAdverse">${opts(ECHELONS, m.echelonAdverse)}</select>
         </label>
         <label>Score
-          <input name="score" value="${h(m.score)}" placeholder="6/4 6/3">
+          <input name="score" value="${h(m.score)}" placeholder="6/4 6/3"
+                 inputmode="numeric" autocomplete="off">
         </label>
       </div>
       ${/* La durée ne vient d'aucune donnée fédérale : elle se note après
@@ -294,6 +296,64 @@ export function matchForm(existant = null) {
         location.hash = cible;
       });
 
+      /* Le score s'écrit en chiffres seuls : « 6462 » devient 6/4 6/2.
+
+         Personne ne tape volontiers une barre oblique sur un clavier de
+         téléphone — il faut changer de page de touches deux fois par
+         set. Les chiffres suffisent à dire le score, et la ponctuation
+         se déduit : un jeu, puis l'autre, puis le set suivant.
+
+         Reste le tie-break décisif, qui monte à dix ou plus et qu'aucun
+         découpage automatique ne peut deviner : « 108 », est-ce 10/8 ou
+         1/0 8 ? Alors dès qu'on tape soi-même un séparateur, le champ
+         se tait et laisse écrire — et il se ravise si l'on efface tout.
+         La règle est celle du carnet entier : deviner tant que c'est
+         sûr, se taire dès que ça ne l'est plus. */
+      const score = racine.querySelector('[name="score"]');
+      if (score) {
+        /* Un score déjà écrit ne se réécrit pas sous les doigts : on le
+           laisse tel quel, et vider le champ rend la main au découpage. */
+        if (/[^0-9\s]/.test(score.value)) score.dataset.libre = '1';
+
+        const auBout = () => {
+          const n = score.value.length;
+          score.setSelectionRange(n, n);
+        };
+
+        score.addEventListener('input', e => {
+          if (score.value === '') { delete score.dataset.libre; return; }
+          const tape = e.data || '';
+
+          /* Le séparateur tapé à la main veut dire « ce nombre-là n'est
+             pas fini » : dix-huit, pas un puis huit. On recolle donc le
+             set en cours — « 1/0 » redevient « 10 » — avant de passer la
+             main. Sans ce recollage, « 10/8 » sortait « 1/0/8 » : le
+             découpage avait déjà tranché avant qu'on puisse le démentir. */
+          if (!score.dataset.libre && /^[\/\-. ,]$/.test(tape)) {
+            const groupes = score.value.slice(0, -1).trim().split(' ');
+            groupes[groupes.length - 1] = groupes[groupes.length - 1].replace('/', '');
+            score.value = groupes.join(' ') + (tape === ',' ? '/' : tape);
+            score.dataset.libre = '1';
+            auBout();
+            return;
+          }
+
+          if (/[^0-9]/.test(tape)) score.dataset.libre = '1';
+          if (score.dataset.libre) return;
+
+          const jeux = score.value.replace(/\D/g, '').split('');
+          const sets = [];
+          for (let i = 0; i < jeux.length; i += 2) {
+            sets.push(jeux.slice(i, i + 2).join('/'));
+          }
+          score.value = sets.join(' ');
+          /* Le curseur au bout : on n'écrit un score que de gauche à
+             droite, et le remettre où il était le placerait avant une
+             barre qu'on vient d'insérer. */
+          auBout();
+        });
+      }
+
       const choix = racine.querySelector('#choix-adversaire');
       const ligneNeuf = racine.querySelector('#ligne-nouvel-adversaire');
       const champNeuf = ligneNeuf.querySelector('input');
@@ -332,9 +392,15 @@ export function matchForm(existant = null) {
         }
         delete d.adversaireNouveau;
 
-        conclure(
+        /* Où en était la montée avant ce match : c'est la comparaison
+           qui dit si la nouvelle vaut d'être annoncée. */
+        const avant = avantMatch();
+        const ok = conclure(
           existant ? modifierMatch(existant.id, d) : ajouterMatch(d),
           existant ? 'Match modifié.' : 'Match ajouté.');
+        /* Une fenêtre qui s'ouvre pendant que l'autre se referme se
+           marche dessus : on laisse le temps du battement. */
+        if (ok) setTimeout(() => feterSiMerite(avant), 250);
       };
 
       racine.querySelector('[data-suppr]')?.addEventListener('click', async () => {

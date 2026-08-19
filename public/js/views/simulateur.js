@@ -9,8 +9,11 @@
    bilans officiels de Ten'Up (voir l'en-tête de classement.js). Le bilan
    n'est donc plus saisi à la main, il est calculé depuis l'historique. */
 
-import { h, puce, dateCourte, openModal, closeModal, toast } from '../util.js';
-import { store, reglagesCalcul, maj } from '../store.js';
+import { h, puce, dateCourte } from '../util.js';
+import { store, reglagesCalcul } from '../store.js';
+/* La fenêtre qui acte une montée sert ici et à l'enregistrement d'un
+   match : deux copies auraient fini par ne plus dire la même chose. */
+import { acterMontee } from '../montee.js';
 import { simuler, bilanA, direScenario, echelonSuivant, ECHELONS, rang, seuil,
          projeter, echeance, rendementParEchelon, moisAVenir } from '../classement.js';
 
@@ -711,42 +714,6 @@ function replier(vue) {
     });
   }
 }
-/** Inscrire un nouvel échelon dans le profil.
- *
- *  On demande confirmation, non par cérémonie mais parce que le geste
- *  refait tous les calculs du carnet : monté trop tôt, le simulateur
- *  répondrait à une question qu'on ne se pose pas encore. Rien n'est
- *  perdu pour autant — l'échelon se rechoisit dans le profil.
- */
-function acterMontee(cible) {
-  const avant = store.profil.echelon;
-  openModal({
-    title: `Passer à ${cible} ?`,
-    body: `<p>Ton profil dira <strong>${h(cible)}</strong> au lieu de ${h(avant)}. Tout le
-        carnet suit : les points que rapporte chaque victoire, l'écart avec tes
-        adversaires, les projections.</p>
-      <p class="tiny muted">À faire une fois le classement publié — d'ici là, le calcul
-        reste juste tant que le profil dit ce que dit ta licence. Et cela se défait :
-        l'échelon se choisit dans ton profil.</p>`,
-    footer: `<button class="btn" data-non>Pas encore</button>
-             <button class="btn btn-primary" data-oui>Oui, je suis ${h(cible)}</button>`,
-    onMount: () => {
-      const racine = document.getElementById('modal-root');
-      racine.querySelector('[data-non]')?.addEventListener('click', closeModal);
-      racine.querySelector('[data-oui]')?.addEventListener('click', () => {
-        maj(s => { s.profil = { ...s.profil, echelon: cible }; });
-        /* L'objectif repart de zéro : viser l'échelon qu'on vient
-           d'atteindre n'a plus de sens, c'est le suivant qu'on regarde. */
-        cibleChoisie = null;
-        closeModal();
-        toast(`Te voilà ${cible}. Bravo.`);
-        /* Pas de redessin ici : `maj` annonce le changement, et l'écran
-           se refait de lui-même. */
-      });
-    },
-  });
-}
-
 export function wire(vue, rerendre) {
   replier(vue);
   brancherCourbe(vue);
@@ -754,7 +721,7 @@ export function wire(vue, rerendre) {
   vue.addEventListener('click', e => {
 
     const mo = e.target.closest('[data-monter]');
-    if (mo) { acterMontee(mo.dataset.monter); return; }
+    if (mo) { acterMontee(mo.dataset.monter, () => { cibleChoisie = null; }); return; }
 
     const c = e.target.closest('[data-cible]');
     if (c) { cibleChoisie = c.dataset.cible; rerendre(); return; }

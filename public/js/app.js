@@ -2,6 +2,7 @@
 
 import { charger, store, remplirTourneeUneFois } from './store.js';
 import { completerClubsConnus } from './clubs-connus.js';
+import { veillerAuClassement } from './montee.js';
 import { h, toast, openModal, closeModal } from './util.js';
 import { appliquerTheme, themeSuivant, themeActuel, ETIQUETTES } from './theme.js';
 import { matchForm, conseilForm, clubForm, profilForm,
@@ -203,6 +204,12 @@ if (!etat.ok) {
 if (etat.neuf) {
   setTimeout(() => { if (!store.matchs.length) profilForm(); }, 400);
 }
+
+/* Le temps fait baisser le bilan sans qu'on joue : mieux vaut
+   l'apprendre en ouvrant l'application qu'en lisant le classement
+   publié. Après l'affichage, pour ne pas retarder l'écran, et une fois
+   seulement — le module retient ce qu'il a déjà dit. */
+setTimeout(veillerAuClassement, 1200);
 
 afficher();
 

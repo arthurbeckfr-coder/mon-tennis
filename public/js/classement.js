@@ -163,7 +163,12 @@ export function monteeAutorisee(matchs, cible, finISO = null) {
    douze mois pleins, ce qui donne le même compte de matchs. */
 export function dansLaFenetre(dateISO, finISO = null) {
   if (!dateISO) return false;
-  const fin = finISO ? new Date(finISO + 'T12:00:00') : new Date();
+  /* Midi des deux côtés, et non l'instant présent. Une date sans heure est
+     lue à midi ; comparer le match du jour à `new Date()` le rejetait donc
+     toute la matinée — noté à onze heures, il ne comptait qu'à partir de
+     midi, et le classement ne bougeait pas d'un point sous les yeux de
+     celui qui venait de gagner. */
+  const fin = new Date((finISO || new Date().toISOString().slice(0, 10)) + 'T12:00:00');
   const debut = new Date(fin);
   debut.setFullYear(debut.getFullYear() - 1);
   const d = new Date(dateISO + 'T12:00:00');
