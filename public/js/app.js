@@ -204,16 +204,35 @@ const TYPES_MESSAGE = [
    minimum de politesse qu'on doit à sa propre boîte aux lettres. */
 const ADRESSE = ['arthurbeck.fr', 'gmail.com'].join('@');
 
-/** Ce que le carnet sait de lui-même, et qu'on ne pense jamais à dire. */
-function contexte() {
-  const version = (document.querySelector('script[type="module"]')?.getAttribute('src')
-    || '').match(/v=(\d+)/)?.[1] || '?';
-  return [
-    `Version du site : ${version}`,
-    `Écran : ${location.hash || '#/'}`,
-    `Appareil : ${navigator.userAgent}`,
-    `Carnet : ${store.matchs.length} match(s), ${store.clubs.length} club(s)`,
-  ].join('\n');
+/** Qui écrit.
+ *
+ *  Le message portait l'agent du navigateur, l'écran, la version et la
+ *  taille du carnet — quatre lignes qui décrivaient une machine, quand
+ *  la seule question devant un signalement est « qui est-ce, et où lui
+ *  répondre ». On les remplace par ce que la personne a écrit elle-même
+ *  dans son profil.
+ *
+ *  Ce qu'elle a écrit, et pas tout : sa main, son sexe, son échelon et
+ *  ses adresses ne disent rien du problème et n'aident à joindre
+ *  personne. Un signalement n'est pas une occasion de faire passer une
+ *  fiche, et ce qu'on n'envoie pas ne se perd pas en route.
+ *
+ *  Les cases vides ne partent pas non plus : une ligne « Téléphone : »
+ *  suivie de rien fait croire à un défaut de plus.
+ */
+function quiEcrit() {
+  const p = store.profil || {};
+  const nom = [p.prenom, p.nom].map(x => (x || '').trim()).filter(Boolean).join(' ');
+  const lignes = [
+    ['Nom', nom],
+    ['E-mail', p.mail],
+    ['Téléphone', p.telephone],
+    ['Club', p.clubPrincipal],
+  ].filter(([, v]) => (v || '').trim())
+   .map(([c, v]) => `${c} : ${String(v).trim()}`);
+
+  return lignes.length ? lignes.join('\n')
+    : 'Profil non renseigné — pas de quoi rappeler.';
 }
 
 function signalerModal() {
@@ -243,9 +262,9 @@ function signalerModal() {
         au message.</strong> Ton logiciel de messagerie s'ouvre avec le texte déjà écrit :
         il ne reste qu'à ajouter l'image avant d'envoyer. Une image montre en une seconde
         ce qu'un paragraphe explique mal.</p>
-      <p class="tiny muted">Partent avec le message la version du site, l'écran où tu es,
-        l'appareil et la taille du carnet. Rien de ce que contient le carnet — ni match, ni
-        nom, ni adresse.</p>
+      <p class="tiny muted">Partent avec le message ton nom, ton e-mail, ton téléphone et
+        ton club, tels que ton profil les donne — de quoi savoir qui écrit et où répondre.
+        Rien d'autre : ni tes matchs, ni ton classement, ni tes adresses.</p>
     </form>`,
     footer: `<button class="btn" data-non>Annuler</button>
              <button class="btn btn-primary" data-envoyer>Écrire le message</button>`,
@@ -269,7 +288,7 @@ function signalerModal() {
       racine.querySelector('[data-envoyer]').addEventListener('click', () => {
         const t = TYPES_MESSAGE.find(x => x.cle === nature) || TYPES_MESSAGE[0];
         const texte = form.querySelector('[name="texte"]').value.trim();
-        const corps = `${texte}\n\n— — —\n${contexte()}`;
+        const corps = `${texte}\n\n— — —\n${quiEcrit()}`;
         /* L'arobase reste elle-même : encodée en %40, elle se retrouve
            écrite telle quelle dans le champ « À » de quelques clients. */
         const lien = `mailto:${ADRESSE}`
