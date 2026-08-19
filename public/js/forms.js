@@ -22,6 +22,7 @@ import { analyser, EXEMPLE } from './import-fft.js';
 import { URL_TENUP } from './config.js';
 import { situer } from './geocodage.js';
 import { poserRetour } from './retour.js';
+import { reduire, poidsLisible, photosDe } from './photos.js';
 import { avantMatch, feterSiMerite } from './montee.js';
 import { blocTerrain, brancherTerrain } from './terrain.js';
 import * as nuage from './nuage.js';
@@ -119,7 +120,7 @@ function optsDuree(min, max, pas, choisi, vide) {
 export function matchForm(existant = null) {
   const m = existant || {
     date: aujourdhui(), issue: 'V', adversaire: '', echelonAdverse: store.profil.echelon,
-    score: '', tournoi: '', surface: '', notes: '', wo: false,
+    score: '', tournoi: '', surface: '', notes: '', wo: false, photos: [], lien: '',
     tour: '', gainMontant: null, gainLot: '',
   };
 
@@ -203,7 +204,8 @@ export function matchForm(existant = null) {
         <p class="tiny muted">Laissé à zéro, rien n'est enregistré : le carnet préfère une
           case vide à une durée inventée, qui fausserait les moyennes.</p>
       </fieldset>
-      <details ${m.tournoi || m.surface || m.notes ? 'open' : ''}>
+      <details ${m.tournoi || m.surface || m.notes || m.lien
+        || photosDe(m).length ? 'open' : ''}>
         <summary>Contexte et ressenti</summary>
         <label>Épreuve
           <input name="tournoi" value="${h(m.tournoi)}" placeholder="Tournoi, championnat par équipes…">
@@ -262,6 +264,32 @@ export function matchForm(existant = null) {
           <textarea name="notes" rows="4"
             placeholder="Ce qui a marché, ce qui a lâché, ce qu'il faudra travailler.">${h(m.notes)}</textarea>
         </label>
+
+        ${/* Les photos. Une remise des prix, un cadre cassé, le court sous
+              la pluie : ce sont des choses qu'on ne raconte pas, on les
+              montre. Elles vivent dans le carnet comme le reste, donc
+              elles suivent d'un appareil à l'autre — et elles sont
+              réduites à l'entrée, faute de quoi deux photos rempliraient
+              à elles seules tout ce que le navigateur accorde. */''}
+        <fieldset class="bloc-photos">
+          <legend>Photos</legend>
+          <div class="vignettes" data-vignettes></div>
+          <div class="rangee-boutons">
+            <button type="button" class="btn" data-ajout-photo>📷 Ajouter une photo</button>
+            <span class="tiny muted" data-poids-photos></span>
+          </div>
+          ${/* `capture` absent volontairement : le laisser force l'appareil
+                photo sur certains téléphones, alors que la photo d'une
+                remise des prix est déjà dans la pellicule. */''}
+          <input type="file" accept="image/*" multiple hidden data-fichier-photo>
+        </fieldset>
+
+        <label>Un lien
+          <input type="url" name="lien" value="${h(m.lien || '')}"
+                 placeholder="https://… l'article du journal, la page du tournoi">
+        </label>
+        <p class="tiny muted">L'adresse d'une page qui parle de ce match : un article, un
+          tableau en ligne, une vidéo. Elle s'ouvrira depuis le ⓘ de la ligne.</p>
       </details>
     </form>`,
     footer: `${existant ? '<button class="btn btn-danger" data-suppr>Supprimer</button>' : ''}
@@ -354,6 +382,50 @@ export function matchForm(existant = null) {
         });
       }
 
+      /* Les photos vivent à côté du formulaire : un champ de fichier ne
+         retient pas ce qu'on lui a donné une fois la fenêtre redessinée,
+         et l'on veut pouvoir en ajouter trois d'affilée puis en retirer
+         une. La liste fait foi ; le champ ne sert qu'à ouvrir la
+         pellicule. */
+      let photos = photosDe(m);
+      const bandeau = racine.querySelector('[data-vignettes]');
+      const poids = racine.querySelector('[data-poids-photos]');
+      const fichier = racine.querySelector('[data-fichier-photo]');
+
+      const dessinerPhotos = () => {
+        bandeau.innerHTML = photos.map((p, i) => `<div class="vignette">
+          <img src="${h(p.src)}" alt="">
+          <button type="button" class="vignette-retirer" data-retirer="${i}"
+            aria-label="Retirer cette photo">✕</button>
+        </div>`).join('');
+        const total = photos.reduce((t, p) => t + (p.poids || 0), 0);
+        poids.textContent = photos.length
+          ? `${photos.length} photo${photos.length > 1 ? 's' : ''}${total ? ` — ${poidsLisible(total)}` : ''}`
+          : '';
+      };
+      dessinerPhotos();
+
+      racine.querySelector('[data-ajout-photo]').addEventListener('click', () => fichier.click());
+      bandeau.addEventListener('click', e => {
+        const b = e.target.closest('[data-retirer]');
+        if (!b) return;
+        photos.splice(Number(b.dataset.retirer), 1);
+        dessinerPhotos();
+      });
+      fichier.addEventListener('change', async () => {
+        const liste = [...fichier.files];
+        fichier.value = '';
+        if (!liste.length) return;
+        poids.textContent = 'réduction…';
+        let refusees = 0;
+        for (const x of liste) {
+          const p = await reduire(x);
+          if (p) photos.push(p); else refusees++;
+        }
+        dessinerPhotos();
+        if (refusees) toast(`${refusees} fichier(s) ignoré(s) : ce n'était pas une image.`);
+      });
+
       const choix = racine.querySelector('#choix-adversaire');
       const ligneNeuf = racine.querySelector('#ligne-nouvel-adversaire');
       const champNeuf = ligneNeuf.querySelector('input');
@@ -384,6 +456,13 @@ export function matchForm(existant = null) {
            sans quoi tous les matchs entreraient dans le total à zéro euro
            et l'on ne saurait plus lesquels ont vraiment rapporté. */
         d.gainMontant = d.gainMontant === '' ? null : Number(d.gainMontant);
+
+        /* Les photos ne passent pas par le formulaire : elles ont leur
+           propre liste, la seule qui sache ce qui a été ajouté puis
+           retiré. Et le lien vide s'écrit vide plutôt qu'absent, sinon
+           l'effacer ne l'effacerait pas. */
+        d.photos = photos;
+        d.lien = (d.lien || '').trim();
 
         if (d.adversaire === '__nouveau') {
           const nom = (d.adversaireNouveau || '').trim();

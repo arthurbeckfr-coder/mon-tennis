@@ -2651,6 +2651,72 @@ body.mode-court .terrain-diapo .terrain {
   min-height: 88px;
 }
 .bouton-rapide:hover { background: var(--carte-2); border-color: var(--accent); }
+/* ===================================================================
+   Les photos d'un match
+   =================================================================== */
+/* Les vignettes du formulaire : carrées, alignées, et coupées au centre.
+   Une bande de photos aux hauteurs inégales fait un accordéon, et l'on
+   ne voit plus que le désordre. Le carré ment un peu sur le cadrage —
+   c'est le rôle de l'agrandissement de rétablir la photo entière. */
+.vignettes { display: flex; flex-wrap: wrap; gap: 8px; }
+.vignettes:empty { display: none; }
+.vignette {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--bord);
+}
+.vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* La croix se pose sur un rond sombre : posée à même la photo, elle
+   disparaît sur un ciel clair et l'on ne sait plus comment retirer
+   l'image qu'on vient d'ajouter par erreur. */
+.vignette-retirer {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(16, 20, 17, .72);
+  color: #fff;
+  font-size: .8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.bloc-photos .rangee-boutons { align-items: center; gap: 10px; margin-top: 9px; }
+
+/* Les vignettes sous le ⓘ. Plus petites que celles du formulaire : ici
+   on ne retire rien, on regarde — et la ligne d'un match ne doit pas
+   doubler de hauteur parce qu'on a pris trois photos ce jour-là. */
+.match-photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.match-photo {
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  overflow: hidden;
+  background: none;
+  cursor: zoom-in;
+}
+.match-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.match-photo:hover { border-color: var(--accent); }
+
+/* L'agrandissement : la photo entière, sans recadrage, tenue dans ce que
+   l'écran laisse à la fenêtre. `contain` et non `cover` — on ouvre
+   justement pour voir ce que la vignette avait coupé. */
+.visionneuse { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.visionneuse img {
+  max-width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+  border-radius: 10px;
+}
+.visionneuse-pied { display: flex; align-items: center; gap: 14px; }
+
 /* Les natures d'un signalement : cinq boutons qui s'enroulent plutôt
    qu'une liste déroulante. Ils gardent la hauteur du pouce — 44 px — et
    le choisi prend la couleur de l'accent, comme partout ailleurs dans ce

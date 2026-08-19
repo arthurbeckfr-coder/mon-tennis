@@ -1,6 +1,8 @@
 /* La petite boîte à outils : échapper du texte, dire un mot à l'écran,
    ouvrir une fenêtre, écrire une date en français. */
 
+import { photosDe } from './photos.js';
+
 /** Échappe tout ce qui vient de l'utilisateur avant de l'injecter en HTML.
  *  Les conseils du prof sont du texte libre : un chevron mal placé ne doit
  *  pas casser la page. */
@@ -151,20 +153,94 @@ export const puce = (texte, teinte = '') =>
    que sur une. Ce qui se répète doit s'écrire une fois. */
 
 /** Le ⓘ, à poser dans la ligne des chiffres. */
-export const puceNote = m => m?.notes
+/* Le ⓘ ne dit plus seulement « il y a un texte ». Un match peut porter
+   trois choses qu'on n'écrit pas sur sa ligne — ce qu'on en retient, des
+   photos, un lien vers l'article du journal — et c'est le même geste qui
+   les découvre. Un second bouton pour les photos aurait chargé une ligne
+   qu'on a passé du temps à alléger. */
+const aQuelqueChose = m => !!(m?.notes || photosDe(m).length || m?.lien);
+
+export const puceNote = m => aQuelqueChose(m)
   ? `<button type="button" class="match-info" data-note="${h(m.id)}"
-      aria-expanded="false" title="Ce que j'en retiens">ⓘ</button>`
+      aria-expanded="false" title="Ce qu'il y a à voir">ⓘ</button>`
   : '';
 
-/** Le texte, replié, à poser juste après la ligne. */
-export const blocNote = m => m?.notes
-  ? `<p class="match-note" data-note-de="${h(m.id)}" hidden>${hMulti(m.notes)}</p>`
-  : '';
+/** Le nom du site, tel qu'on le dirait : « paris-normandie.fr » plutôt
+ *  qu'une adresse de trois lignes dont on ne lit que le début. */
+const nomDuSite = url => {
+  try { return new URL(url).hostname.replace(/^www\./, ''); }
+  catch { return url; }
+};
+
+/** Ce qu'il y a à voir, replié, à poser juste après la ligne. */
+export const blocNote = m => {
+  if (!aQuelqueChose(m)) return '';
+  const photos = photosDe(m);
+  return `<div class="match-note" data-note-de="${h(m.id)}" hidden>
+    ${m.notes ? `<p>${hMulti(m.notes)}</p>` : ''}
+    ${photos.length ? `<div class="match-photos">${photos.map((p, i) =>
+      `<button type="button" class="match-photo" data-photo="${h(m.id)}" data-i="${i}"
+        title="Voir en grand"><img src="${h(p.src)}" alt="" loading="lazy"></button>`
+      ).join('')}</div>` : ''}
+    ${m.lien ? `<p class="tiny"><a href="${h(m.lien)}" target="_blank"
+      rel="noopener noreferrer">🔗 ${h(nomDuSite(m.lien))} ↗</a></p>` : ''}
+  </div>`;
+};
+
+/** La photo en grand, et les autres derrière elle.
+ *
+ *  Une vignette de soixante pixels ne montre rien d'une remise des prix.
+ *  On ouvre donc la vraie image, et l'on passe à la suivante sans
+ *  refermer : c'est ainsi qu'on regarde des photos, l'une après l'autre.
+ */
+export function visionneuse(photos, depart = 0) {
+  let i = Math.max(0, Math.min(depart, photos.length - 1));
+  const dessiner = () => {
+    const corps = document.querySelector('#modal-root .modal-corps');
+    if (!corps) return;
+    corps.innerHTML = `<div class="visionneuse">
+      <img src="${h(photos[i].src)}" alt="">
+      ${photos.length > 1 ? `<div class="visionneuse-pied">
+        <button class="btn btn-ghost" data-prec aria-label="Précédente">←</button>
+        <span class="tiny muted">${i + 1} / ${photos.length}</span>
+        <button class="btn btn-ghost" data-suiv aria-label="Suivante">→</button>
+      </div>` : ''}
+    </div>`;
+  };
+  openModal({
+    title: 'Photo',
+    large: true,
+    body: '',
+    onMount: corps => {
+      dessiner();
+      corps.addEventListener('click', e => {
+        if (e.target.closest('[data-prec]')) { i = (i - 1 + photos.length) % photos.length; dessiner(); }
+        if (e.target.closest('[data-suiv]')) { i = (i + 1) % photos.length; dessiner(); }
+      });
+    },
+  });
+}
 
 /** Branche les ⓘ d'un écran. Le geste est de lecture, jamais d'édition :
  *  il ne doit donc pas remonter jusqu'au gestionnaire qui ouvre le match. */
 export function brancherNotes(racine) {
   racine.addEventListener('click', e => {
+    /* Une vignette ouvre la photo en grand, et rien d'autre : le clic ne
+       doit remonter ni au dépliement ni à la fiche du match. */
+    const ph = e.target.closest('[data-photo]');
+    if (ph) {
+      e.stopPropagation();
+      e.preventDefault();
+      const bloc = racine.querySelector(`[data-note-de="${CSS.escape(ph.dataset.photo)}"]`);
+      const srcs = [...(bloc?.querySelectorAll('.match-photo img') || [])]
+        .map(img => ({ src: img.getAttribute('src') }));
+      if (srcs.length) visionneuse(srcs, Number(ph.dataset.i) || 0);
+      return;
+    }
+    /* Le lien s'ouvre tout seul : on le laisse passer, mais sans replier
+       le bloc sous les doigts de celui qui vient de le toucher. */
+    if (e.target.closest('.match-note a')) { e.stopPropagation(); return; }
+
     const b = e.target.closest('[data-note]');
     if (!b) return;
     e.stopPropagation();
