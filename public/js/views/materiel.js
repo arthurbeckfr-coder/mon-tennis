@@ -229,6 +229,35 @@ function vueMoi() {
       ${o.inputmode ? `inputmode="${o.inputmode}"` : ''}
       ${o.autocomplete ? `autocomplete="${o.autocomplete}"` : ''}></label>`;
 
+  /* Mon club se choisit dans la liste des clubs du carnet plutôt que de
+     se retaper. Saisi à la main, il s'écrivait « TC Puys » ici et
+     « TENNIS DE PUYS » dans la page des clubs : deux noms pour un même
+     club, qu'aucun rapprochement ne pouvait plus faire.
+
+     Deux précautions. Le nom déjà saisi reste proposé même s'il ne
+     correspond à aucun club connu — une liste déroulante ne doit pas
+     effacer ce qu'elle ne reconnaît pas. Et tant qu'aucun club n'existe,
+     le champ libre demeure : une liste vide n'est pas un choix. */
+  const choixClub = () => {
+    const clubs = [...store.clubs].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+    if (!clubs.length) {
+      return champ('clubPrincipal', 'Mon club', { placeholder: 'TC de ma ville' }) +
+        `<p class="tiny muted">La liste s'ouvrira ici dès qu'un club sera dans le carnet —
+          il s'en crée un à chaque épreuve rattachée.</p>`;
+    }
+    const mien = (p.clubPrincipal || '').trim();
+    const inconnu = mien && !clubs.some(c => c.nom === mien);
+    return `<label>Mon club
+      <select name="clubPrincipal">
+        <option value="">— aucun —</option>
+        ${clubs.map(c => `<option value="${h(c.nom)}"${c.nom === mien ? ' selected' : ''}
+          >${h(c.nom)}</option>`).join('')}
+        ${inconnu ? `<option value="${h(mien)}" selected>${h(mien)} (hors liste)</option>` : ''}
+      </select></label>
+      ${inconnu ? `<p class="tiny muted">« ${h(mien)} » n'est pas un club du carnet. Il reste
+        choisi tant que tu n'en prends pas un autre.</p>` : ''}`;
+  };
+
   const lieu = (cle, libelle, exemple) => {
     const l = p[cle];
     return `<label>${h(libelle)}
@@ -262,7 +291,7 @@ function vueMoi() {
           ${champ('telephone', 'Téléphone', { type: 'tel', autocomplete: 'tel' })}
           ${champ('mail', 'E-mail', { type: 'email', autocomplete: 'email' })}
         </div>
-        ${champ('clubPrincipal', 'Mon club', { placeholder: 'TC de ma ville' })}
+        ${choixClub()}
         <p class="tiny muted">Le numéro de licence est ce qu'on cherche le plus souvent,
           debout au club, au moment de s'inscrire. Rien de tout cela ne sort du carnet.</p>
       </div>
