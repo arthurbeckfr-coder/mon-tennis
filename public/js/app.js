@@ -171,41 +171,106 @@ const RAPIDE = () => [
   ['🛒', 'Une course',  'À racheter : cordage, grip, balles', () => courseForm()],
 ];
 
-/** Le lien qui écrit le message, adresse et contexte compris.
+/* ─── Signaler quelque chose ───────────────────────────────────────────
  *
- *  L'adresse ne vit pas dans le code : elle est lue dans le profil, où
- *  elle a été saisie. Le dépôt est public, et une adresse écrite en clair
- *  dans une page publiée est une adresse récoltée dans la semaine — pour
- *  un carnet qui n'a qu'un seul lecteur, ce serait payer cher un lien.
+ * Un lien `mailto` nu ouvrait un message vide : à charge de l'auteur du
+ * message de dire ce qui ne va pas, sur quel écran, et avec quelle
+ * version. Personne ne le fait — on écrit « ça marche pas » et l'on
+ * repart. La fenêtre pose donc les trois questions à sa place : de quoi
+ * s'agit-il, que s'est-il passé, et le reste, elle le sait toute seule.
  *
- *  Le contexte part avec : version du site, appareil, taille du carnet.
- *  Ce sont les trois questions qu'on se pose devant un défaut, et les
- *  trois qu'on ne pense jamais à donner en le racontant.
+ * Elle ne peut pas joindre l'image : aucune page web n'attache un
+ * fichier à un message, `mailto` ne le permet pas et c'est une bonne
+ * chose. Elle le dit, et laisse le logiciel de messagerie faire ce
+ * qu'il sait faire.
  */
-function lienMessage() {
-  const adresse = (store.profil?.mail || '').trim();
-  if (!adresse) return '';
+const TYPES_MESSAGE = [
+  { cle: 'bug',      nom: 'Un bug',        aide: 'Quelque chose ne marche pas comme prévu' },
+  { cle: 'faux',     nom: 'Un chiffre faux', aide: 'Un compte, un classement ou une distance qui ne tombe pas juste' },
+  { cle: 'question', nom: 'Une question',  aide: 'Je ne comprends pas ce que fait le carnet' },
+  { cle: 'idee',     nom: 'Une idée',      aide: 'Il manque quelque chose, ou ça pourrait être mieux' },
+  { cle: 'autre',    nom: 'Autre chose',   aide: '' },
+];
+
+/* L'adresse, assemblée à l'exécution. Écrite d'un seul tenant dans un
+   dépôt public, elle serait récoltée par les robots qui lisent le code
+   des sites ; en deux morceaux, elle échappe aux plus simples d'entre
+   eux. Ce n'est pas un secret et cela n'en fait pas un — c'est le
+   minimum de politesse qu'on doit à sa propre boîte aux lettres. */
+const ADRESSE = ['arthurbeck.fr', 'gmail.com'].join('@');
+
+/** Ce que le carnet sait de lui-même, et qu'on ne pense jamais à dire. */
+function contexte() {
   const version = (document.querySelector('script[type="module"]')?.getAttribute('src')
     || '').match(/v=(\d+)/)?.[1] || '?';
-  const corps = [
-    '',
-    '',
-    '— — —',
+  return [
     `Version du site : ${version}`,
+    `Écran : ${location.hash || '#/'}`,
     `Appareil : ${navigator.userAgent}`,
     `Carnet : ${store.matchs.length} match(s), ${store.clubs.length} club(s)`,
   ].join('\n');
-  /* L'arobase reste elle-même : encodée en %40, elle passe partout en
-     théorie, et se retrouve écrite telle quelle dans le champ « À » de
-     quelques clients de messagerie. */
-  return `mailto:${encodeURIComponent(adresse).replace(/%40/g, '@')}`
-    + `?subject=${encodeURIComponent('Mon tennis — remarque')}`
-    + `&body=${encodeURIComponent(corps)}`;
 }
 
+function signalerModal() {
+  openModal({
+    title: 'Signaler quelque chose',
+    body: `<form id="f-signal" class="form">
+      <label>De quoi s'agit-il ?
+        <select name="type">
+          ${TYPES_MESSAGE.map(t => `<option value="${t.cle}">${h(t.nom)}</option>`).join('')}
+        </select>
+      </label>
+      <p class="tiny muted" data-aide>${h(TYPES_MESSAGE[0].aide)}</p>
+      <label>Ce qui s'est passé
+        <textarea name="texte" rows="6" placeholder="Ce que tu faisais, ce que tu attendais, ce qui est arrivé à la place. Trois lignes suffisent."></textarea>
+      </label>
+      ${/* La capture d'écran vaut dix explications, et c'est la seule
+            chose que cette fenêtre ne peut pas faire à ta place. */''}
+      <p class="tiny muted">📸 <strong>Si tu as une capture d'écran du problème, joins-la
+        au message.</strong> Ton logiciel de messagerie s'ouvre avec le texte déjà écrit :
+        il ne reste qu'à ajouter l'image avant d'envoyer. Une image montre en une seconde
+        ce qu'un paragraphe explique mal.</p>
+      <p class="tiny muted">Partent avec le message la version du site, l'écran où tu es,
+        l'appareil et la taille du carnet. Rien de ce que contient le carnet — ni match, ni
+        nom, ni adresse.</p>
+    </form>`,
+    footer: `<button class="btn" data-non>Annuler</button>
+             <button class="btn btn-primary" data-envoyer>Écrire le message</button>`,
+    onMount: () => {
+      const racine = document.getElementById('modal-root');
+      const form = racine.querySelector('#f-signal');
+      const choix = form.querySelector('[name="type"]');
+      const aide = form.querySelector('[data-aide]');
+      choix.addEventListener('change', () => {
+        aide.textContent = TYPES_MESSAGE.find(t => t.cle === choix.value)?.aide || '';
+      });
+      racine.querySelector('[data-non]').addEventListener('click', closeModal);
+      racine.querySelector('[data-envoyer]').addEventListener('click', () => {
+        const t = TYPES_MESSAGE.find(x => x.cle === choix.value) || TYPES_MESSAGE[0];
+        const texte = form.querySelector('[name="texte"]').value.trim();
+        const corps = `${texte}\n\n— — —\n${contexte()}`;
+        /* L'arobase reste elle-même : encodée en %40, elle se retrouve
+           écrite telle quelle dans le champ « À » de quelques clients. */
+        const lien = `mailto:${ADRESSE}`
+          + `?subject=${encodeURIComponent(`Mon tennis — ${t.nom.toLowerCase()}`)}`
+          + `&body=${encodeURIComponent(corps)}`;
+        closeModal();
+        /* Un lien qu'on clique plutôt qu'une adresse qu'on impose : sur
+           un téléphone, changer `location` d'un coup fait parfois sortir
+           de l'application sans y revenir. */
+        const el = document.createElement('a');
+        el.href = lien;
+        el.rel = 'noopener';
+        document.body.appendChild(el);
+        el.click();
+        el.remove();
+        toast('Ton logiciel de messagerie s\'ouvre — pense à la capture d\'écran.');
+      });
+    },
+  });
+}
 function ajoutRapide() {
   const liste = RAPIDE();
-  const mail = lienMessage();
   openModal({
     title: 'Ajouter',
     body: `<div class="grille-rapide">
@@ -218,19 +283,12 @@ function ajoutRapide() {
           au même rang que les autres, c'était la proposer à chaque fois
           qu'on vient noter un match. */''}
     <div class="rangee-message">
-      ${mail ? `<a class="btn btn-ghost" href="${h(mail)}">✉️ Un bug, une question…</a>`
-        : `<button class="btn btn-ghost" data-sans-mail>✉️ Un bug, une question…</button>`}
+      <button class="btn btn-ghost" data-signaler>✉️ Un bug, une question…</button>
     </div>`,
     onMount: el => el.addEventListener('click', e => {
       const b = e.target.closest('[data-q]');
       if (b) { closeModal(); liste[+b.dataset.q][3](); return; }
-      /* Sans adresse dans le profil, on ne devine pas : on dit où la
-         mettre, et le bouton marchera la fois d'après. */
-      if (e.target.closest('[data-sans-mail]')) {
-        closeModal();
-        toast('Renseigne ton e-mail dans ton profil : c\'est là que ce bouton va le chercher.');
-        location.hash = '#/matos';
-      }
+      if (e.target.closest('[data-signaler]')) { closeModal(); signalerModal(); }
     }),
   });
 }
