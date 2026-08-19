@@ -43,10 +43,28 @@ if (absents.length) {
 }
 
 const versions = new Set(Object.values(carte.imports).map(v => v.split('?v=')[1]));
-const entree = (html.match(/js\/app\.js\?v=(\d+)/) || [])[1];
+
+/* La balise, et non la première occurrence du nom : la carte d'imports
+   contient « ./js/app.js?v=… » bien avant le `<script>` du bas, si bien
+   que ce contrôle comparait la carte à elle-même. Il passait donc
+   toujours, pendant que le module d'entrée restait figé à une vieille
+   version — la panne même qu'il devait interdire. */
+const entree = (html.match(/<script type="module" src="js\/app\.js\?v=(\d+)"/) || [])[1];
+const feuille = (html.match(/css\/style\.css\?v=(\d+)/) || [])[1];
+
 if (versions.size !== 1 || !versions.has(entree)) {
   console.error("::error::La carte d'imports et le module d'entrée ne portent pas la même version"
     + ` (carte : ${[...versions].join(', ')} ; entrée : ${entree}).`);
+  process.exit(1);
+}
+
+/* La feuille de style suit le même chemin et le même cache. Publiée
+   sous une version périmée, elle donne un écran aux styles d'avant sur
+   un site dont le code est d'après : plus déroutant encore qu'un module
+   figé, parce que rien n'a l'air cassé. */
+if (feuille !== entree) {
+  console.error('::error::La feuille de style ne porte pas la version du site'
+    + ` (style : ${feuille} ; entrée : ${entree}).`);
   process.exit(1);
 }
 

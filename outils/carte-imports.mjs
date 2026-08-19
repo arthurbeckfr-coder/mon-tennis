@@ -54,8 +54,22 @@ if (debut >= 0) {
   html = html.replace('</head>', `${bloc}\n</head>`);
 }
 
+/* Le module d'entrée porte son propre marqueur, et il faut viser la
+   balise qui le charge — pas la première occurrence du nom dans le
+   fichier. Depuis que la carte d'imports existe, celle-ci contient
+   « ./js/app.js?v=… » bien avant le `<script>` du bas : la
+   substitution retombait sur la carte, qui venait d'être réécrite,
+   et le `<script src>` restait à la version qu'il avait ce jour-là.
+
+   Il y est resté quatre-vingt-dix versions. Les modules importés
+   suivaient, eux, puisque la carte les redirige — si bien qu'un
+   appareil pouvait servir l'ancien `app.js` avec tout le reste à
+   jour : le routeur et le menu d'avant, les écrans d'après. C'est
+   exactement la panne que la carte devait empêcher, déplacée d'un
+   cran. */
 html = html.replace(/css\/style\.css\?v=\d+/, `css/style.css?v=${version}`)
-           .replace(/js\/app\.js\?v=\d+/, `js/app.js?v=${version}`);
+           .replace(/(<script type="module" src=")js\/app\.js\?v=\d+/,
+                    `$1js/app.js?v=${version}`);
 
 writeFileSync('public/index.html', html);
 console.log(`carte d'imports : ${modules.length} modules en v=${version}`);
