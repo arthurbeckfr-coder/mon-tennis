@@ -2586,6 +2586,25 @@ body.mode-court .terrain-diapo .terrain {
   min-height: 0;
   align-items: center;
   text-align: center;
+  /* Et la couleur de l'accent, seule de la grille. Cinq cases blanches se
+     valent toutes : l'œil les parcourt une à une pour trouver celle qu'il
+     cherchait. Une seule colorée se trouve sans être lue — et c'est bien
+     ce qu'on demande à la dictée, dont l'intérêt est précisément de
+     n'avoir ni les mains ni le temps. */
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-txt);
+}
+/* Le sous-titre reprend la couleur du texte plutôt que le gris commun :
+   du gris sur du vert ne se lit plus. Légèrement effacé, il reste second
+   sans devenir illisible. */
+.bouton-rapide.large .muted { color: inherit; opacity: .85; }
+.bouton-rapide.large:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  /* Le survol des autres cases éclaircit le fond ; ici il ne peut pas —
+     le fond est déjà la couleur. Il assombrit donc d'un cran. */
+  filter: brightness(.93);
 }
 .bouton-rapide {
   display: flex;
