@@ -186,7 +186,13 @@ export function sauver() {
  * chaque envoi. Six mois, c'est le temps d'une saison plus une trêve —
  * un téléphone qu'on n'a pas ouvert de tout ce temps a d'autres soucis.
  */
-const LISTES = ['matchs', 'conseils', 'sources', 'clubs', 'raquettes',
+/* Les listes que la fusion sait rapprocher. Exportée pour que l'essai
+   puisse vérifier qu'aucune liste du carnet n'en manque : une liste
+   oubliée ici partirait bien en ligne, mais n'en reviendrait jamais —
+   elle s'ajouterait sur l'appareil qui l'a écrite et nulle part
+   ailleurs. C'est le genre d'oubli qu'on ne voit qu'au moment où il
+   manque quelque chose. */
+export const LISTES = ['matchs', 'conseils', 'sources', 'clubs', 'raquettes',
                 'cordages', 'chaussures', 'courses', 'joueurs', 'depenses'];
 
 const MEMOIRE_TOMBES = 180 * 24 * 3600 * 1000;

@@ -95,4 +95,36 @@ const avant = JSON.stringify(A.etat());
 A.reprendre(B.exporter());
 dit(JSON.stringify(A.etat()) === avant, 'une fusion sans nouveauté ne change rien');
 
+/* ─── 7. Aucune liste n'est oubliée par la fusion ──────────────────── */
+const D = await appareil('D');
+const listesDuCarnet = Object.keys(D.etat())
+  .filter(c => Array.isArray(D.etat()[c]) && c !== 'supprimes');
+const oubliees = listesDuCarnet.filter(c => !D.m.LISTES.includes(c));
+dit(oubliees.length === 0,
+    'toutes les listes du carnet passent par la fusion' +
+    (oubliees.length ? ' — oubliée(s) : ' + oubliees.join(', ') : ''));
+
+/* ─── 8. Le profil entier traverse, champ par champ ────────────────── */
+await new Promise(r => setTimeout(r, 5));
+A.m.maj(s => {
+  s.profil = { ...s.profil, prenom: 'Arthur', nom: 'Beck', licence: '1234567',
+    telephone: '06', mail: 'x@y.fr', clubPrincipal: 'TENNIS DE PUYS',
+    naissance: '1990-01-01', sexe: 'h', gaucher: true, coutKm: 0.3,
+    coutVictoire: 4, tourneeReglee: true,
+    domicile: { adresse: 'quelque part', point: [1, 2], libelle: 'quelque part' } };
+});
+B.reprendre(A.exporter());
+const manquants = Object.keys(A.etat().profil)
+  .filter(c => JSON.stringify(A.etat().profil[c]) !== JSON.stringify(B.etat().profil[c]));
+dit(manquants.length === 0,
+    'le profil traverse en entier' +
+    (manquants.length ? ' — resté(s) en route : ' + manquants.join(', ') : ''));
+
+/* Et il redescend dans l'autre sens, sans emporter le reste. */
+await new Promise(r => setTimeout(r, 5));
+B.m.maj(s => { s.profil = { ...s.profil, telephone: '07' }; });
+A.reprendre(B.exporter());
+dit(A.etat().profil.telephone === '07' && A.etat().profil.prenom === 'Arthur',
+    'une correction du profil remonte sans effacer les autres champs');
+
 console.log(process.exitCode ? '\nDes cas échouent.' : '\nTous les cas passent.');

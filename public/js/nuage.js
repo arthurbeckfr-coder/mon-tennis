@@ -24,6 +24,7 @@
 
 import { SUPABASE_URL, SUPABASE_CLE } from './config.js';
 import { store, exporterJSON, fusionnerDistant } from './store.js';
+import { viderBrouillons } from './util.js';
 
 const CLE_SESSION = 'tennis-session';
 const CLE_SYNC = 'tennis-derniere-sync';
@@ -191,6 +192,46 @@ export async function synchroniser() {
   }
 }
 
+/** L'envoi de la dernière chance.
+ *
+ *  Une requête ordinaire est annulée avec la page : sur un téléphone,
+ *  fermer l'application au moment où le minuteur allait partir, c'était
+ *  perdre l'envoi. `keepalive` demande au navigateur de la mener au bout
+ *  quoi qu'il arrive — au prix d'un corps limité à soixante-quatre
+ *  kilo-octets. Au-delà, on retombe sur l'envoi ordinaire : il a toutes
+ *  ses chances quand on ne fait que passer à une autre application, et
+ *  le tour suivant rattrapera de toute façon.
+ *
+ *  On n'y rafraîchit pas le jeton : le faire demande un aller-retour
+ *  qui n'aura pas lieu. Jeton périmé, on ne tente rien — la donnée reste
+ *  au chaud dans le navigateur et partira à la prochaine ouverture.
+ */
+function envoyerEnPartant() {
+  const s = lireSession();
+  if (!s?.access_token || s.expire_le <= Date.now()) return false;
+
+  const corps = JSON.stringify({
+    utilisateur: s.utilisateur,
+    donnees: JSON.parse(exporterJSON()),
+    appareil: appareil(),
+  });
+  attente = false;
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/carnets`, {
+      method: 'POST',
+      keepalive: corps.length <= 60_000,
+      headers: {
+        apikey: SUPABASE_CLE,
+        Authorization: `Bearer ${s.access_token}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: corps,
+    }).catch(() => { /* on s'en va : personne pour l'entendre */ });
+    return true;
+  } catch { return false; }
+}
+
 /* Une modification locale ne déclenche pas un envoi immédiat : on saisit
    souvent trois choses d'affilée, et trois envois pour un seul geste de
    l'utilisateur seraient du gaspillage. On attend un moment de calme —
@@ -241,9 +282,18 @@ export function planifierEnvoi(delai = 1500) {
 const REPOS = 30_000;          // le temps de calme minimal entre deux tours
 const RYTHME = 600_000;        // dix minutes
 
+/* `derniereSync` rend ce que le stockage garde, c'est-à-dire du texte.
+   On lui demandait l'heure comme à une date, ce qui levait une erreur —
+   dans une fonction asynchrone, donc en silence — et emportait avec elle
+   les trois quarts de la synchronisation automatique : le retour sur
+   l'écran, le retour au premier plan et le battement des dix minutes ne
+   rapportaient plus rien. Seuls l'ouverture et le retour du réseau
+   passaient encore, parce qu'ils forcent et ne consultent pas l'horloge.
+   Une date illisible ne doit pas davantage bloquer : dans le doute, on
+   synchronise. */
 const tropTot = () => {
-  const q = derniereSync();
-  return q ? (Date.now() - q.getTime()) < REPOS : false;
+  const t = Date.parse(derniereSync());
+  return Number.isFinite(t) && (Date.now() - t) < REPOS;
 };
 
 async function synchroSiUtile(force = false) {
@@ -269,11 +319,18 @@ export function brancherSynchroAuto() {
     if (document.visibilityState === 'visible') synchroSiUtile();
   }, RYTHME);
 
-  /* En partant, on envoie ce qui attend encore. `pagehide` plutôt que
-     `beforeunload` : c'est le seul que les navigateurs de téléphone
-     déclenchent vraiment quand on ferme l'onglet ou qu'on change
-     d'application. */
-  window.addEventListener('pagehide', () => {
-    if (connecte() && enAttente()) synchroniser();
+  /* En partant, on enregistre ce qui traîne dans les champs, puis on
+     l'envoie. `pagehide` plutôt que `beforeunload` : c'est le seul que
+     les navigateurs de téléphone déclenchent vraiment quand on ferme
+     l'onglet ou qu'on change d'application. Et `visibilitychange`
+     avec, parce qu'il arrive le premier quand on passe à une autre
+     application — le moment où l'on perd la page sans la fermer. */
+  const partir = () => {
+    viderBrouillons();
+    if (connecte() && enAttente()) envoyerEnPartant();
+  };
+  window.addEventListener('pagehide', partir);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') partir();
   });
 }

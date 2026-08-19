@@ -176,3 +176,30 @@ export function brancherNotes(racine) {
     b.classList.toggle('ouvert', ouvert);
   }, true);
 }
+
+/* ─── Ce qui n'est pas encore écrit au moment où l'on s'en va ──────────
+ *
+ * Un champ de formulaire ne s'enregistre qu'une fois quitté : c'est ce
+ * que veut dire « change ». Tant qu'on écrit dedans, rien n'est écrit
+ * nulle part — et ranger son téléphone en plein milieu, c'est perdre ce
+ * qu'on venait de taper. Le cas n'a rien d'exotique : c'est même la
+ * façon normale de quitter une application sur un téléphone.
+ *
+ * D'où ce registre. Un écran qui tient des champs à demi remplis y
+ * dépose de quoi les enregistrer, et le départ le vide avant d'envoyer
+ * quoi que ce soit. L'ordre importe : vider d'abord, envoyer ensuite,
+ * sans quoi l'envoi partirait sans ce qu'on vient à peine d'écrire.
+ */
+const brouillons = new Set();
+
+/** Dépose de quoi enregistrer ce qui traîne. Rend de quoi le retirer. */
+export function aVider(fn) {
+  brouillons.add(fn);
+  return () => brouillons.delete(fn);
+}
+
+/** Enregistre tout ce qui traîne. Une erreur dans l'un ne doit pas
+ *  empêcher les autres : on s'en va, c'est la dernière occasion. */
+export function viderBrouillons() {
+  for (const f of [...brouillons]) { try { f(); } catch { /* tant pis pour celui-là */ } }
+}

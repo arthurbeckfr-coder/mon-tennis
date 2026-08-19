@@ -11,7 +11,8 @@
    courses et un historique de cordages n'ont rien à se dire, les empiler
    ne ferait que rallonger le défilement. */
 
-import { h, dateCourte, dateLongue, puce, confirmer, toast, openModal } from '../util.js';
+import { h, dateCourte, dateLongue, puce, confirmer, toast, openModal,
+         aVider } from '../util.js';
 import { store, basculerAchat, rangerCourses, courses as coursesCRUD, raquetteDe,
          clubDuMatch, CATEGORIES_DEPENSE, nomCategorieDepense, maj } from '../store.js';
 import { pointDuClub } from '../carte.js';
@@ -123,9 +124,61 @@ function ligneInfo(emoji, libelle, valeur, lien = '') {
  *  rangée, et l'on écrit sous le champ ce qu'on a trouvé — ou qu'on n'a
  *  rien trouvé, ce qui vaut mieux qu'un point posé au hasard.
  */
+/* De quoi retirer le rattrapage du profil précédent : la page se
+   redessine à chaque écriture, et laisser s'empiler un rattrapage par
+   passage ferait travailler dix écrans morts au moment du départ. */
+let oublierRattrapage = null;
+
 function brancherProfil(vue) {
   const textes = ['prenom', 'nom', 'licence', 'naissance', 'telephone', 'mail',
                   'clubPrincipal', 'echelon', 'sexe'];
+
+  /* Ce qu'un champ vaut, à l'écran comme dans le carnet, pour ne rien
+     écrire quand rien n'a bougé — une écriture pour rien redessine
+     l'écran et relance un envoi. */
+  const lu = el => {
+    if (el.name === 'gaucher') return el.value === '1';
+    if (el.name === 'coutKm' || el.name === 'coutVictoire') {
+      return el.value === '' ? null : Number(el.value);
+    }
+    return el.value.trim();
+  };
+  const garde = cle => {
+    const v = store.profil?.[cle];
+    return (cle === 'domicile' || cle === 'bureau') ? (v?.adresse || '') : v;
+  };
+
+  /* Le rattrapage du départ. Un champ ne s'enregistre qu'une fois
+     quitté ; taper son numéro de licence puis passer à une autre
+     application, c'était le perdre — et donc ne rien synchroniser du
+     tout. On repasse donc sur les champs au moment où la page s'en va.
+
+     Les adresses y sont gardées telles quelles, sans leur point : les
+     situer demande un aller-retour au géocodeur qui n'aura pas lieu. Le
+     texte est sauf, et le bouton « Placer sur la carte » finit le
+     travail à la prochaine ouverture — mieux vaut une adresse sans point
+     qu'une adresse perdue. */
+  oublierRattrapage?.();
+  oublierRattrapage = aVider(() => {
+    if (!document.contains(vue)) return;
+    const change = {};
+    for (const el of vue.querySelectorAll('[name]')) {
+      const cle = el.name;
+      if (cle === 'domicile' || cle === 'bureau') {
+        const adresse = el.value.trim();
+        if (adresse === garde(cle)) continue;
+        change[cle] = adresse ? { adresse, point: null, libelle: '' } : null;
+        continue;
+      }
+      if (!textes.includes(cle) && cle !== 'gaucher'
+          && cle !== 'coutKm' && cle !== 'coutVictoire') continue;
+      const v = lu(el);
+      if (v === garde(cle)) continue;
+      change[cle] = v;
+      if (cle === 'coutVictoire') change.tourneeReglee = true;
+    }
+    if (Object.keys(change).length) maj(s => { s.profil = { ...s.profil, ...change }; });
+  });
 
   vue.addEventListener('change', async e => {
     const el = e.target.closest('[name]');
