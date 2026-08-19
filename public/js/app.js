@@ -219,6 +219,12 @@ const ADRESSE = ['arthurbeck.fr', 'gmail.com'].join('@');
  *
  *  Les cases vides ne partent pas non plus : une ligne « Téléphone : »
  *  suivie de rien fait croire à un défaut de plus.
+ *
+ *  Reste la version du site, seule ligne de machine à survivre, et pour
+ *  une raison précise : devant un défaut qu'on ne reproduit pas, la
+ *  première question est de savoir si l'autre a la version du jour ou
+ *  celle d'il y a trois semaines. Sans elle, on cherche un bug déjà
+ *  corrigé.
  */
 function quiEcrit() {
   const p = store.profil || {};
@@ -231,8 +237,13 @@ function quiEcrit() {
   ].filter(([, v]) => (v || '').trim())
    .map(([c, v]) => `${c} : ${String(v).trim()}`);
 
-  return lignes.length ? lignes.join('\n')
-    : 'Profil non renseigné — pas de quoi rappeler.';
+  const version = (document.querySelector('script[type="module"]')?.getAttribute('src')
+    || '').match(/v=(\d+)/)?.[1] || '?';
+
+  return [
+    lignes.length ? lignes.join('\n') : 'Profil non renseigné — pas de quoi rappeler.',
+    `Version du site : ${version}`,
+  ].join('\n');
 }
 
 function signalerModal() {
@@ -263,8 +274,9 @@ function signalerModal() {
         il ne reste qu'à ajouter l'image avant d'envoyer. Une image montre en une seconde
         ce qu'un paragraphe explique mal.</p>
       <p class="tiny muted">Partent avec le message ton nom, ton e-mail, ton téléphone et
-        ton club, tels que ton profil les donne — de quoi savoir qui écrit et où répondre.
-        Rien d'autre : ni tes matchs, ni ton classement, ni tes adresses.</p>
+        ton club, tels que ton profil les donne — de quoi savoir qui écrit et où répondre —
+        ainsi que la version du site, sans laquelle on cherche un défaut déjà corrigé. Rien
+        d'autre : ni tes matchs, ni ton classement, ni tes adresses.</p>
     </form>`,
     footer: `<button class="btn" data-non>Annuler</button>
              <button class="btn btn-primary" data-envoyer>Écrire le message</button>`,
