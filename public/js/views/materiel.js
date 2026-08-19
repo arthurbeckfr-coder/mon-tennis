@@ -569,19 +569,46 @@ function detailArgent(quoi) {
 
   if (quoi === 'gains') {
     const g = gains(saisonRoute);
+    /* Le contexte d'un gain : quand, où, contre qui. C'est la même ligne
+       des deux côtés, seule la colonne de droite change. */
+    const ou = x => `${h(dateCourte(x.date))}${x.tournoi ? ' — ' + h(x.tournoi) : ''}${
+      direTour(x) ? ' — ' + h(direTour(x)) : ''}`;
+
     openModal({
       title: 'Ce que les tournois ont rapporté',
-      body: `<p class="tiny muted">${g.total ? `${euros(g.total)} en tout` : 'Aucun gain en'
-          + ' argent'}${g.lots ? `, et ${g.lots} lot(s)` : ''}. Les lots ne sont pas
-          convertis en euros : un prix inventé passerait pour une recette.</p>
-        <ul class="clubs-adverses">${g.liste.map(x => `<li>
+      body: `<section class="chiffres">
+          <div class="chiffre"><b>${euros(g.total)}</b><span>en argent</span></div>
+          <div class="chiffre"><b>${g.lots}</b><span>lot${g.lots > 1 ? 's' : ''}</span></div>
+        </section>
+
+        ${g.argent.length ? `<span class="etiquette">En argent</span>
+        <ul class="clubs-adverses">${g.argent.map(x => `<li>
           <div><strong>${h(x.adversaire || 'Adversaire inconnu')}</strong>
-            <div class="tiny muted">${h(dateCourte(x.date))}${
-              x.tournoi ? ' — ' + h(x.tournoi) : ''}${
-              direTour(x) ? ' — ' + h(direTour(x)) : ''}</div></div>
-          <div class="club-score"><b>${x.gainMontant ? euros(x.gainMontant) : ''}</b>
-            ${x.gainLot ? `<span class="tiny muted">${h(x.gainLot)}</span>` : ''}</div>
-        </li>`).join('')}</ul>`,
+            <div class="tiny muted">${ou(x)}</div></div>
+          <div class="club-score"><b>${euros(x.gainMontant)}</b></div>
+        </li>`).join('')}</ul>` : ''}
+
+        ${/* Les lots portent le nom du lot en tête : c'est lui qu'on
+              cherche — « la raquette, c'était quel tournoi ? » — et non
+              l'adversaire, qui ne se souvient de rien. */''}
+        ${g.enNature.length ? `<span class="etiquette">En nature</span>
+        <ul class="clubs-adverses">${g.enNature.map(x => `<li>
+          <div><strong>${h(x.gainLot)}</strong>
+            <div class="tiny muted">${ou(x)}${
+              x.adversaire ? ' — contre ' + h(x.adversaire) : ''}</div></div>
+          ${/* Un match peut avoir rapporté les deux. L'argent est alors
+                rappelé en petit et non en gras : répété en colonne, il se
+                lisait comme une seconde somme, et le total ne suivait
+                pas. */''}
+          <div class="club-score">${x.gainMontant
+            ? `<span class="tiny muted">et ${euros(x.gainMontant)}, comptés plus haut</span>`
+            : '<span class="tiny muted">🎁</span>'}</div>
+        </li>`).join('')}</ul>
+        <p class="tiny muted">Les lots ne sont pas convertis en euros et ne s'ajoutent
+          donc à aucun total : un prix inventé passerait pour une recette.</p>` : ''}
+
+        ${!g.liste.length ? `<p class="tiny muted">Rien de noté pour l'instant. Le gain se
+          saisit dans la fiche d'un match, en argent ou en toutes lettres.</p>` : ''}`,
     });
     return;
   }
@@ -641,9 +668,20 @@ function tournees(saison = 'tout') {
 function gains(saison = 'tout') {
   const liste = store.matchs.filter(x =>
     (x.gainMontant || x.gainLot)
-    && (saison === 'tout' || saisonDe(x.date) === Number(saison)));
+    && (saison === 'tout' || saisonDe(x.date) === Number(saison)))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  /* Deux natures, deux listes. Un bon d'achat et deux cents euros ne se
+     lisent pas ensemble : l'argent s'additionne, le lot se raconte — et
+     mêlés dans une même liste, les lots n'apparaissaient qu'en petit
+     sous une colonne de montants vides. Ce sont pourtant les seuls gains
+     saisis à la main, donc les seuls dont on se souvienne.
+
+     On ne convertit toujours pas : un raquette « valant » quatre-vingts
+     euros passerait pour une recette de quatre-vingts euros. */
   return {
-    liste: liste.sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    liste,
+    argent: liste.filter(x => Number(x.gainMontant) > 0),
+    enNature: liste.filter(x => x.gainLot),
     total: liste.reduce((t, x) => t + (Number(x.gainMontant) || 0), 0),
     lots: liste.filter(x => x.gainLot).length,
   };
@@ -715,10 +753,16 @@ function vueArgent() {
             constatée. Trois natures de chiffres, trois cases. */''}
       ${tour.total ? `<div class="chiffre" data-argent="tournees" title="Voir le détail"
         ><b>${euros(tour.total)}</b><span>de tournées</span></div>` : ''}
+      ${/* Quand il y a de l'argent et des lots, le chiffre porte les deux :
+            n'annoncer que les euros faisait disparaître de la page les
+            seuls gains qu'on ait pris la peine d'écrire à la main. */''}
       ${gagne.total || gagne.lots ? `<div class="chiffre" data-argent="gains"
         title="Voir le détail"><b>${gagne.total ? euros(gagne.total)
-          : gagne.lots}</b><span>${gagne.total ? 'gagnés en tournoi'
-          : 'lot(s) gagné(s)'}</span></div>` : ''}
+          : gagne.lots}</b><span>${gagne.total
+            ? `gagnés en tournoi${gagne.lots ? ` et ${gagne.lots} lot${
+                gagne.lots > 1 ? 's' : ''}` : ''}`
+            : `lot${gagne.lots > 1 ? 's' : ''} gagné${gagne.lots > 1 ? 's' : ''}`
+          }</span></div>` : ''}
     </section>
 
     <div class="rangee-boutons" style="justify-content:center">
