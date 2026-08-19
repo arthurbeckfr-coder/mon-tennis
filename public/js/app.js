@@ -185,11 +185,16 @@ const RAPIDE = () => [
  * qu'il sait faire.
  */
 const TYPES_MESSAGE = [
-  { cle: 'bug',      nom: 'Un bug',        aide: 'Quelque chose ne marche pas comme prévu' },
-  { cle: 'faux',     nom: 'Un chiffre faux', aide: 'Un compte, un classement ou une distance qui ne tombe pas juste' },
-  { cle: 'question', nom: 'Une question',  aide: 'Je ne comprends pas ce que fait le carnet' },
-  { cle: 'idee',     nom: 'Une idée',      aide: 'Il manque quelque chose, ou ça pourrait être mieux' },
-  { cle: 'autre',    nom: 'Autre chose',   aide: '' },
+  { cle: 'bug',      emoji: '🐞', nom: 'Un bug',
+    aide: 'Quelque chose ne marche pas comme prévu' },
+  { cle: 'faux',     emoji: '🔢', nom: 'Un chiffre faux',
+    aide: 'Un compte, un classement ou une distance qui ne tombe pas juste' },
+  { cle: 'question', emoji: '❓', nom: 'Une question',
+    aide: 'Je ne comprends pas ce que fait le carnet' },
+  { cle: 'idee',     emoji: '💡', nom: 'Une idée',
+    aide: 'Il manque quelque chose, ou ça pourrait être mieux' },
+  { cle: 'autre',    emoji: '✉️', nom: 'Autre chose',
+    aide: 'Ce qui n\'entre dans aucune des cases au-dessus' },
 ];
 
 /* L'adresse, assemblée à l'exécution. Écrite d'un seul tenant dans un
@@ -215,11 +220,19 @@ function signalerModal() {
   openModal({
     title: 'Signaler quelque chose',
     body: `<form id="f-signal" class="form">
-      <label>De quoi s'agit-il ?
-        <select name="type">
-          ${TYPES_MESSAGE.map(t => `<option value="${t.cle}">${h(t.nom)}</option>`).join('')}
-        </select>
-      </label>
+      ${/* Des boutons plutôt qu'une liste déroulante. Une liste demande
+            trois gestes — ouvrir, chercher, choisir — et cache ses
+            options jusqu'au premier. Ici les cinq natures sont lisibles
+            d'un coup d'œil, et choisir tient en un appui. C'est la même
+            raison qui a mis la dictée en tête du menu : ce qui se voit
+            se choisit plus vite que ce qui se déroule. */''}
+      <span class="etiquette">De quoi s'agit-il ?</span>
+      <div class="choix-nature" role="radiogroup" aria-label="Nature du message">
+        ${TYPES_MESSAGE.map((t, i) => `<button type="button" data-type="${t.cle}"
+          class="${i === 0 ? 'actif' : ''}" role="radio"
+          aria-checked="${i === 0 ? 'true' : 'false'}"
+          ><span>${t.emoji}</span>${h(t.nom)}</button>`).join('')}
+      </div>
       <p class="tiny muted" data-aide>${h(TYPES_MESSAGE[0].aide)}</p>
       <label>Ce qui s'est passé
         <textarea name="texte" rows="6" placeholder="Ce que tu faisais, ce que tu attendais, ce qui est arrivé à la place. Trois lignes suffisent."></textarea>
@@ -239,14 +252,22 @@ function signalerModal() {
     onMount: () => {
       const racine = document.getElementById('modal-root');
       const form = racine.querySelector('#f-signal');
-      const choix = form.querySelector('[name="type"]');
       const aide = form.querySelector('[data-aide]');
-      choix.addEventListener('change', () => {
-        aide.textContent = TYPES_MESSAGE.find(t => t.cle === choix.value)?.aide || '';
+      let nature = TYPES_MESSAGE[0].cle;
+      form.querySelector('.choix-nature').addEventListener('click', e => {
+        const b = e.target.closest('[data-type]');
+        if (!b) return;
+        nature = b.dataset.type;
+        for (const x of form.querySelectorAll('[data-type]')) {
+          const choisi = x === b;
+          x.classList.toggle('actif', choisi);
+          x.setAttribute('aria-checked', choisi ? 'true' : 'false');
+        }
+        aide.textContent = TYPES_MESSAGE.find(t => t.cle === nature)?.aide || '';
       });
       racine.querySelector('[data-non]').addEventListener('click', closeModal);
       racine.querySelector('[data-envoyer]').addEventListener('click', () => {
-        const t = TYPES_MESSAGE.find(x => x.cle === choix.value) || TYPES_MESSAGE[0];
+        const t = TYPES_MESSAGE.find(x => x.cle === nature) || TYPES_MESSAGE[0];
         const texte = form.querySelector('[name="texte"]').value.trim();
         const corps = `${texte}\n\n— — —\n${contexte()}`;
         /* L'arobase reste elle-même : encodée en %40, elle se retrouve

@@ -2651,6 +2651,37 @@ body.mode-court .terrain-diapo .terrain {
   min-height: 88px;
 }
 .bouton-rapide:hover { background: var(--carte-2); border-color: var(--accent); }
+/* Les natures d'un signalement : cinq boutons qui s'enroulent plutôt
+   qu'une liste déroulante. Ils gardent la hauteur du pouce — 44 px — et
+   le choisi prend la couleur de l'accent, comme partout ailleurs dans ce
+   carnet : c'est le même geste, il doit avoir le même air. */
+.choix-nature {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+.choix-nature button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 9px 13px;
+  border: 1px solid var(--bord);
+  border-radius: 11px;
+  background: var(--carte);
+  color: var(--texte);
+  font: inherit;
+  font-size: .86rem;
+  cursor: pointer;
+}
+.choix-nature button:hover { border-color: var(--accent); }
+.choix-nature button.actif {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-txt);
+}
+
 /* La porte de sortie de la fenêtre « Ajouter » : détachée de la grille
    par un filet, et discrète — on ne signale pas un défaut tous les
    jours, mais le jour où l'on en trouve un, il faut savoir où aller. */
