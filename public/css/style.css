@@ -1197,6 +1197,35 @@ a.btn-tenup { display: inline-flex; align-items: center; text-decoration: none; 
 .carte-club.choisi .carte-halo { opacity: .45; }
 .carte-club.choisi .carte-point { stroke: var(--accent); stroke-width: .0022; }
 
+/* Mon club, sur toutes les cartes.
+
+   Un anneau d'or détaché de la balle, et non une balle dorée : la
+   couleur des balles dit déjà quelque chose — jaune sur la carte des
+   clubs, verte ou rouge sur celle d'un adversaire — et la repeindre
+   effacerait le bilan pour dire l'appartenance. L'anneau se pose
+   au-dessus sans rien recouvrir.
+
+   C'est aussi une forme et pas seulement une teinte, comme le pointillé
+   du contour perdant : un signe qui ne tient qu'à la couleur disparaît
+   au soleil et pour qui distingue mal les teintes. */
+.carte-anneau, .carte-anneau-encre {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.carte-anneau { stroke: var(--or); stroke-width: 2.1; stroke-opacity: .95; }
+/* L'or seul ne tient pas sur un fond de carte clair : 2,5 pour 1, en
+   dessous des 3 qu'il faut à un trait. On le double donc d'encre, plus
+   large d'un pixel de chaque côté — le même geste que le cerne de la
+   balle, et le résultat est le même : un anneau qui se détache de tout
+   ce qu'il survole, mer, terre ou ville. */
+.carte-anneau-encre { stroke: #232a10; stroke-width: 4.1; stroke-opacity: .55; }
+/* Le halo prend l'or lui aussi, et un peu plus d'appui : de loin, c'est
+   lui qu'on voit avant l'anneau, et il fait le repère qu'on cherche en
+   ouvrant la carte — « où est-ce que je joue, moi ? ». */
+.carte-club.mien .carte-halo { fill: var(--or); opacity: .28; }
+.carte-club.mien:hover .carte-halo, .carte-club.mien:focus-visible .carte-halo { opacity: .45; }
+
 /* La bulle est en HTML par-dessus le SVG : sa taille de texte ne dépend
    donc pas du zoom, et reste lisible aussi bien de loin que de près. Elle
    est ancrée sur le club et remonte au-dessus de lui, comme une infobulle

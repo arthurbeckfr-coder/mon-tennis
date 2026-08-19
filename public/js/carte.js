@@ -72,6 +72,21 @@ const sansAccent = s => (s || '').toUpperCase()
 
 const INDEX = new Map(Object.keys(COMMUNES).map(k => [sansAccent(k), COMMUNES[k]]));
 
+/** Le club dont on porte les couleurs, tel que le profil le nomme.
+ *
+ *  La comparaison ignore la casse et les accents parce que les deux
+ *  noms ne viennent pas du même endroit : celui du profil se choisit
+ *  dans une liste, celui de la fiche a pu être créé par un import. Un
+ *  club reconnu à une majuscule près serait un club non reconnu.
+ */
+const aplat = s => (s || '').trim().toUpperCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+
+export const estMonClub = club => {
+  const mien = aplat(store?.profil?.clubPrincipal);
+  return !!mien && aplat(club?.nom) === mien;
+};
+
 /** La couture d'une balle de tennis, vue de face : une courbe en S d'un
  *  bord à l'autre. Deux arcs symétriques seraient plus fidèles à l'objet
  *  et illisibles à douze pixels — c'est le S que l'œil reconnaît sur les
@@ -303,8 +318,12 @@ export function carteClubs(clubs, { couleur = 'club' } = {}) {
       ${routes}
       ${villes}
       ${ancres}
+      ${/* Le club dont on porte les couleurs. Comparé sans casse ni
+            accents : le profil dit « Tennis de Puys » et la fiche
+            « TENNIS DE PUYS », c'est le même endroit. */''}
       ${pts.map(p => {
         const [x, y] = p.xy;
+        const mien = estMonClub(p.club);
         const rpx = rayonPx(p.matchs.length);
         const r = rpx / echInitiale;
         /* Vert, rouge, ou les deux. Un club où l'on a gagné et perdu
@@ -324,7 +343,7 @@ export function carteClubs(clubs, { couleur = 'club' } = {}) {
            finit par ne plus rien lire. Le nom vient au clic, dans une
            bulle en HTML — laquelle garde sa taille de lecture à tous les
            zooms, là où un texte SVG grossirait avec la carte. */
-        return `<g class="carte-club ${teinte}"
+        return `<g class="carte-club ${teinte}${mien ? ' mien' : ''}"
              data-club-carte="${h(p.club.id)}" role="button" tabindex="0"
              data-x="${x.toFixed(5)}" data-y="${y.toFixed(5)}"
              data-rpx="${rpx.toFixed(2)}"
@@ -340,7 +359,7 @@ export function carteClubs(clubs, { couleur = 'club' } = {}) {
                })()}"
              data-lon="${p.point[0]}" data-lat="${p.point[1]}"
              data-adresse="${h(adresseDuClub(p.club))}">
-          <title>${h(p.club.nom)} — ${p.matchs.length} match(s), ${p.bilan.v}V–${p.bilan.d}D</title>
+          <title>${h(p.club.nom)}${mien ? ' — mon club' : ''} — ${p.matchs.length} match(s), ${p.bilan.v}V–${p.bilan.d}D</title>
           ${/* Une balle de tennis plutôt qu'un disque : sur une carte où
                 l'on cherche des courts, le sujet doit se reconnaître de
                 loin. La couture est une courbe en S — c'est ainsi que se
@@ -349,6 +368,16 @@ export function carteClubs(clubs, { couleur = 'club' } = {}) {
                 comme le rayon : voir `redimensionner`. */''}
           <circle class="carte-halo" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
                   r="${(r * 1.9).toFixed(4)}"/>
+          ${/* Son club porte un anneau, et l'anneau est une forme, pas
+                seulement une couleur : la règle du carnet veut qu'un
+                signe ne repose jamais sur la teinte seule — un daltonien
+                doit voir la différence, et l'or ne survit pas au plein
+                soleil. Un cercle détaché autour de la balle se voit dans
+                les deux cas. */''}
+          ${mien ? `<circle class="carte-anneau-encre" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
+                  r="${(r * 1.42).toFixed(4)}"/>
+          <circle class="carte-anneau" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
+                  r="${(r * 1.42).toFixed(4)}"/>` : ''}
           <circle class="carte-point" cx="${x.toFixed(4)}" cy="${y.toFixed(4)}"
                   r="${r.toFixed(4)}"/>
           ${mixte ? `<path class="carte-moitie haut" d="${moitie(x, y, r, true)}"/>
@@ -552,6 +581,9 @@ export function brancherCarte(racine, ouvrirClub) {
       const r = Number(g.dataset.rpx) / ech;
       g.querySelector('.carte-point').setAttribute('r', r.toFixed(5));
       g.querySelector('.carte-halo').setAttribute('r', (r * 1.9).toFixed(5));
+      for (const a of g.querySelectorAll('.carte-anneau, .carte-anneau-encre')) {
+        a.setAttribute('r', (r * 1.42).toFixed(5));
+      }
       const gx = Number(g.dataset.x), gy = Number(g.dataset.y);
       g.querySelector('.carte-couture')?.setAttribute('d', couture(gx, gy, r));
       g.querySelector('.carte-moitie.haut')?.setAttribute('d', moitie(gx, gy, r, true));
