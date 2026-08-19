@@ -5,8 +5,7 @@ import { completerClubsConnus } from './clubs-connus.js';
 import { veillerAuClassement } from './montee.js';
 import { h, toast, openModal, closeModal } from './util.js';
 import { appliquerTheme, themeSuivant, themeActuel, ETIQUETTES } from './theme.js';
-import { matchForm, conseilForm, clubForm, profilForm,
-         importFFTForm } from './forms.js';
+import { matchForm, conseilForm, clubForm, profilForm } from './forms.js';
 
 import * as matchs     from './views/matchs.js';
 import * as simulateur from './views/simulateur.js';
@@ -131,17 +130,23 @@ function afficher() {
 // =====================================================================
 //  Le bouton +
 // =====================================================================
+/* La dictée était un bouton flottant de plus, à côté du « + ». Deux
+   ronds pour une seule intention — ajouter quelque chose — et le second
+   mangeait le bas de l'écran sans qu'on sache ce qu'il faisait avant de
+   le toucher. Ici, il porte son nom — et il passe en tête, sur toute la
+   largeur : c'est le geste des mains prises, celui qu'on cherche en
+   sortant du court, et il ne se cherche pas au fond d'une grille.
+
+   L'import de Ten'Up quitte cette liste. Il ne s'y faisait qu'une fois,
+   au premier jour, et occupait ensuite une case sur six dans un menu
+   qu'on ouvre pour noter un match. Il reste où il sert : au bas de la
+   liste des matchs, et sur l'écran vide qui l'accueille au départ. */
 const RAPIDE = () => [
+  ['🎤', 'Dicter une note', "Parler plutôt qu'écrire",     () => dicterModal(), true],
   ['🎾', 'Un match',   'Résultat, score, ressenti',       () => matchForm()],
   ['💡', 'Un conseil', 'Ce que le prof vient de dire',     () => conseilForm()],
-  ['📥', 'Importer',   'Mon palmarès depuis Ten\'Up',      () => importFFTForm()],
   ['🏟️', 'Un club',    'Adresse, surfaces, juge-arbitre',  () => clubForm()],
   ['🏅', 'Mon classement', 'Échelon et bilan',             () => profilForm()],
-  /* La dictée était un bouton flottant de plus, à côté du « + ». Deux
-     ronds pour une seule intention — ajouter quelque chose — et le
-     second mangeait le bas de l'écran sans qu'on sache ce qu'il faisait
-     avant de le toucher. Ici, il porte son nom. */
-  ['🎤', 'Dicter une note', "Parler plutôt qu'écrire",     () => dicterModal()],
 ];
 
 function ajoutRapide() {
@@ -149,7 +154,7 @@ function ajoutRapide() {
   openModal({
     title: 'Ajouter',
     body: `<div class="grille-rapide">
-      ${liste.map((q, i) => `<button class="bouton-rapide" data-q="${i}">
+      ${liste.map((q, i) => `<button class="bouton-rapide${q[4] ? ' large' : ''}" data-q="${i}">
         <span class="qi">${q[0]}</span><b>${h(q[1])}</b>
         <span class="tiny muted">${h(q[2])}</span></button>`).join('')}
     </div>`,

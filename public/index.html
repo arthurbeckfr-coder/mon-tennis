@@ -10,37 +10,37 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎾</text></svg>">
 <!-- Le ?v= force le navigateur à retélécharger la feuille de style :
      à incrémenter quand un correctif CSS doit arriver partout. -->
-<link rel="stylesheet" href="css/style.css?v=128">
+<link rel="stylesheet" href="css/style.css?v=131">
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=128",
-    "./js/carte.js": "./js/carte.js?v=128",
-    "./js/classement.js": "./js/classement.js?v=128",
-    "./js/clubs-connus.js": "./js/clubs-connus.js?v=128",
-    "./js/config.js": "./js/config.js?v=128",
-    "./js/contours.js": "./js/contours.js?v=128",
-    "./js/dictee.js": "./js/dictee.js?v=128",
-    "./js/forms.js": "./js/forms.js?v=128",
-    "./js/france.js": "./js/france.js?v=128",
-    "./js/geocodage.js": "./js/geocodage.js?v=128",
-    "./js/graphes.js": "./js/graphes.js?v=128",
-    "./js/import-fft.js": "./js/import-fft.js?v=128",
-    "./js/materiel.js": "./js/materiel.js?v=128",
-    "./js/montee.js": "./js/montee.js?v=128",
-    "./js/nuage.js": "./js/nuage.js?v=128",
-    "./js/reperes.js": "./js/reperes.js?v=128",
-    "./js/retour.js": "./js/retour.js?v=128",
-    "./js/store.js": "./js/store.js?v=128",
-    "./js/terrain.js": "./js/terrain.js?v=128",
-    "./js/theme.js": "./js/theme.js?v=128",
-    "./js/util.js": "./js/util.js?v=128",
-    "./js/views/clubs.js": "./js/views/clubs.js?v=128",
-    "./js/views/coaching.js": "./js/views/coaching.js?v=128",
-    "./js/views/joueurs.js": "./js/views/joueurs.js?v=128",
-    "./js/views/matchs.js": "./js/views/matchs.js?v=128",
-    "./js/views/materiel.js": "./js/views/materiel.js?v=128",
-    "./js/views/simulateur.js": "./js/views/simulateur.js?v=128"
+    "./js/app.js": "./js/app.js?v=131",
+    "./js/carte.js": "./js/carte.js?v=131",
+    "./js/classement.js": "./js/classement.js?v=131",
+    "./js/clubs-connus.js": "./js/clubs-connus.js?v=131",
+    "./js/config.js": "./js/config.js?v=131",
+    "./js/contours.js": "./js/contours.js?v=131",
+    "./js/dictee.js": "./js/dictee.js?v=131",
+    "./js/forms.js": "./js/forms.js?v=131",
+    "./js/france.js": "./js/france.js?v=131",
+    "./js/geocodage.js": "./js/geocodage.js?v=131",
+    "./js/graphes.js": "./js/graphes.js?v=131",
+    "./js/import-fft.js": "./js/import-fft.js?v=131",
+    "./js/materiel.js": "./js/materiel.js?v=131",
+    "./js/montee.js": "./js/montee.js?v=131",
+    "./js/nuage.js": "./js/nuage.js?v=131",
+    "./js/reperes.js": "./js/reperes.js?v=131",
+    "./js/retour.js": "./js/retour.js?v=131",
+    "./js/store.js": "./js/store.js?v=131",
+    "./js/terrain.js": "./js/terrain.js?v=131",
+    "./js/theme.js": "./js/theme.js?v=131",
+    "./js/util.js": "./js/util.js?v=131",
+    "./js/views/clubs.js": "./js/views/clubs.js?v=131",
+    "./js/views/coaching.js": "./js/views/coaching.js?v=131",
+    "./js/views/joueurs.js": "./js/views/joueurs.js?v=131",
+    "./js/views/matchs.js": "./js/views/matchs.js?v=131",
+    "./js/views/materiel.js": "./js/views/materiel.js?v=131",
+    "./js/views/simulateur.js": "./js/views/simulateur.js?v=131"
   }
 }
 </script>
@@ -48,7 +48,9 @@
 <body>
 
 <div id="boot" class="boot">
-  <div class="boot-logo">🎾</div>
+  <!-- La balle est dans un conteneur : elle saute, son ombre reste au
+       sol. Une ombre qui monterait avec elle ne serait plus une ombre. -->
+  <div class="boot-logo"><span class="boot-balle">🎾</span></div>
   <div class="boot-text">Chargement…</div>
   <div id="boot-diag" class="boot-diag" hidden></div>
 </div>

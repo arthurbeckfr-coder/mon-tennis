@@ -144,7 +144,78 @@ a { color: var(--accent); }
   gap: 10px;
   padding: 24px;
 }
-.boot-logo { font-size: 48px; }
+/* La balle rebondit pendant le chargement.
+
+   Un écran qui ne bouge pas ressemble à un écran bloqué : trois secondes
+   de réseau lent et l'on se demande si le site est mort. La balle qui
+   saute dit « ça travaille » sans un mot de plus, et c'est déjà l'objet
+   dont il est question ici.
+
+   Le mouvement suit la chute : lent en haut, rapide au contact. C'est
+   `alternate` qui le donne presque gratuitement — la montée en ease-out
+   se rejoue à l'envers en descente, donc en ease-in, ce qui est très
+   exactement une balle qui tombe. Restait à l'écraser au sol et à lui
+   donner son ombre.
+
+   `translate` et `scale` plutôt qu'un `transform` unique : deux
+   animations sur une même propriété s'écrasent, alors que les
+   propriétés séparées se composent. Le saut et l'écrasement n'ont pas
+   la même période — l'un fait un aller, l'autre l'aller-retour — et il
+   fallait qu'ils tiennent ensemble. */
+.boot-logo {
+  font-size: 48px;
+  line-height: 1;
+  position: relative;
+  /* La place du saut, réservée au-dessus : sans elle, la balle sortirait
+     de sa boîte et le texte au-dessous paraîtrait décalé. */
+  padding-top: 46px;
+}
+.boot-balle {
+  display: inline-block;
+  /* Vite au décollage, lent au sommet : c'est le profil d'un lancer,
+     et `alternate` le rejoue à l'envers pour la chute. Une courbe
+     symétrique donnait un ascenseur. */
+  animation: balle-saut .58s cubic-bezier(0, .55, .45, 1) infinite alternate,
+             balle-ecrase 1.16s infinite;
+}
+/* L'ombre : elle ne bouge pas, elle s'étale et pâlit. C'est ce
+   contraste-là qui donne la hauteur — une balle qui monte sans que rien
+   ne change au sol a l'air de flotter. */
+.boot-logo::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 34px;
+  height: 7px;
+  margin-left: -17px;
+  border-radius: 50%;
+  background: currentColor;
+  color: var(--muet);
+  animation: balle-ombre 1.16s infinite;
+}
+@keyframes balle-saut {
+  from { translate: 0 0; }
+  to   { translate: 0 -46px; }
+}
+/* Au contact seulement : le reste du temps la balle est ronde. Une
+   déformation qui dure tout le vol donne un ballon de baudruche. */
+@keyframes balle-ecrase {
+  0%, 100% { scale: 1.18 .82; }
+  9%,  91% { scale: 1 1; }
+  50%      { scale: .97 1.03; }
+}
+@keyframes balle-ombre {
+  0%, 100% { opacity: .38; scale: 1 1; }
+  50%      { opacity: .12; scale: .55 1; }
+}
+/* Un mouvement perpétuel n'est pas donné à tout le monde : qui a demandé
+   moins d'animation garde une balle immobile, et l'écran dit la même
+   chose avec son texte. */
+@media (prefers-reduced-motion: reduce) {
+  .boot-balle, .boot-logo::after { animation: none; }
+  .boot-logo::after { opacity: .3; }
+}
 .boot-text { color: var(--muet); }
 .boot-diag {
   max-width: 460px;
@@ -2502,6 +2573,9 @@ body.mode-court .terrain-diapo .terrain {
    Ajout rapide
    =================================================================== */
 .grille-rapide { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+/* Une entrée peut tenir la ligne entière. La dictée est la seule : elle
+   ouvre le menu, et une demi-case l'aurait rangée parmi les autres. */
+.bouton-rapide.large { grid-column: 1 / -1; min-height: 0; }
 .bouton-rapide {
   display: flex;
   flex-direction: column;
