@@ -48,7 +48,7 @@ let saisonRoute = 'tout';
    détour par l'argent doit rouvrir la page où on l'avait laissée, pas la
    première des trois. */
 const ONGLETS = [
-  { cle: 'moi',      emoji: '🪪', nom: 'Moi' },
+  { cle: 'moi',      emoji: '👤', nom: 'Moi' },
   { cle: 'courses',  emoji: '🛒', nom: 'Courses' },
   { cle: 'argent',   emoji: '💶', nom: 'Argent' },
   { cle: 'materiel', emoji: '🎒', nom: 'Matériel' },

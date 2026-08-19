@@ -10,36 +10,36 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎾</text></svg>">
 <!-- Le ?v= force le navigateur à retélécharger la feuille de style :
      à incrémenter quand un correctif CSS doit arriver partout. -->
-<link rel="stylesheet" href="css/style.css?v=118">
+<link rel="stylesheet" href="css/style.css?v=119">
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=118",
-    "./js/carte.js": "./js/carte.js?v=118",
-    "./js/classement.js": "./js/classement.js?v=118",
-    "./js/clubs-connus.js": "./js/clubs-connus.js?v=118",
-    "./js/config.js": "./js/config.js?v=118",
-    "./js/contours.js": "./js/contours.js?v=118",
-    "./js/dictee.js": "./js/dictee.js?v=118",
-    "./js/forms.js": "./js/forms.js?v=118",
-    "./js/france.js": "./js/france.js?v=118",
-    "./js/geocodage.js": "./js/geocodage.js?v=118",
-    "./js/graphes.js": "./js/graphes.js?v=118",
-    "./js/import-fft.js": "./js/import-fft.js?v=118",
-    "./js/materiel.js": "./js/materiel.js?v=118",
-    "./js/nuage.js": "./js/nuage.js?v=118",
-    "./js/reperes.js": "./js/reperes.js?v=118",
-    "./js/retour.js": "./js/retour.js?v=118",
-    "./js/store.js": "./js/store.js?v=118",
-    "./js/terrain.js": "./js/terrain.js?v=118",
-    "./js/theme.js": "./js/theme.js?v=118",
-    "./js/util.js": "./js/util.js?v=118",
-    "./js/views/clubs.js": "./js/views/clubs.js?v=118",
-    "./js/views/coaching.js": "./js/views/coaching.js?v=118",
-    "./js/views/joueurs.js": "./js/views/joueurs.js?v=118",
-    "./js/views/matchs.js": "./js/views/matchs.js?v=118",
-    "./js/views/materiel.js": "./js/views/materiel.js?v=118",
-    "./js/views/simulateur.js": "./js/views/simulateur.js?v=118"
+    "./js/app.js": "./js/app.js?v=119",
+    "./js/carte.js": "./js/carte.js?v=119",
+    "./js/classement.js": "./js/classement.js?v=119",
+    "./js/clubs-connus.js": "./js/clubs-connus.js?v=119",
+    "./js/config.js": "./js/config.js?v=119",
+    "./js/contours.js": "./js/contours.js?v=119",
+    "./js/dictee.js": "./js/dictee.js?v=119",
+    "./js/forms.js": "./js/forms.js?v=119",
+    "./js/france.js": "./js/france.js?v=119",
+    "./js/geocodage.js": "./js/geocodage.js?v=119",
+    "./js/graphes.js": "./js/graphes.js?v=119",
+    "./js/import-fft.js": "./js/import-fft.js?v=119",
+    "./js/materiel.js": "./js/materiel.js?v=119",
+    "./js/nuage.js": "./js/nuage.js?v=119",
+    "./js/reperes.js": "./js/reperes.js?v=119",
+    "./js/retour.js": "./js/retour.js?v=119",
+    "./js/store.js": "./js/store.js?v=119",
+    "./js/terrain.js": "./js/terrain.js?v=119",
+    "./js/theme.js": "./js/theme.js?v=119",
+    "./js/util.js": "./js/util.js?v=119",
+    "./js/views/clubs.js": "./js/views/clubs.js?v=119",
+    "./js/views/coaching.js": "./js/views/coaching.js?v=119",
+    "./js/views/joueurs.js": "./js/views/joueurs.js?v=119",
+    "./js/views/matchs.js": "./js/views/matchs.js?v=119",
+    "./js/views/materiel.js": "./js/views/materiel.js?v=119",
+    "./js/views/simulateur.js": "./js/views/simulateur.js?v=119"
   }
 }
 </script>
@@ -65,8 +65,14 @@
            réglages de l'application, et ils se cherchent au même endroit.
            Les adversaires et les clubs, eux, sont des écrans qu'on visite,
            pas des réglages : ils descendent dans la barre du bas. -->
+      <!-- Une personne, au singulier : c'est moi. La carte de licence
+           disait bien le contenu de l'écran — état civil, numéro,
+           classement — mais elle ne disait pas à qui il appartient, et
+           c'est la seule question qu'on se pose devant une icône. Les
+           adversaires prennent le pluriel : mêmes silhouettes, un cran
+           plus loin, et l'une se lit par rapport à l'autre. -->
       <a href="#/matos" id="btn-profil" class="icon-btn"
-         title="Mon profil" aria-label="Mon profil">🪪</a>
+         title="Mon profil" aria-label="Mon profil">👤</a>
       <button id="btn-theme" class="icon-btn" title="Clair, sombre ou comme l'appareil"
               aria-label="Changer le thème">🌗</button>
     </div>
@@ -87,7 +93,7 @@
     <a href="#/"           data-tab="/"><span>🎾</span>Matchs</a>
     <a href="#/classement" data-tab="/classement"><span>🏅</span>Classement</a>
     <a href="#/court"      data-tab="/court"><span>🎯</span>Court</a>
-    <a href="#/joueurs"    data-tab="/joueurs"><span>👤</span>Adversaires</a>
+    <a href="#/joueurs"    data-tab="/joueurs"><span>👥</span>Adversaires</a>
     <a href="#/clubs"      data-tab="/clubs"><span>🏟️</span>Clubs</a>
   </nav>
 </div>

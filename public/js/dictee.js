@@ -163,7 +163,7 @@ async function rangerEnLigne(texte) {
 //  L'écran
 // =====================================================================
 const NOMS = {
-  match: '🎾 Un match', conseil: '💡 Un conseil', joueur: '👤 Un adversaire',
+  match: '🎾 Un match', conseil: '💡 Un conseil', joueur: '👥 Un adversaire',
   course: '🛒 À acheter', cordage: '🪢 Un cordage',
 };
 
