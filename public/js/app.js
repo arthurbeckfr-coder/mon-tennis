@@ -455,6 +455,42 @@ rafraichirBoutonTheme();
 
 $('fab').addEventListener('click', ajoutRapide);
 
+/* ─── Le clavier du téléphone ──────────────────────────────────────────
+ *
+ * Sur iPhone, ouvrir le clavier rétrécit la fenêtre *visible* sans rien
+ * dire à la page : la fenêtre de mise en page, elle, ne bouge pas. Or
+ * c'est à celle-là que `position: fixed` s'accroche. La barre du bas et
+ * le « + » restent donc à leur place — c'est-à-dire, à l'écran, en plein
+ * milieu, par-dessus le texte, avec la page qui continue dessous.
+ *
+ * Rien à réparer dans la mise en page : elle est juste. Ce qu'il faut,
+ * c'est savoir que le clavier est là, et la seule façon de l'apprendre
+ * est de regarder la fenêtre visible se rétrécir. Deux fenêtres pour un
+ * écran : tout le sujet tient dans cette phrase.
+ *
+ * On efface alors les deux éléments plutôt que de les déplacer. Ils ne
+ * servent à rien pendant qu'on écrit — on ne navigue pas d'un onglet à
+ * l'autre en pleine saisie — et ils masquaient le champ dans lequel on
+ * tape. Ils reviennent dès que le clavier se referme.
+ *
+ * Le seuil est à cent vingt pixels parce que la barre d'adresse, qui
+ * s'escamote au défilement, rétrécit elle aussi la fenêtre visible — de
+ * quarante à soixante pixels. La confondre avec un clavier ferait
+ * disparaître la navigation à chaque coup de pouce.
+ */
+const fenetreVisible = window.visualViewport;
+if (fenetreVisible) {
+  const guetter = () => {
+    const manque = window.innerHeight - fenetreVisible.height;
+    document.body.classList.toggle('clavier-ouvert', manque > 120);
+  };
+  fenetreVisible.addEventListener('resize', guetter);
+  /* `scroll` aussi : iOS ne prévient pas toujours à la fermeture, et le
+     premier défilement qui suit est le moment où l'on s'en aperçoit. */
+  fenetreVisible.addEventListener('scroll', guetter);
+  guetter();
+}
+
 // =====================================================================
 //  Démarrage
 // =====================================================================

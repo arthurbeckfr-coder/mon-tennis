@@ -304,6 +304,13 @@ a.icon-btn { display: grid; place-items: center; text-decoration: none; }
   padding: 12px 14px calc(96px + env(safe-area-inset-bottom));
 }
 
+/* Pendant qu'on écrit, la barre du bas et le « + » s'effacent : le
+   clavier les laisserait au milieu de l'écran, par-dessus le champ dans
+   lequel on tape. Voir `app.js`, où le clavier se devine au rétrécissement
+   de la fenêtre visible. */
+body.clavier-ouvert .tabbar,
+body.clavier-ouvert .fab { display: none; }
+
 /* Barre du bas : la navigation est là où le pouce arrive. */
 .tabbar {
   position: fixed;
