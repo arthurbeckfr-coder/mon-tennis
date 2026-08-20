@@ -386,6 +386,7 @@ export function renderFiche(params) {
               <div class="match-tete">
                 <strong>${h(m.score || (m.wo ? 'W.O.' : 'sans score'))}</strong>
                 ${puce(m.echelonAdverse)}
+                ${puceNote(m)}
               </div>
               <div class="match-bas">
                 <span>${h(dateCourte(m.date))}</span>
@@ -393,7 +394,6 @@ export function renderFiche(params) {
                 ${club ? `<span class="muted">${h(club.nom)}</span>` : ''}
                 ${m.surface ? puce(m.surface) : ''}
                 ${direTour(m) ? puce(direTour(m), m.tour === 'finale' && m.issue === 'V' ? 'puce-titre' : '') : ''}
-                ${puceNote(m)}
               </div>
               ${blocNote(m)}
             </div>

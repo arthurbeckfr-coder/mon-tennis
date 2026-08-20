@@ -762,13 +762,13 @@ function rendreMatchsOrphelins(nom) {
           <div class="match-corps">
             <div class="match-tete">
               <strong>${h(m.adversaire || '—')}</strong>${puce(m.echelonAdverse)}
+              ${puceNote(m)}
             </div>
             <div class="match-bas">
               <span>${h(dateCourte(m.date))}</span>
               ${m.score ? `<span>${h(m.score)}</span>` : ''}
               ${m.surface ? puce(m.surface) : ''}
               ${direTour(m) ? puce(direTour(m)) : ''}
-              ${puceNote(m)}
             </div>
             ${blocNote(m)}
           </div>
@@ -926,12 +926,12 @@ export function renderFiche(params) {
                         <div class="match-corps">
                           <div class="match-tete">
                             <strong>${h(m.adversaire || '—')}</strong>${puce(m.echelonAdverse)}
+                            ${puceNote(m)}
                           </div>
                           <div class="match-bas">
                             <span>${h(dateCourte(m.date))}</span>
                             ${m.score ? `<span>${h(m.score)}</span>` : ''}
                             ${m.tour ? puce(direTour(m)) : ''}
-                            ${puceNote(m)}
                           </div>
                           ${blocNote(m)}
                         </div>

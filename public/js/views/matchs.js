@@ -132,22 +132,29 @@ function ligneMatch(m) {
   return `<li class="match ${m.issue === 'V' ? 'gagne' : 'perdu'}" data-id="${h(m.id)}">
     <div class="match-issue">${m.issue === 'V' ? 'V' : 'D'}</div>
     <div class="match-corps">
+      ${/* Le ⓘ tient la ligne du nom, après le classement.
+
+            Il vivait au milieu du bas de ligne, entre l'épreuve et la
+            durée, où il changeait de place selon ce que le match
+            portait : après le tournoi ici, après la surface là, et
+            nulle part deux fois au même endroit d'un écran à l'autre.
+            Un signe qu'on cherche des yeux avant de le toucher n'est
+            plus un signe, c'est une devinette.
+
+            En haut, il a une place fixe — la première ligne existe
+            toujours, et elle ne porte que le nom et le classement. La
+            flamme reste collée au classement, dont elle qualifie
+            l'écart. */''}
       <div class="match-tete">
         <strong>${h(m.adversaire || 'Adversaire inconnu')}</strong>
         ${puce(m.echelonAdverse, ecart > 0 ? 'puce-fort' : ecart < 0 ? 'puce-faible' : '')}
         ${exploit ? '<span class="exploit" title="Victoire contre plus fort que toi">🔥</span>' : ''}
+        ${puceNote(m)}
       </div>
       <div class="match-bas">
         <span>${h(dateCourte(m.date))}</span>
         ${m.score ? `<span>${h(m.score)}</span>` : ''}
         ${m.tournoi ? `<span class="muted">${h(m.tournoi)}</span>` : ''}
-        ${/* Le ⓘ se pose juste après l'épreuve et n'en bouge plus. Il a
-              d'abord été le résumé d'un `<details>`, dont le dépliement
-              faisait prendre toute la largeur au bloc — le signe partait
-              alors à la ligne suivante, et l'on cherchait des yeux ce
-              qu'on venait de toucher. Bouton d'un côté, texte de l'autre :
-              le premier ne bouge pas, le second s'affiche dessous. */''}
-        ${puceNote(m)}
         ${/* Le tour se dit avant tout le reste du contexte : « vainqueur »
               ou « 1/4 de finale » raconte le match mieux qu'une durée. */''}
         ${direTour(m) ? puce(direTour(m), m.tour === 'finale' && m.issue === 'V'
