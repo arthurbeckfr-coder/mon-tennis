@@ -182,7 +182,9 @@ export function recapEdition(cle, matchs = store.matchs) {
     route: route(club, s.jours),
     issue: issueDuTournoi(liste),
     parcours: parcours(liste),
-    adversaires: [...new Set(liste.map(m => (m.adversaire || '').trim()).filter(Boolean))],
+    /* Dans l'ordre où on les a joués, et non celui du carnet : un parcours
+       se raconte du premier tour à la finale. */
+    adversaires: [...new Set(parcours(liste).map(m => (m.adversaire || '').trim()).filter(Boolean))],
   };
 }
 

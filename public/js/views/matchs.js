@@ -5,7 +5,7 @@
    que moi ? Est-ce que je perds toujours contre les gauchers ? Les
    compteurs du haut sont là pour ça, et non pour décorer. */
 
-import { h, hMulti, dateCourte, puce, dansLesDouzeMois, openModal,
+import { h, hMulti, dateCourte, puce, dansLesDouzeMois, openModal, closeModal,
          puceNote, blocNote, brancherNotes, visionneuse } from '../util.js';
 import { store, bilanMatchs, surfaceDuMatch, estParEquipes, saisonEquipe, direTour,
          tournoisRemportes } from '../store.js';
@@ -295,7 +295,12 @@ const phraseBilan = b =>
  * chronométré aucun match ne montre pas « 0 h » : il ne montre rien, et
  * c'est la vérité de ce qu'on sait. */
 function fenetreEdition(cle) {
-  const r = recapEdition(cle, matchsVus());
+  /* Tout l'historique, et non ce que le filtre laisse. La période dit
+     quels tournois s'affichent dans la liste ; elle n'a rien à dire de
+     ce qu'un tournoi contient. Sur « 12 derniers mois », un titre de 2024
+     n'avait plus un seul match à montrer — et la fenêtre ne s'ouvrait
+     même pas, ce qui ressemblait à un bouton mort. */
+  const r = recapEdition(cle, store.matchs);
   if (!r) return;
   const b = r.bilan;
 
@@ -316,12 +321,31 @@ function fenetreEdition(cle) {
           'comptés à ton échelon d\'aujourd\'hui') : ''}
       </section>
 
-      <p class="tiny muted">${h(direQuand(r.dates))}${
-        r.club ? ` — ${h(r.club.nom)}` : ''}${
-        Object.keys(r.surfaces).length === 1 ? ` — ${h(Object.keys(r.surfaces)[0].toLowerCase())}` : ''}.
-        ${r.chronos && r.chronos < b.total
-          ? `Le temps de jeu ne porte que sur ${r.chronos} match${r.chronos > 1 ? 's' : ''} : les autres n'ont pas été chronométrés.`
-          : ''}</p>
+      ${/* Où, quand, sur quoi. Le club en tête et cliquable : c'est le
+            premier repère qu'on cherche en rouvrant un tournoi trois ans
+            plus tard — « c'était où, déjà ? » — et sa fiche dit le reste,
+            l'adresse, la route, les autres années qu'on y a jouées. */''}
+      <ul class="fiche-infos recap-infos">
+        <li><span class="fiche-emoji">📅</span><div>${h(direQuand(r.dates))}
+          — ${r.jours} jour${r.jours > 1 ? 's' : ''} de jeu, ${b.total} match${b.total > 1 ? 's' : ''}</div></li>
+        ${r.club ? `<li><span class="fiche-emoji">🏟️</span><div>
+          <a href="#/clubs/${h(r.club.id)}">${h(r.club.nom)}</a>${
+            r.club.ville ? ` <span class="muted">${h(r.club.ville)}</span>` : ''}</div></li>` : ''}
+        ${Object.keys(r.surfaces).length ? `<li><span class="fiche-emoji">🎾</span><div>${
+          Object.entries(r.surfaces).sort((x, y) => y[1] - x[1])
+            .map(([s, n]) => `${puce(s)}${Object.keys(r.surfaces).length > 1
+              ? ` <span class="muted tiny">${n} match${n > 1 ? 's' : ''}</span>` : ''}`)
+            .join(' ')}</div></li>` : ''}
+        ${r.adversaires.length ? `<li><span class="fiche-emoji">👥</span><div>${
+          h(r.adversaires.join(', '))}</div></li>` : ''}
+        ${r.route ? `<li><span class="fiche-emoji">🚗</span><div>${Math.round(r.route.km)} km
+          en tout — ${h(direDistance(r.route.unAller))} de chez toi, ${r.route.jours} aller-retour${
+          r.route.jours > 1 ? 's' : ''}</div></li>` : ''}
+      </ul>
+      ${r.chronos && r.chronos < b.total
+        ? `<p class="tiny muted">Le temps de jeu ne porte que sur ${r.chronos} match${
+            r.chronos > 1 ? 's' : ''} : les autres n'ont pas été chronométrés.</p>`
+        : ''}
 
       ${r.scalp ? `<p class="tiny">🎯 Meilleure victoire : <strong>${h(r.scalp.adversaire || 'un adversaire')}</strong>
         ${puce(r.scalp.echelonAdverse)}${r.scalp.score ? ` — ${h(r.scalp.score)}` : ''}</p>` : ''}
@@ -331,8 +355,6 @@ function fenetreEdition(cle) {
         r.lots.length ? r.lots.map(x => h(x)).join(', ') : '',
       ].filter(Boolean).join(' — ')}</p>` : ''}
 
-      ${r.route ? `<p class="tiny muted">🚗 ${Math.round(r.route.km)} km à vol d'oiseau,
-        aller-retour compté une fois par jour joué (${h(direDistance(r.route.unAller))} de chez toi).</p>` : ''}
 
       ${r.photos.length ? `<div class="match-photos" data-photos-recap>${r.photos.map((p, i) =>
         `<button type="button" class="match-photo" data-photo-recap="${i}">
@@ -343,6 +365,10 @@ function fenetreEdition(cle) {
     onMount: corps => {
       brancherNotes(corps);
       corps.addEventListener('click', e => {
+        /* Un lien vers la fiche du club : on ferme, sinon la fenêtre
+           resterait par-dessus l'écran qu'elle vient d'ouvrir. */
+        if (e.target.closest('a[href^="#/clubs/"]')) { closeModal(); return; }
+
         /* La bande de photos du tournoi les rassemble toutes, celles de
            chaque match confondues : c'est l'album de l'open, et il n'a
            pas à être rangé match par match pour se regarder. */
@@ -372,7 +398,9 @@ function fenetreEdition(cle) {
  * particulière : c'est le seul chiffre qui dépend de l'ordre des matchs,
  * donc le seul qu'aucune moyenne ne peut rendre. */
 function fenetreSaison(annee) {
-  const r = recapSaison(annee, matchsVus(), saisonDe);
+  /* Une saison est une saison entière : la tronquer aux douze derniers
+     mois donnerait un récapitulatif qui porte son nom sans le tenir. */
+  const r = recapSaison(annee, store.matchs, saisonDe);
   if (!r) return;
   const b = r.bilan;
 
