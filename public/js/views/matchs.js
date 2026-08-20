@@ -6,12 +6,18 @@
    compteurs du haut sont là pour ça, et non pour décorer. */
 
 import { h, hMulti, dateCourte, puce, dansLesDouzeMois, openModal,
-         puceNote, blocNote, brancherNotes } from '../util.js';
+         puceNote, blocNote, brancherNotes, visionneuse } from '../util.js';
 import { store, bilanMatchs, surfaceDuMatch, estParEquipes, saisonEquipe, direTour,
          tournoisRemportes } from '../store.js';
 import { pointsVictoire, rang, ECHELONS } from '../classement.js';
 import { matchForm, importFFTForm } from '../forms.js';
 import { barresGroupees, tableauDouble } from '../graphes.js';
+/* `direPeriode` existe déjà ici, et dit tout autre chose : le filtre de
+   période choisi. Celui du récapitulatif nomme les dates d'un tournoi. Le
+   même mot pour deux idées voisines est la meilleure façon de lire le
+   mauvais chiffre sans s'en apercevoir. */
+import { recapEdition, recapSaison, editions, direPeriode as direQuand, direTemps,
+         chiffre, direDistance } from '../recap.js';
 
 let filtre = { periode: '12', issue: 'tout', texte: '', exploit: false };
 let ongletVue = 'liste';
@@ -206,7 +212,8 @@ let detail = null;
    L'état est gardé ici plutôt que dans le DOM, parce qu'un redessin — une
    synchronisation qui rapporte un match — repartirait sinon de zéro et
    refermerait ce qu'on venait d'ouvrir. */
-const replies = new Set(['durees', 'titres', 'echelon', 'surface', 'epreuve', 'equipes']);
+const replies = new Set(['durees', 'titres', 'echelon', 'surface', 'epreuve', 'equipes',
+                         'tournois', 'saisons']);
 
 function carteDepliable(cle, titre, contenu, chapeau = '') {
   if (!contenu) return '';
@@ -277,22 +284,151 @@ const phraseBilan = b =>
 
    Les colonnes des graphiques gardent leur panneau sur place : celui-là
    s'ouvre juste sous la colonne cliquée, donc au bon endroit déjà. */
+/* ─── Le récapitulatif d'un tournoi ────────────────────────────────────
+ *
+ * La liste des matchs disait déjà tout, à condition de la lire et de
+ * tenir les totaux de tête. Ce qu'on veut savoir d'un open — combien de
+ * jours, combien d'heures, jusqu'où on est allé, contre qui — n'existait
+ * nulle part avant qu'on l'écrive.
+ *
+ * Les chiffres qui manquent ne s'affichent pas. Un tournoi dont on n'a
+ * chronométré aucun match ne montre pas « 0 h » : il ne montre rien, et
+ * c'est la vérité de ce qu'on sait. */
 function fenetreEdition(cle) {
-  const { liste, bilan, titre } = matchsDeLAxe('edition', cle);
+  const r = recapEdition(cle, matchsVus());
+  if (!r) return;
+  const b = r.bilan;
+
   openModal({
-    title: titre,
+    title: `${r.nom} ${r.an}`,
     large: true,
-    body: `<p class="tiny muted">${phraseBilan(bilan)}</p>
-      ${liste.length ? `<ul class="matchs" style="margin-top:10px">
-        ${liste.map(ligneMatch).join('')}</ul>` : ''}`,
+    body: `
+      ${r.issue.texte ? `<p class="recap-issue">${r.issue.emoji}
+        <strong>${h(r.issue.texte)}</strong></p>` : ''}
+
+      <section class="chiffres">
+        ${chiffre(`${b.v}–${b.d}`, 'victoires–défaites')}
+        ${chiffre(r.jours, `jour${r.jours > 1 ? 's' : ''} de jeu`,
+          h(direQuand(r.dates)))}
+        ${r.chronos ? chiffre(direTemps(r.minutes), 'sur le court',
+          `sur ${r.chronos} match${r.chronos > 1 ? 's chronométrés' : ' chronométré'}`) : ''}
+        ${r.points ? chiffre(`+${r.points}`, 'points marqués',
+          'comptés à ton échelon d\'aujourd\'hui') : ''}
+      </section>
+
+      <p class="tiny muted">${h(direQuand(r.dates))}${
+        r.club ? ` — ${h(r.club.nom)}` : ''}${
+        Object.keys(r.surfaces).length === 1 ? ` — ${h(Object.keys(r.surfaces)[0].toLowerCase())}` : ''}.
+        ${r.chronos && r.chronos < b.total
+          ? `Le temps de jeu ne porte que sur ${r.chronos} match${r.chronos > 1 ? 's' : ''} : les autres n'ont pas été chronométrés.`
+          : ''}</p>
+
+      ${r.scalp ? `<p class="tiny">🎯 Meilleure victoire : <strong>${h(r.scalp.adversaire || 'un adversaire')}</strong>
+        ${puce(r.scalp.echelonAdverse)}${r.scalp.score ? ` — ${h(r.scalp.score)}` : ''}</p>` : ''}
+
+      ${r.gains || r.lots.length ? `<p class="tiny">💶 ${[
+        r.gains ? `${r.gains} €` : '',
+        r.lots.length ? r.lots.map(x => h(x)).join(', ') : '',
+      ].filter(Boolean).join(' — ')}</p>` : ''}
+
+      ${r.route ? `<p class="tiny muted">🚗 ${Math.round(r.route.km)} km à vol d'oiseau,
+        aller-retour compté une fois par jour joué (${h(direDistance(r.route.unAller))} de chez toi).</p>` : ''}
+
+      ${r.photos.length ? `<div class="match-photos" data-photos-recap>${r.photos.map((p, i) =>
+        `<button type="button" class="match-photo" data-photo-recap="${i}">
+          <img src="${h(p.src)}" alt="" loading="lazy"></button>`).join('')}</div>` : ''}
+
+      <span class="etiquette">Le parcours</span>
+      <ul class="matchs">${r.parcours.map(ligneMatch).join('')}</ul>`,
     onMount: corps => {
       brancherNotes(corps);
       corps.addEventListener('click', e => {
+        /* La bande de photos du tournoi les rassemble toutes, celles de
+           chaque match confondues : c'est l'album de l'open, et il n'a
+           pas à être rangé match par match pour se regarder. */
+        const ph = e.target.closest('[data-photo-recap]');
+        if (ph) {
+          e.stopPropagation();
+          visionneuse(r.photos, Number(ph.dataset.photoRecap) || 0);
+          return;
+        }
         const li = e.target.closest('.match');
         if (!li) return;
         const m = store.matchs.find(x => x.id === li.dataset.id);
         // Une fenêtre à la fois : celle du match remplace celle du tournoi.
         if (m) matchForm(m);
+      });
+    },
+  });
+}
+
+/* ─── Le récapitulatif d'une saison ────────────────────────────────────
+ *
+ * Même idée, un cran plus haut. Une saison de tennis ne se raconte pas
+ * en un bilan : on veut savoir combien de tournois, combien de jours
+ * passés sur un court, jusqu'où l'on est allé, et contre qui.
+ *
+ * La plus longue série de victoires y a sa place pour une raison
+ * particulière : c'est le seul chiffre qui dépend de l'ordre des matchs,
+ * donc le seul qu'aucune moyenne ne peut rendre. */
+function fenetreSaison(annee) {
+  const r = recapSaison(annee, matchsVus(), saisonDe);
+  if (!r) return;
+  const b = r.bilan;
+
+  openModal({
+    title: `Saison ${r.libelle}`,
+    large: true,
+    body: `
+      <section class="chiffres">
+        ${chiffre(b.total, `match${b.total > 1 ? 's' : ''}`)}
+        ${chiffre(`${b.v}–${b.d}`, 'victoires–défaites')}
+        ${chiffre(`${b.ratio}%`, 'de réussite')}
+        ${chiffre(r.jours, `jour${r.jours > 1 ? 's' : ''} de jeu`, h(direQuand(r.dates)))}
+      </section>
+
+      <section class="chiffres">
+        ${chiffre(r.tournois.length, `tournoi${r.tournois.length > 1 ? 's' : ''}`)}
+        ${r.titres.length ? chiffre(`🏆 ${r.titres.length}`, `titre${r.titres.length > 1 ? 's' : ''}`) : ''}
+        ${r.finales.length ? chiffre(`🥈 ${r.finales.length}`, `finale${r.finales.length > 1 ? 's' : ''} perdue${r.finales.length > 1 ? 's' : ''}`) : ''}
+        ${r.exploits ? chiffre(r.exploits, 'contre plus fort') : ''}
+        ${r.chronos ? chiffre(direTemps(r.minutes), 'sur le court',
+          `sur ${r.chronos} match${r.chronos > 1 ? 's chronométrés' : ' chronométré'}`) : ''}
+        ${r.points ? chiffre(`+${r.points}`, 'points marqués') : ''}
+      </section>
+
+      ${/* Les pluriels s'accordent : « 1 club(s) visité(s) » est le genre de
+            détail qui fait lire un tableau de bord plutôt qu'une phrase. */''}
+      <p class="tiny muted">${h(direQuand(r.dates))} — ${r.adversaires.length}
+        adversaire${r.adversaires.length > 1 ? 's différents' : ' différent'},
+        ${r.clubs} club${r.clubs > 1 ? 's visités' : ' visité'}${
+        r.equipes ? `, dont ${r.equipes} match${r.equipes > 1 ? 's' : ''} par équipes` : ''}.</p>
+
+      ${r.serie.n > 1 ? `<p class="tiny">🔥 Plus longue série : <strong>${r.serie.n} victoires
+        d'affilée</strong>${r.serie.dernier?.date ? `, jusqu'au ${h(dateCourte(r.serie.dernier.date))}` : ''}.</p>` : ''}
+      ${r.scalp ? `<p class="tiny">🎯 Meilleure victoire : <strong>${h(r.scalp.adversaire || 'un adversaire')}</strong>
+        ${puce(r.scalp.echelonAdverse)}${r.scalp.date ? ` — ${h(dateCourte(r.scalp.date))}` : ''}</p>` : ''}
+      ${r.moisFort ? `<p class="tiny muted">Mois le plus chargé : ${h(r.moisFort.libelle)}
+        (${r.moisFort.n} matchs).</p>` : ''}
+      ${r.km ? `<p class="tiny muted">🚗 ${Math.round(r.km)} km à vol d'oiseau sur la saison,
+        aller-retour compté une fois par jour joué dans chaque club.</p>` : ''}
+      ${r.gains || r.lots.length ? `<p class="tiny">💶 ${[
+        r.gains ? `${r.gains} €` : '', r.lots.length ? r.lots.map(x => h(x)).join(', ') : '',
+      ].filter(Boolean).join(' — ')}</p>` : ''}
+
+      ${r.tournois.length ? `<span class="etiquette">Les tournois de la saison</span>
+      <ul class="clubs-adverses">${r.tournois.map(e => {
+        const eb = bilanMatchs(e.matchs);
+        return `<li data-edition="${h(e.cle)}" role="button" tabindex="0">
+          <div><strong>${h(e.nom)}</strong>
+            <div class="tiny muted">${eb.total} match${eb.total > 1 ? 's' : ''}</div></div>
+          <div class="club-score"><b>${eb.v}–${eb.d}</b></div></li>`;
+      }).join('')}</ul>` : ''}`,
+    onMount: corps => {
+      corps.addEventListener('click', e => {
+        const t = e.target.closest('[data-edition]');
+        // Une fenêtre à la fois : le tournoi remplace la saison.
+        if (t) fenetreEdition(t.dataset.edition);
       });
     },
   });
@@ -398,6 +534,10 @@ function vueStats() {
         versTableau(parEchelon, echelons))}
     `)}
 
+    ${rendreTournois(vus)}
+
+    ${rendreSaisons(vus)}
+
     ${rendreDurees()}
 
     ${rendreTitres()}
@@ -478,6 +618,65 @@ function rendreTitres() {
       journées quoi qu'il arrive.</p>
     <ul class="titres">${titres.map(ligne).join('')}</ul>
     <p class="tiny muted">Touche un titre pour revoir ses matchs.</p>
+  `);
+}
+
+/* ─── Les tournois, un par un ──────────────────────────────────────────
+ *
+ * Les titres avaient déjà leur liste, et c'est une liste de trophées :
+ * elle ne montre que ce qu'on a gagné. Or un tournoi perdu au deuxième
+ * tour a duré deux jours lui aussi, et c'est encore lui qu'on retrouve
+ * l'année suivante en se demandant comment ça s'était passé.
+ *
+ * On les liste donc tous, du plus récent au plus ancien, avec le seul
+ * chiffre qui tienne sur une ligne — le bilan — et le reste au clic. */
+function rendreTournois(vus) {
+  const liste = editions(vus.filter(m => !estParEquipes(m)));
+  if (!liste.length) return '';
+
+  return carteDepliable('tournois',
+    `${liste.length} tournoi${liste.length > 1 ? 's' : ''} joué${liste.length > 1 ? 's' : ''}`, `
+    <ul class="clubs-adverses">${liste.map(e => {
+      const b = bilanMatchs(e.matchs);
+      const gagne = b.d === 0 && b.v > 0;
+      const finalistePerdu = e.matchs.some(m => m.tour === 'finale' && m.issue === 'D');
+      return `<li data-edition="${h(e.cle)}" role="button" tabindex="0" title="Voir le récapitulatif">
+        <div><strong>${gagne ? '🏆 ' : finalistePerdu ? '🥈 ' : ''}${h(e.nom)}</strong>
+          <div class="tiny muted">${h(e.an)} — ${b.total} match${b.total > 1 ? 's' : ''}</div></div>
+        <div class="club-score"><b>${b.v}–${b.d}</b></div></li>`;
+    }).join('')}</ul>
+    <p class="tiny muted">Touche un tournoi : jours de jeu, temps sur le court, parcours,
+      meilleure victoire, photos.</p>
+  `);
+}
+
+/* ─── Les saisons ──────────────────────────────────────────────────────
+ *
+ * Le même geste, un cran plus haut. La saison est l'unité dont on parle
+ * vraiment — « la saison où on est montés » — et jusqu'ici elle
+ * n'existait que comme filtre de période. */
+function rendreSaisons(vus) {
+  const par = {};
+  for (const m of vus) {
+    const s = saisonDe(m.date);
+    if (s != null) (par[s] = par[s] || []).push(m);
+  }
+  const annees = Object.keys(par).sort((a, b) => b - a);
+  if (annees.length < 2) return '';
+
+  return carteDepliable('saisons', `${annees.length} saisons`, `
+    <ul class="clubs-adverses">${annees.map(a => {
+      const b = bilanMatchs(par[a]);
+      const jours = new Set(par[a].map(m => m.date).filter(Boolean)).size;
+      return `<li data-saison="${h(a)}" role="button" tabindex="0" title="Voir le récapitulatif">
+        <div><strong>${h(nomSaison(Number(a)))}</strong>
+          <div class="tiny muted">${b.total} match${b.total > 1 ? 's' : ''} —
+            ${jours} jour${jours > 1 ? 's' : ''} de jeu</div></div>
+        <div class="club-score"><b>${b.v}–${b.d}</b>
+          <span class="tiny muted">${b.ratio}%</span></div></li>`;
+    }).join('')}</ul>
+    <p class="tiny muted">Touche une saison : tournois, titres, série la plus longue,
+      kilomètres, meilleure victoire.</p>
   `);
 }
 
@@ -724,7 +923,7 @@ export function wire(vue, rerendre) {
      porte role="button", ce qui promet Entrée et Espace. */
   vue.addEventListener('keydown', e => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    const g = e.target.closest('[data-axe], [data-edition]');
+    const g = e.target.closest('[data-axe], [data-edition], [data-saison]');
     if (!g) return;
     e.preventDefault();
     g.click();
@@ -738,6 +937,9 @@ export function wire(vue, rerendre) {
 
     const t = e.target.closest('[data-edition]');
     if (t) { fenetreEdition(t.dataset.edition); return; }
+
+    const sa = e.target.closest('[data-saison]');
+    if (sa) { fenetreSaison(sa.dataset.saison); return; }
 
     /* Ouvrir ou fermer une section se retient : sinon le prochain redessin
        refermerait ce qu'on vient d'ouvrir. On laisse le navigateur faire
