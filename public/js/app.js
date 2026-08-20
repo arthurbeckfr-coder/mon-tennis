@@ -246,6 +246,91 @@ function quiEcrit() {
   ].join('\n');
 }
 
+/* ─── Passer l'adresse ─────────────────────────────────────────────────
+ *
+ * Il n'y a rien à installer et rien à créer : le carnet est une page, et
+ * l'ouvrir suffit. Encore faut-il pouvoir en donner l'adresse sans aller
+ * la chercher dans la barre du navigateur — sur un téléphone en mode
+ * application, cette barre n'existe même plus.
+ *
+ * Le partage du système fait le travail quand il est là : c'est lui qui
+ * connaît les contacts, les messageries et l'ordre dans lequel on s'en
+ * sert. Sur un ordinateur il manque souvent, et l'on retombe sur quatre
+ * chemins écrits à la main — dont la copie, qui marche partout et
+ * n'engage rien.
+ */
+const adresseDuSite = () => location.origin + location.pathname;
+
+const MOT_DE_PARTAGE = 'Mon carnet de tennis : matchs, classement FFT, clubs et conseils.'
+  + ' Rien à installer, tout reste sur ton téléphone.';
+
+async function partager() {
+  const url = adresseDuSite();
+  /* `canShare` avant `share` : quelques navigateurs de bureau annoncent
+     la fonction sans savoir partager un lien, et l'appel échoue alors
+     silencieusement — l'utilisateur touche un bouton qui ne fait rien. */
+  const donnees = { title: 'Mon tennis', text: MOT_DE_PARTAGE, url };
+  if (navigator.share && (!navigator.canShare || navigator.canShare(donnees))) {
+    try { await navigator.share(donnees); return true; }
+    catch { /* partage refusé ou annulé : on ouvre la fenêtre à la place */ }
+  }
+  return false;
+}
+
+async function copierAdresse() {
+  const url = adresseDuSite();
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Lien copié — il n\'y a plus qu\'à le coller.');
+    return true;
+  } catch {
+    /* Le presse-papiers est refusé hors d'un geste direct, et sur
+       certains navigateurs anciens. Plutôt que d'annoncer une copie qui
+       n'a pas eu lieu, on montre l'adresse et l'on laisse faire. */
+    toast('Copie refusée par le navigateur — l\'adresse est affichée, sélectionne-la.');
+    return false;
+  }
+}
+
+function partagerModal() {
+  const url = adresseDuSite();
+  const texte = encodeURIComponent(`${MOT_DE_PARTAGE}\n${url}`);
+  openModal({
+    title: 'Partager l\'application',
+    body: `<p class="tiny muted">Envoie ce lien : la personne l'ouvre et s'en sert
+        aussitôt. Il n'y a rien à installer, aucun compte à créer, et son carnet reste
+        chez elle — tu ne verras pas ses matchs, elle ne verra pas les tiens.</p>
+
+      <div class="rangee-partage">
+        <button class="btn btn-primary" data-copier>🔗 Copier le lien</button>
+        <a class="btn" href="sms:?&body=${texte}">💬 SMS</a>
+        <a class="btn" href="https://wa.me/?text=${texte}" target="_blank"
+           rel="noopener noreferrer">WhatsApp ↗</a>
+        <a class="btn" href="mailto:?subject=${encodeURIComponent('Mon tennis')}&body=${texte}">✉️ E-mail</a>
+      </div>
+
+      <p class="adresse-partage" data-adresse>${h(url)}</p>
+      <p class="tiny muted">Sur un téléphone, le bouton « Partager » du menu ouvre
+        directement la liste de tes contacts et de tes applications.</p>`,
+    onMount: corps => {
+      corps.addEventListener('click', async e => {
+        if (!e.target.closest('[data-copier]')) return;
+        const ok = await copierAdresse();
+        /* Copie refusée : on sélectionne l'adresse pour que le geste
+           suivant — Ctrl+C — trouve quelque chose de prêt. */
+        if (!ok) {
+          const p = corps.querySelector('[data-adresse]');
+          const s = window.getSelection();
+          const r = document.createRange();
+          r.selectNodeContents(p);
+          s.removeAllRanges();
+          s.addRange(r);
+        }
+      });
+    },
+  });
+}
+
 function signalerModal() {
   openModal({
     title: 'Signaler quelque chose',
@@ -335,12 +420,18 @@ function ajoutRapide() {
           au même rang que les autres, c'était la proposer à chaque fois
           qu'on vient noter un match. */''}
     <div class="rangee-message">
+      <button class="btn btn-ghost" data-partager>📣 Partager l'application</button>
       <button class="btn btn-ghost" data-signaler>✉️ Un bug, une question…</button>
     </div>`,
     onMount: el => el.addEventListener('click', e => {
       const b = e.target.closest('[data-q]');
       if (b) { closeModal(); liste[+b.dataset.q][3](); return; }
-      if (e.target.closest('[data-signaler]')) { closeModal(); signalerModal(); }
+      if (e.target.closest('[data-signaler]')) { closeModal(); signalerModal(); return; }
+      /* Le partage du système d'abord ; s'il n'est pas là, la fenêtre. */
+      if (e.target.closest('[data-partager]')) {
+        closeModal();
+        partager().then(fait => { if (!fait) partagerModal(); });
+      }
     }),
   });
 }

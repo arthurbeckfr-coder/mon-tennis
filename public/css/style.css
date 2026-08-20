@@ -2761,8 +2761,32 @@ body.mode-court .terrain-diapo .terrain {
 /* La porte de sortie de la fenêtre « Ajouter » : détachée de la grille
    par un filet, et discrète — on ne signale pas un défaut tous les
    jours, mais le jour où l'on en trouve un, il faut savoir où aller. */
+/* Les quatre chemins du partage : ils s'enroulent, parce que quatre
+   boutons côte à côte ne tiennent pas dans la largeur d'un téléphone et
+   qu'aucun d'eux ne doit passer avant les autres. */
+.rangee-partage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+/* L'adresse en toutes lettres : c'est le dernier recours quand la copie
+   est refusée, et c'est aussi ce qu'on regarde pour vérifier qu'on envoie
+   la bonne chose. Elle se coupe où elle peut plutôt que de déborder. */
+.adresse-partage {
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  background: var(--carte-2);
+  border-radius: 9px;
+  font-size: .82rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .rangee-message {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: center;
   margin-top: 14px;
   padding-top: 12px;
