@@ -13,6 +13,7 @@ import {
   ajouterConseil, modifierConseil, supprimerConseil,
   ajouterSource, ajouterClub, modifierClub, clubDuMatch, surfaceDuMatch,
   exporterJSON, importerJSON, toutEffacer,
+  proprietaireDuCarnet, poserProprietaire, volumeDuCarnet,
   raquettes, cordages, chaussures, courses, noterJoueur,
   ajouterDepense, modifierDepense, supprimerDepense,
   PROFILS, MOMENTS, CATEGORIES, PLATEFORMES, SURFACES, CATEGORIES_DEPENSE, TOURS,
@@ -1687,6 +1688,89 @@ export function blocDonnees() {
     </div>`;
 }
 
+/* ─── Se connecter à un autre compte que le sien ───────────────────────
+ *
+ * Le carnet vit dans le navigateur, et la synchronisation fait ce pour
+ * quoi elle est faite : elle verse ce qu'il y a ici dans le compte
+ * connecté. Tant qu'on se reconnecte au même compte, c'est exactement ce
+ * qu'on veut. Le jour où l'on ouvre un second compte sur le même
+ * appareil, c'est une fuite : les matchs de l'un partent chez l'autre,
+ * sans que rien ne l'ait demandé ni annoncé.
+ *
+ * Le compte n'y est pour rien, la base non plus — chacun ne lit que sa
+ * ligne. Ce qui manquait, c'est que le carnet sache d'où il vient.
+ *
+ * Alors on demande. Pas « voulez-vous fusionner », qui n'a pas de bonne
+ * réponse, mais le seul choix honnête : ce qui est ici n'appartient pas
+ * au compte qui vient d'ouvrir, donc on le met de côté avant de le
+ * remplacer — et la sauvegarde est proposée d'abord, parce qu'effacer
+ * sans filet ce que quelqu'un a mis trois ans à écrire ne se rattrape
+ * pas.
+ */
+function fenetreAutreCompte(email, apres) {
+  const v = volumeDuCarnet();
+  return new Promise(resolve => {
+    openModal({
+      title: 'Un autre carnet est déjà ici',
+      body: `<p>Cet appareil contient le carnet d'un autre compte :
+          <strong>${v.matchs} match${v.matchs > 1 ? 's' : ''}</strong>${
+          v.conseils ? `, ${v.conseils} conseil${v.conseils > 1 ? 's' : ''}` : ''}.</p>
+        <p>Il ne sera pas versé dans <strong>${h(email)}</strong> : ce n'est pas le sien.
+          Pour continuer, il faut le retirer de cet appareil et charger celui de ce
+          compte.</p>
+        <p class="tiny muted">Le carnet retiré n'est pas perdu pour autant : il reste en
+          ligne dans son compte d'origine, et se retrouve en s'y reconnectant. Prends
+          quand même une sauvegarde si tu as le moindre doute — c'est un fichier, il ne
+          coûte rien.</p>
+        <div class="rangee-boutons" style="margin-top:12px">
+          <button class="btn" data-sauver>💾 Enregistrer une sauvegarde</button>
+        </div>`,
+      footer: `<button class="btn" data-annuler>Annuler</button>
+               <button class="btn btn-danger" data-remplacer>Charger le carnet de ce compte</button>`,
+      onMount: () => {
+        const racine = document.getElementById('modal-root');
+        racine.querySelector('[data-sauver]').addEventListener('click', () => {
+          telechargerExport();
+        });
+        racine.querySelector('[data-annuler]').addEventListener('click', () => {
+          closeModal();
+          resolve(false);
+        });
+        racine.querySelector('[data-remplacer]').addEventListener('click', () => {
+          closeModal();
+          resolve(true);
+        });
+      },
+    });
+  }).then(apres);
+}
+
+/** Le fichier de sauvegarde.
+ *
+ *  Une seule copie de ce geste, appelée par le bouton « Enregistrer un
+ *  fichier » comme par la fenêtre du changement de compte : deux copies
+ *  auraient fini par ne plus traiter le refus de la même façon, et c'est
+ *  justement le cas qu'il faut traiter — un lien de téléchargement est
+ *  bloqué dans certains contextes d'affichage, et un bouton mort qui
+ *  précède un effacement est ce qu'on peut faire de pire.
+ */
+function telechargerExport() {
+  try {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([exporterJSON()], { type: 'application/json' }));
+    a.download = `tennis-${aujourdhui()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('Fichier enregistré.');
+    return true;
+  } catch {
+    toast('Téléchargement refusé par le navigateur — utilise « Copier ».');
+    return false;
+  }
+}
+
 /** Branche le bloc ci-dessus, où qu'il soit posé. */
 export function brancherDonnees(racine) {
 
@@ -1752,6 +1836,32 @@ export function brancherDonnees(racine) {
       dessinerSync();
       document.addEventListener('sync-change', dessinerSync);
 
+      /* Le premier tour après une connexion : c'est là, et là seulement,
+         que le carnet peut changer de main. */
+      const premiereSynchro = async (email) => {
+        const uid = nuage.utilisateurCourant();
+        const proprio = proprietaireDuCarnet();
+        const v = volumeDuCarnet();
+
+        if (proprio && uid && proprio !== uid && v.total) {
+          const remplacer = await fenetreAutreCompte(email, x => x);
+          if (!remplacer) {
+            /* Refus : on ne synchronise pas, et l'on se déconnecte plutôt
+               que de laisser un compte ouvert sur le carnet d'un autre. */
+            nuage.deconnexion();
+            toast('Déconnecté — le carnet de cet appareil est resté intact.');
+            return;
+          }
+          toutEffacer();
+          poserProprietaire(uid);
+        } else if (uid && !proprio) {
+          poserProprietaire(uid);
+        }
+
+        const r = await nuage.synchroniser();
+        toast(r.ok ? messageSync(r) : `Connecté, mais : ${r.erreur}`);
+      };
+
       bloc.addEventListener('click', async e => {
         const m = e.target.closest('[data-mode]');
         if (m) { mode = m.dataset.mode; dessinerSync(); return; }
@@ -1771,8 +1881,7 @@ export function brancherDonnees(racine) {
             const r = await nuage.inscription(mail, mdp);
             if (r.connecte) {
               dessinerSync();
-              const s = await nuage.synchroniser();
-              toast(s.ok ? 'Compte créé — ton carnet est en ligne.' : `Compte créé, mais : ${s.erreur}`);
+              await premiereSynchro(mail);
               dessinerSync();
             } else {
               /* Confirmation exigée : le compte n'existera qu'une fois le
@@ -1822,8 +1931,7 @@ export function brancherDonnees(racine) {
           try {
             await nuage.connexion(mail, mdp);
             dessinerSync();
-            const r = await nuage.synchroniser();
-            toast(r.ok ? messageSync(r) : `Connecté, mais : ${r.erreur}`);
+            await premiereSynchro(mail);
             dessinerSync();
           } catch (ex) {
             err.hidden = false;
@@ -1839,25 +1947,7 @@ export function brancherDonnees(racine) {
         }
       });
 
-      racine.querySelector('[data-fichier]').onclick = async () => {
-        const nom = `tennis-${new Date().toISOString().slice(0, 10)}.json`;
-        const contenu = exporterJSON();
-        // Un lien de téléchargement est bloqué dans certains contextes
-        // d'affichage : on prévient plutôt que de laisser un bouton mort.
-        try {
-          const blob = new Blob([contenu], { type: 'application/json' });
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = nom;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-          toast('Fichier enregistré.');
-        } catch {
-          toast('Téléchargement refusé par le navigateur — utilise « Copier ».');
-        }
-      };
+      racine.querySelector('[data-fichier]').onclick = telechargerExport;
 
       racine.querySelector('[data-presse]').onclick = async () => {
         try {

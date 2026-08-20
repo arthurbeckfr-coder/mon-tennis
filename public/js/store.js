@@ -89,6 +89,15 @@ function vide() {
     version: VERSION,
     /* Les suppressions, datées : voir le bandeau sur la synchronisation. */
     supprimes: [],
+    /* À quel compte ce carnet appartient. Vide tant qu'on ne s'est
+       jamais connecté — un carnet peut vivre toute sa vie sans compte.
+
+       Il ne sert qu'à une chose, et elle est grave : reconnaître qu'on
+       se connecte à un autre compte que celui dont ces données sont
+       issues. Sans ce témoin, la synchronisation faisait ce pour quoi
+       elle est faite — verser le carnet local dans le compte connecté —
+       et versait donc les matchs de l'un dans le compte de l'autre. */
+    proprietaire: null,
     profilModifieLe: null,
     baremeModifieLe: null,
     /* Rien de calculable ne se saisit : le bilan, les victoires
@@ -768,6 +777,22 @@ export function fusionnerDistant(distant) {
     retires: r.retires || 0,
   };
 }
+/** À qui appartient le carnet posé sur cet appareil. */
+export const proprietaireDuCarnet = () => store.proprietaire || null;
+
+/** Le carnet change de main. À n'appeler qu'après avoir vérifié que
+ *  c'est bien voulu : ce que contient l'appareil ne remontera plus. */
+export function poserProprietaire(utilisateur) {
+  return maj(s => { s.proprietaire = utilisateur || null; });
+}
+
+/** Ce que contient le carnet, en une phrase — pour demander avant
+ *  d'effacer, plutôt qu'après. */
+export function volumeDuCarnet() {
+  const n = LISTES.reduce((t, c) => t + (store[c]?.length || 0), 0);
+  return { total: n, matchs: store.matchs.length, conseils: store.conseils.length };
+}
+
 export function toutEffacer() {
   store = vide();
   return sauver();

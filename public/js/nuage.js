@@ -23,7 +23,8 @@
    pas est celle qui efface trois conseils notés après un cours. */
 
 import { SUPABASE_URL, SUPABASE_CLE } from './config.js';
-import { store, exporterJSON, fusionnerDistant } from './store.js';
+import { store, exporterJSON, fusionnerDistant,
+         proprietaireDuCarnet, poserProprietaire } from './store.js';
 import { viderBrouillons } from './util.js';
 
 const CLE_SESSION = 'tennis-session';
@@ -48,6 +49,9 @@ const ecrireSession = (s) => {
 
 export const connecte = () => !!lireSession()?.refresh_token;
 export const courriel = () => lireSession()?.email || '';
+/** L'identifiant du compte connecté — celui que la base utilise pour
+ *  ranger les carnets, et le seul qui ne change pas avec l'adresse. */
+export const utilisateurCourant = () => lireSession()?.utilisateur || '';
 export const derniereSync = () => {
   try { return localStorage.getItem(CLE_SYNC) || ''; } catch { return ''; }
 };
@@ -196,6 +200,16 @@ export async function synchroniser() {
     const s = await jeton();
     if (!s) throw new Error('Non connecté.');
 
+    /* La garde. Un carnet appartenant à un autre compte ne doit pas
+       partir dans celui-ci, même si l'on est arrivé là par un chemin
+       qui n'a rien demandé : c'est la dernière barrière avant l'envoi,
+       et c'est celle qui compte. */
+    const proprio = proprietaireDuCarnet();
+    if (proprio && proprio !== s.utilisateur) {
+      return { ok: false, autreCompte: true,
+        erreur: 'Ce carnet appartient à un autre compte — rien n\'a été envoyé.' };
+    }
+
     const lignes = await requete(`carnets?utilisateur=eq.${s.utilisateur}&select=donnees,modifie_le`);
     const distant = lignes?.[0]?.donnees || null;
 
@@ -213,6 +227,10 @@ export async function synchroniser() {
         appareil: appareil(),
       }),
     });
+
+    /* Le carnet est désormais celui de ce compte : on le note, faute de
+       quoi la garde ci-dessus ne saurait jamais rien. */
+    if (!proprio) poserProprietaire(s.utilisateur);
 
     const quand = new Date().toISOString();
     try { localStorage.setItem(CLE_SYNC, quand); } catch {}
