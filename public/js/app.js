@@ -475,10 +475,58 @@ if (!etat.ok) {
   toast('Données locales illisibles — on repart d\'un carnet vide.');
 }
 
-/* Le classement conditionne tout le calcul des points. Sur un carnet
-   vierge, on le demande une fois — sans bloquer l'accès au reste. */
+/* ─── Le premier jour ──────────────────────────────────────────────────
+ *
+ * Un carnet vierge ouvrait droit sur le réglage du classement, sans un
+ * mot d'explication : on tombait sur un formulaire fédéral avant d'avoir
+ * compris où l'on était. C'était supportable pour qui a écrit le site ;
+ * ça ne l'est pas pour quelqu'un à qui l'on vient d'envoyer un lien.
+ *
+ * Trois phrases, puis deux chemins. Le compte est proposé en premier
+ * parce que c'est la seule chose qu'on regrette de ne pas avoir faite :
+ * trois mois de matchs notés sur un téléphone, et rien sur l'ordinateur.
+ * Mais il ne barre pas la route — le carnet marche sans compte, et le
+ * dire est plus honnête que de faire semblant d'exiger une inscription.
+ */
+function accueilPremierJour() {
+  openModal({
+    title: 'Bienvenue',
+    body: `<p>Ce carnet range une saison de tennis : les matchs et leur score, le
+        classement et ce qu'il faudrait pour monter, les clubs où l'on joue, les
+        conseils du prof qu'on oublie en sortant du court.</p>
+      <p class="tiny muted">Tout reste dans ton navigateur, et rien ne part nulle part
+        sans que tu le demandes. Il fonctionne sans réseau — c'est fait pour un bord de
+        court.</p>
+      <p class="tiny muted">Un compte ne sert qu'à une chose : retrouver le même carnet
+        sur ton téléphone et sur ton ordinateur. Tu peux le créer maintenant ou plus tard,
+        rien ne sera perdu.</p>
+      <div class="rangee-boutons" style="margin-top:14px">
+        <button class="btn btn-primary" data-compte>Créer un compte</button>
+        <button class="btn" data-sans-compte>Commencer sans compte</button>
+      </div>`,
+    onMount: corps => {
+      corps.addEventListener('click', e => {
+        if (e.target.closest('[data-compte]')) {
+          closeModal();
+          /* Le profil, où vit le bloc du compte. La fenêtre de réglage du
+             classement viendra après, une fois le compte réglé : deux
+             formulaires empilés le premier jour, c'est un de trop. */
+          location.hash = '#/matos';
+          return;
+        }
+        if (e.target.closest('[data-sans-compte]')) {
+          closeModal();
+          /* Le classement conditionne tout le calcul des points : c'est la
+             seule chose qu'on demande avant de laisser entrer. */
+          setTimeout(profilForm, 250);
+        }
+      });
+    },
+  });
+}
+
 if (etat.neuf) {
-  setTimeout(() => { if (!store.matchs.length) profilForm(); }, 400);
+  setTimeout(() => { if (!store.matchs.length) accueilPremierJour(); }, 400);
 }
 
 /* Le temps fait baisser le bilan sans qu'on joue : mieux vaut

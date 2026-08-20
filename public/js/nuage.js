@@ -85,6 +85,39 @@ export async function connexion(email, motDePasse) {
   return { email: d.user?.email };
 }
 
+/** Créer un compte.
+ *
+ *  Deux réponses possibles, et il faut les distinguer pour ne pas mentir
+ *  à celui qui vient de s'inscrire :
+ *
+ *  — une session complète, quand la base n'exige pas de confirmation :
+ *    on est connecté, il n'y a plus rien à faire ;
+ *  — un utilisateur sans session : un courriel de confirmation est
+ *    parti, et le compte ne servira qu'une fois le lien suivi.
+ *
+ *  Un troisième cas se cache dans le second. Depuis quelques versions,
+ *  Supabase répond la même chose pour une adresse déjà inscrite que pour
+ *  une inscription neuve — c'est volontaire, cela empêche de deviner qui
+ *  a un compte. On ne peut donc pas promettre « compte créé » : on dit ce
+ *  qui est sûr, à savoir qu'un courriel a été envoyé s'il devait l'être.
+ */
+export async function inscription(email, motDePasse) {
+  /* Où le lien de confirmation ramène : ici, et non sur la page d'accueil
+     que la base a en réglage. Sans cela on confirme son compte et l'on se
+     retrouve devant autre chose que le carnet qu'on venait d'ouvrir.
+
+     L'adresse doit figurer dans les redirections autorisées du projet,
+     faute de quoi la base la remplace par la sienne — ce qui n'est pas
+     une panne, seulement un retour moins direct. */
+  const retour = encodeURIComponent(location.origin + location.pathname);
+  const d = await auth(`signup?redirect_to=${retour}`, { email, password: motDePasse });
+  if (d.access_token) {
+    poserSession(d);
+    return { connecte: true, email: d.user?.email || email };
+  }
+  return { connecte: false, email: d.user?.email || d.email || email };
+}
+
 export function deconnexion() {
   ecrireSession(null);
   try { localStorage.removeItem(CLE_SYNC); } catch {}

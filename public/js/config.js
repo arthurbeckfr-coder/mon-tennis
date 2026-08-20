@@ -20,3 +20,13 @@ export const SUPABASE_CLE = 'sb_publishable_Yy0xYYEZFfpGenYL_lMM4Q_DRKNrZq5';
    du navigateur fait le reste — d'où l'adresse d'accueil plutôt qu'une
    page interne, dont le chemin changerait sans prévenir. */
 export const URL_TENUP = 'https://tenup.fft.fr/';
+
+/* L'adresse où écrire à celui qui tient ce carnet : signalement d'un
+   défaut, demande d'accès quand les inscriptions sont fermées.
+
+   Assemblée à l'exécution plutôt qu'écrite d'un tenant. Le dépôt est
+   public, et une adresse en clair dans du code publié est une adresse
+   récoltée : en deux morceaux, elle échappe aux robots les plus simples.
+   Ce n'est pas un secret, c'est le minimum de politesse qu'on doit à sa
+   propre boîte aux lettres. */
+export const ADRESSE_AUTEUR = ['arthurbeck.fr', 'gmail.com'].join('@');

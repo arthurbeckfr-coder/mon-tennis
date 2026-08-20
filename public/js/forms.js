@@ -19,7 +19,7 @@ import {
 } from './store.js';
 import { ICONES, CATEGORIES_COURSES, CAUSES_CORDAGE } from './materiel.js';
 import { analyser, EXEMPLE } from './import-fft.js';
-import { URL_TENUP } from './config.js';
+import { URL_TENUP, ADRESSE_AUTEUR } from './config.js';
 import { situer } from './geocodage.js';
 import { poserRetour } from './retour.js';
 import { reduire, poidsLisible, photosDe } from './photos.js';
@@ -1693,22 +1693,43 @@ export function brancherDonnees(racine) {
       /* Le bloc de synchronisation se redessine à chaque changement d'état :
          connecté ou non, en cours ou non. */
       const bloc = racine.querySelector('#bloc-sync');
+      /* Connexion ou inscription : l'état vit ici, hors du dessin, sinon
+         chaque redessin ramènerait au premier des deux. */
+      let mode = 'connexion';
       const dessinerSync = () => {
         if (nuage.enTrain()) {
           bloc.innerHTML = `<p class="tiny muted">Synchronisation en cours…</p>`;
           return;
         }
         if (!nuage.connecte()) {
+          /* Deux gestes très proches — se connecter, s'inscrire — et un
+             seul formulaire. Les séparer en deux écrans obligerait à
+             deviner, avant d'avoir rien lu, si l'on a déjà un compte ; les
+             mettre côte à côte laisse la question se poser au bon moment,
+             c'est-à-dire devant les champs. */
+          const neuf = mode === 'inscription';
           bloc.innerHTML = `
-            <p class="tiny muted">Connecte-toi pour retrouver ton carnet sur tous tes
-              appareils. Tant que tu ne le fais pas, tout fonctionne comme avant, en local.</p>
+            <div class="segments" role="group" style="margin-bottom:10px">
+              <button data-mode="connexion" class="${neuf ? '' : 'actif'}">Se connecter</button>
+              <button data-mode="inscription" class="${neuf ? 'actif' : ''}">Créer un compte</button>
+            </div>
+            <p class="tiny muted">${neuf
+              ? `Un compte ne sert qu'à une chose : retrouver ton carnet sur tes autres
+                 appareils. Il ne le publie nulle part — personne d'autre que toi n'y a
+                 accès, l'auteur du site compris.`
+              : `Connecte-toi pour retrouver ton carnet sur tous tes appareils. Tant que tu
+                 ne le fais pas, tout fonctionne comme avant, en local.`}</p>
             <div class="duo">
               <label>Email<input id="sync-mail" type="email" autocomplete="username"></label>
               <label>Mot de passe<input id="sync-mdp" type="password"
-                     autocomplete="current-password"></label>
+                     autocomplete="${neuf ? 'new-password' : 'current-password'}"></label>
             </div>
-            <button class="btn btn-primary" data-connexion>Se connecter</button>
-            <p id="sync-erreur" class="tiny alerte" hidden></p>`;
+            ${neuf ? `<p class="tiny muted">Six caractères au moins. Choisis-en un que tu
+              n'utilises pas ailleurs.</p>` : ''}
+            <button class="btn btn-primary" data-${neuf ? 'inscription' : 'connexion'}>${
+              neuf ? 'Créer mon compte' : 'Se connecter'}</button>
+            <p id="sync-erreur" class="tiny alerte" hidden></p>
+            <div id="sync-recours" hidden></div>`;
           return;
         }
         const quand = nuage.derniereSync();
@@ -1732,6 +1753,67 @@ export function brancherDonnees(racine) {
       document.addEventListener('sync-change', dessinerSync);
 
       bloc.addEventListener('click', async e => {
+        const m = e.target.closest('[data-mode]');
+        if (m) { mode = m.dataset.mode; dessinerSync(); return; }
+
+        if (e.target.closest('[data-inscription]')) {
+          const mail = bloc.querySelector('#sync-mail').value.trim();
+          const mdp = bloc.querySelector('#sync-mdp').value;
+          const err = bloc.querySelector('#sync-erreur');
+          const recours = bloc.querySelector('#sync-recours');
+          err.hidden = true; recours.hidden = true;
+          if (!mail || mdp.length < 6) {
+            err.hidden = false;
+            err.textContent = 'Une adresse, et un mot de passe d\'au moins six caractères.';
+            return;
+          }
+          try {
+            const r = await nuage.inscription(mail, mdp);
+            if (r.connecte) {
+              dessinerSync();
+              const s = await nuage.synchroniser();
+              toast(s.ok ? 'Compte créé — ton carnet est en ligne.' : `Compte créé, mais : ${s.erreur}`);
+              dessinerSync();
+            } else {
+              /* Confirmation exigée : le compte n'existera qu'une fois le
+                 lien suivi. On ne prétend pas le contraire, et l'on ne
+                 promet pas non plus que l'adresse était neuve — la base
+                 répond exprès la même chose dans les deux cas. */
+              bloc.innerHTML = `<p class="tiny">📬 Un courriel vient de partir vers
+                <strong>${h(r.email)}</strong>. Suis le lien qu'il contient, puis reviens
+                ici te connecter.</p>
+                <p class="tiny muted">Rien ne presse : le carnet fonctionne déjà, et se
+                  mettra en ligne à ta première connexion. Si le courriel n'arrive pas,
+                  regarde dans les indésirables — et si tu avais déjà un compte à cette
+                  adresse, connecte-toi simplement.</p>
+                <button class="btn btn-ghost" data-mode="connexion">Revenir à la connexion</button>`;
+            }
+          } catch (ex) {
+            err.hidden = false;
+            /* Les inscriptions peuvent être fermées côté base. Ce n'est pas
+               une faute de l'utilisateur et il n'y peut rien : on lui donne
+               le seul chemin qui reste, écrire à celui qui tient le site. */
+            const fermees = /signup|not allowed|disabled/i.test(ex.message);
+            err.textContent = fermees
+              ? 'Les inscriptions ne sont pas ouvertes pour l\'instant.'
+              : /already registered/i.test(ex.message)
+                ? 'Cette adresse a déjà un compte — connecte-toi.'
+                : ex.message;
+            if (fermees) {
+              const sujet = encodeURIComponent('Mon tennis — demande d\'accès');
+              const corps = encodeURIComponent(
+                `Bonjour,\n\nJ'aimerais un compte pour synchroniser mon carnet.\n`
+                + `Adresse : ${mail}\n\nMerci.`);
+              recours.hidden = false;
+              recours.innerHTML = `<p class="tiny muted">Demande un accès : le compte sera
+                créé à la main, et tu recevras une réponse à cette adresse.</p>
+                <a class="btn" href="mailto:${ADRESSE_AUTEUR}?subject=${sujet}&body=${corps}"
+                  >✉️ Demander un accès</a>`;
+            }
+          }
+          return;
+        }
+
         if (e.target.closest('[data-connexion]')) {
           const mail = bloc.querySelector('#sync-mail').value.trim();
           const mdp = bloc.querySelector('#sync-mdp').value;
