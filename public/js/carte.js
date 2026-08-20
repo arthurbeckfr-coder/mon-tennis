@@ -33,6 +33,7 @@ import { store } from './store.js';
 import { distanceKm, direDistance, lienItineraire, adresseDuClub } from './geocodage.js';
 import { CONTOURS } from './contours.js';
 import { FRANCE, VILLES_FRANCE } from './france.js';
+import { ANTILLES, VILLES_ANTILLES } from './antilles.js';
 import { ROUTES, VILLES, COMMUNES_TRACE } from './reperes.js';
 
 /* Le centre officiel de chaque commune où l'on a joué, en [longitude,
@@ -231,7 +232,16 @@ export function carteClubs(clubs, { couleur = 'club' } = {}) {
 
      Le second redessine une partie du premier, et c'est voulu — la
      précision régionale doit gagner là où elle existe. */
-  const fondFrance = FRANCE
+  /* La Martinique et la Guadeloupe sont dans le même tableau que les
+     départements métropolitains, et c'est tout ce qu'il y a à faire : le
+     cadrage se calcule sur les clubs, pas sur un pays. Qui joue aux
+     Antilles voit ses îles ; qui joue en Normandie ne les verra jamais,
+     elles sont à six mille kilomètres du cadre.
+
+     Rien à choisir, donc, et surtout rien à basculer : une carte qui
+     demande « métropole ou outre-mer ? » pose une question dont la
+     réponse est déjà sur l'écran. */
+  const fondFrance = [...FRANCE, ...ANTILLES]
     .flatMap(d => d.anneaux)
     .map(anneau => `<path class="carte-france" data-rang="0" d="${chemin(anneau)}"/>`)
     .join('');
@@ -292,7 +302,7 @@ export function carteClubs(clubs, { couleur = 'club' } = {}) {
      et la nationale vient d'abord parce qu'elle porte le rang le plus
      bas, donc la meilleure visibilité. */
   const vues = new Set();
-  const villes = [...VILLES_FRANCE, ...VILLES]
+  const villes = [...VILLES_FRANCE, ...VILLES_ANTILLES, ...VILLES]
     .filter(v => {
       const n = sansAccent(v.nom);
       if (vues.has(n) || villesDeClubs.has(n)) return false;
