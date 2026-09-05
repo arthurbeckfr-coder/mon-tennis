@@ -244,6 +244,34 @@ Deno.serve(async (req: Request) => {
   return json({ elements });
 });
 
+/** La clé publique du projet, quel que soit le nom qu'elle porte.
+ *
+ *  `SUPABASE_ANON_KEY` est marquée dépréciée dans le tableau de bord et
+ *  finira par disparaître ; la nouvelle, `SUPABASE_PUBLISHABLE_KEYS`, est
+ *  un dictionnaire JSON de plusieurs clés. On prend la première venue :
+ *  elles ouvrent toutes la même porte, celle qui ne donne accès à rien
+ *  sans jeton d'utilisateur.
+ *
+ *  Le jour où l'ancienne s'en va, cette fonction continue — plutôt que
+ *  de refuser tout le monde un matin, sans qu'on ait rien touché.
+ */
+function clePublique(): string {
+  const ancienne = Deno.env.get('SUPABASE_ANON_KEY');
+  if (ancienne) return ancienne;
+  const dict = Deno.env.get('SUPABASE_PUBLISHABLE_KEYS');
+  if (dict) {
+    try {
+      const o = JSON.parse(dict);
+      const v = Array.isArray(o) ? o[0] : Object.values(o)[0];
+      if (typeof v === 'string') return v;
+      if (v && typeof v === 'object' && typeof (v as { api_key?: string }).api_key === 'string') {
+        return (v as { api_key: string }).api_key;
+      }
+    } catch { /* dictionnaire illisible : on tentera avec le jeton */ }
+  }
+  return '';
+}
+
 /** L'utilisateur derrière le jeton, ou null.
  *
  *  On ne lit pas le jeton nous-mêmes : on le donne à Supabase, qui sait
@@ -256,9 +284,8 @@ async function utilisateur(req: Request) {
   if (!jeton) return null;
 
   const base = Deno.env.get('SUPABASE_URL');
-  const publique = Deno.env.get('SUPABASE_ANON_KEY')
-    || Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || jeton;
   if (!base) return null;
+  const publique = clePublique() || jeton;
 
   try {
     const r = await fetch(`${base}/auth/v1/user`, {

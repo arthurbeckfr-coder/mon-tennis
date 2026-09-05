@@ -405,6 +405,14 @@ export function dicterModal(depart = null) {
         } catch (err) {
           elements = rangerLocalement(texte);
           dessiner(false);
+          /* La raison se pose au-dessus des propositions, et non sous le
+             bouton du micro : c'est là qu'on regarde après avoir rangé,
+             et une explication qu'on ne voit pas ne vaut pas mieux qu'un
+             silence. */
+          props.insertAdjacentHTML('afterbegin',
+            `<p class="alerte tiny">${h(/Connecte-toi/.test(err.message)
+              ? 'Claude n\'a pas trié : connecte-toi dans ton profil.'
+              : `Claude n'a pas trié — ${err.message}`)}</p>`);
           /* On dit toujours pourquoi. Le tri assisté a passé des mois à
              échouer sans un mot — l'adresse qu'il appelait n'existait
              pas —, et l'on croyait lire Claude là où l'on lisait trois
