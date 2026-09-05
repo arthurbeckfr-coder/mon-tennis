@@ -87,6 +87,89 @@ const PROFILS_MOTS = {
   physique: /\b(physique|court partout|endurant)/,
 };
 
+/** L'adversaire, dans l'ordre du plus sûr au moins sûr.
+ *
+ *  D'abord un nom du répertoire : si l'on a déjà joué contre Dupont et
+ *  que le mot « dupont » est dans la phrase, c'est lui — la
+ *  reconnaissance vocale rend les noms en minuscules et sans accents,
+ *  alors on compare de la même façon. C'est de loin le plus fiable :
+ *  aucune grammaire à deviner, une liste fermée à reconnaître.
+ *
+ *  À défaut, ce qui suit « contre ». La version d'avant exigeait une
+ *  majuscule, que la dictée ne met jamais : « j'ai gagné contre pierre
+ *  martin » ne donnait donc rien du tout. On accepte les minuscules et
+ *  l'on s'arrête au premier mot de liaison, sans quoi le nom emporterait
+ *  la moitié de la phrase.
+ */
+function adversaireDicte(texte, t) {
+  const connus = repertoire()
+    .map(j => j.nom)
+    .sort((a, b) => b.length - a.length);   // « jean dupont » avant « jean »
+  for (const nom of connus) {
+    const cle = sansAccent(nom).toLowerCase();
+    if (cle.length > 2 && t.includes(cle)) return nom;
+  }
+
+  /* Les mots qui ne peuvent pas être un nom de famille : ils marquent la
+     fin du nom. Sans eux, « contre Martin en finale » donnait « Martin
+     en » — et le carnet aurait gardé un adversaire nommé « Martin En ». */
+  const LIAISON = 'en|au|aux|a|le|la|les|du|de|des|sur|sous|dans|par|pour|avec'
+    + '|score|set|jeu|j|et|puis|hier|aujourd|ce|cet|cette|mon|ma|mes|il|elle|on';
+  const m = texte.match(new RegExp(
+    `\\bcontre\\s+((?!(?:${LIAISON})\\b)[A-Za-zÀ-ÿ][\\wÀ-ÿ'-]*`
+    + `(?:\\s+(?!(?:${LIAISON})\\b)[A-Za-zÀ-ÿ][\\wÀ-ÿ'-]*)?)`, 'i'));
+  if (!m) return '';
+  /* Écrit comme on écrit un nom : la dictée rend « pierre martin ». */
+  return m[1].trim().split(/\s+/)
+    .map(x => x.charAt(0).toUpperCase() + x.slice(1))
+    .join(' ');
+}
+
+/** Le tour, quand il est dit. « Finale » attrape aussi « demi-finale » :
+ *  on cherche donc du plus précis au moins précis. */
+const TOURS_MOTS = [
+  ['demie', /\b(demi[- ]?finale|demie)/],
+  ['quart', /\bquart/],
+  ['huitieme', /\b(huitieme|8e|1\/8)/],
+  ['seizieme', /\b(seizieme|16e|1\/16)/],
+  ['trentedeuxieme', /\b(trente[- ]?deuxieme|32e|1\/32)/],
+  ['qualif', /\b(qualif|qualification)/],
+  ['poule', /\bpoule/],
+  ['tour1', /\b(premier tour|1er tour)/],
+  ['finale', /\bfinale/],
+];
+const tourDicte = t => (TOURS_MOTS.find(([, m]) => m.test(t)) || [''])[0];
+
+/** La surface, dans les mots du carnet — et seulement si elle y est :
+ *  une surface inventée fausse une statistique pour toujours. */
+const SURFACES_MOTS = [
+  ['Terre battue traditionnelle', /\bterre battue|\bterre\b|\bocre\b/],
+  ['Terre artificielle', /\bterre artificielle|\bterre synthetique/],
+  ['Résine', /\bresine|\bdur\b|\bgreenset|\bgreen set/],
+  ['Moquette', /\bmoquette/],
+  ['Gazon synthétique', /\bgazon/],
+  ['Béton poreux', /\bbeton/],
+];
+const surfaceDictee = t => (SURFACES_MOTS.find(([, m]) => m.test(t)) || [''])[0];
+
+/** Le tournoi. On ne devine que la tournure explicite — « au tournoi de
+ *  Dieppe », « à l'open de Puys » — et l'on rend la main sinon : un nom
+ *  d'épreuve faux se propage au club, à la surface et aux statistiques. */
+function tournoiDicte(texte, t) {
+  const connus = [...new Set(store.matchs.map(m => (m.tournoi || '').trim()).filter(Boolean))]
+    .sort((a, b) => b.length - a.length);
+  for (const nom of connus) {
+    const cle = sansAccent(nom).toLowerCase();
+    if (cle.length > 5 && t.includes(cle)) return nom;
+  }
+  const STOP = 'sur|en|au|a|le|la|les|du|de|des|dans|par|pour|avec|contre|j|et|puis|hier';
+  const m = texte.match(new RegExp(
+    `\\b(?:tournoi|open|championnat)\\s+(?:de\\s+la\\s+|de\\s+|du\\s+|des\\s+|d['’]\\s*)?`
+    + `((?!(?:${STOP})\\b)[A-Za-zÀ-ÿ][\\wÀ-ÿ'’-]*`
+    + `(?:\\s+(?!(?:${STOP})\\b)[A-Za-zÀ-ÿ][\\wÀ-ÿ'’-]*)?)`, 'i'));
+  return m ? m[0].trim().toUpperCase() : '';
+}
+
 /**
  * Range une dictée sans réseau. Devine la destination et ce qu'il peut
  * des champs — jamais le reste.
@@ -107,14 +190,15 @@ export function rangerLocalement(texte) {
   if (destination === 'match') {
     const score = (texte.match(new RegExp(MOTIF_SCORE.source, 'g')) || []).join(' ');
     const perdu = /\b(perdu|defaite|battu par)/.test(t);
-    /* Le nom vient après « contre » : c'est la seule tournure fiable à
-       l'oral. Sans elle on laisse vide plutôt que de ramasser un mot. */
-    const nom = texte.match(/\bcontre\s+([A-ZÉÈÀÂ][\wÀ-ÿ'-]*(?:\s+[A-ZÉÈÀÂ][\wÀ-ÿ'-]*)?)/);
     element.match = {
       date: aujourdhui(),
       issue: perdu ? 'D' : 'V',
-      adversaire: nom ? nom[1].trim() : '',
+      adversaire: adversaireDicte(texte, t),
       score: score.trim(),
+      tour: tourDicte(t),
+      surface: surfaceDictee(t),
+      tournoi: tournoiDicte(texte, t),
+      wo: /\b(forfait|w\.?o\.?)\b/.test(t),
       notes: texte,
     };
   } else if (destination === 'course') {
@@ -195,8 +279,18 @@ export function dicterModal() {
 
       if (!micDisponible()) {
         bouton.disabled = true;
-        etat.textContent = 'Ce navigateur ne sait pas dicter — Firefox notamment. '
-          + 'Tape ta note, le rangement fonctionne pareil.';
+        /* Ni Firefox ni aucun navigateur sur iPhone : sur iOS, tous
+           passent par le moteur de Safari, qui n'implémente pas la
+           reconnaissance vocale. Dire « ce navigateur » laissait croire
+           qu'en changer suffirait. Le clavier du téléphone, lui, sait
+           dicter — et c'est la bonne réponse, pas un pis-aller. */
+        const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+          || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        etat.textContent = iOS
+          ? 'Sur iPhone, aucun navigateur ne sait dicter — c\'est iOS qui ne le permet pas. '
+            + 'Touche le champ ci-dessous et utilise le 🎤 de ton clavier : le rangement fonctionne pareil.'
+          : 'Ce navigateur ne sait pas dicter — Firefox notamment. '
+            + 'Tape ta note, le rangement fonctionne pareil.';
       } else {
         etat.textContent = 'La dictée passe par le service de reconnaissance du navigateur : '
           + 'elle demande du réseau.';

@@ -118,8 +118,19 @@ function optsDuree(min, max, pas, choisi, vide) {
   return lignes.join('');
 }
 
-export function matchForm(existant = null) {
-  const m = existant || {
+export function matchForm(recu = null) {
+  /* Un objet sans identifiant n'est pas une fiche du carnet : c'est un
+     brouillon — celui que la dictée vient de remplir, ou qu'un autre
+     écran propose. Le prendre pour une fiche existante faisait
+     enregistrer une modification sur un identifiant qui n'existe pas :
+     la recherche ne trouvait rien, rien n'était écrit, et le message
+     annonçait pourtant « modifié ». On dictait un match, on corrigeait,
+     on enregistrait, et il n'apparaissait nulle part.
+
+     D'où cette ligne, et elle vaut pour tous les formulaires : ce qui
+     porte un identifiant se modifie, le reste s'ajoute. */
+  const existant = recu?.id ? recu : null;
+  const m = recu || {
     date: aujourdhui(), issue: 'V', adversaire: '', echelonAdverse: store.profil.echelon,
     score: '', tournoi: '', surface: '', notes: '', wo: false, photos: [], lien: '',
     tour: '', gainMontant: null, gainLot: '',
@@ -545,8 +556,10 @@ export function matchForm(existant = null) {
 // =====================================================================
 //  Un conseil
 // =====================================================================
-export function conseilForm(existant = null) {
-  const c = existant || {
+export function conseilForm(recu = null) {
+  // Voir `matchForm` : sans identifiant, c'est un brouillon.
+  const existant = recu?.id ? recu : null;
+  const c = recu || {
     date: aujourdhui(), titre: '', texte: '', categorie: 'tactique',
     profils: [], moments: [], source: '', favori: false,
   };
@@ -1419,8 +1432,10 @@ function palette(choisie) {
   </div>`;
 }
 
-export function courseForm(existant = null) {
-  const a = existant || { nom: '', icone: '🎾', categorie: 'materiel', recurrent: false, note: '' };
+export function courseForm(recu = null) {
+  // Voir `matchForm` : sans identifiant, c'est un brouillon.
+  const existant = recu?.id ? recu : null;
+  const a = recu || { nom: '', icone: '🎾', categorie: 'materiel', recurrent: false, note: '' };
   let icone = a.icone;
 
   openModal({
@@ -1533,11 +1548,13 @@ export function raquetteForm(existant = null) {
 /* Poser un cordage se note en trois secondes ou ne se note pas. D'où les
    valeurs pré-remplies depuis la raquette : dans la plupart des cas il n'y
    a qu'à valider. */
-export function cordageForm(existant = null, raquetteId = null) {
-  const rq = store.raquettes.find(x => x.id === (existant?.raquetteId || raquetteId))
+export function cordageForm(recu = null, raquetteId = null) {
+  // Voir `matchForm` : sans identifiant, c'est un brouillon.
+  const existant = recu?.id ? recu : null;
+  const rq = store.raquettes.find(x => x.id === (recu?.raquetteId || raquetteId))
           || store.raquettes.find(x => x.active) || store.raquettes[0];
 
-  const c = existant || {
+  const c = recu || {
     date: aujourdhui(), raquetteId: rq?.id || '', cause: 'casse',
     marque: rq?.cordageHabituel || '', tension: rq?.tensionHabituelle || '', note: '',
   };
