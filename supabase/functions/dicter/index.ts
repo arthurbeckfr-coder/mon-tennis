@@ -192,11 +192,12 @@ Deno.serve(async (req: Request) => {
     return json({ erreur: 'POST attendu.' }, 405);
   }
 
+  const qui = await utilisateur(req);
+  if (!qui) return json({ erreur: 'Connecte-toi pour le tri assisté.' }, 401);
+
   const cle = Deno.env.get('ANTHROPIC_API_KEY');
   if (!cle) return json({ erreur: 'La clé de l\'API n\'est pas posée sur le projet.' }, 500);
 
-  const qui = await utilisateur(req);
-  if (!qui) return json({ erreur: 'Connecte-toi pour le tri assisté.' }, 401);
 
   let corps: Record<string, unknown>;
   try { corps = await req.json(); }
