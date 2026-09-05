@@ -23,7 +23,7 @@ import { openModal, closeModal, toast, h, aujourdhui } from './util.js';
 import { store, PROFILS, MOMENTS, SURFACES } from './store.js';
 import { ECHELONS } from './classement.js';
 import { COUPS } from './terrain.js';
-import { SUPABASE_URL } from './config.js';
+import { SUPABASE_URL, SUPABASE_CLE } from './config.js';
 import * as nuage from './nuage.js';
 import { matchForm, conseilForm, courseForm, cordageForm, joueurForm } from './forms.js';
 import { repertoire } from './views/joueurs.js';
@@ -270,7 +270,14 @@ async function rangerEnLigne(texte) {
      tri retombait chaque fois sur les mots-clés, en silence. */
   const r = await fetch(`${SUPABASE_URL}/functions/v1/dicter`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jeton}` },
+    /* La clé publique voyage avec le jeton : la fonction en a besoin
+       pour demander à la base qui parle, et elle n'a rien de secret —
+       elle est déjà dans cette page. */
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${jeton}`,
+      apikey: SUPABASE_CLE,
+    },
     body: JSON.stringify({ texte, ...contexte() }),
   });
   const d = await r.json().catch(() => ({}));

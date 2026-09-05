@@ -285,7 +285,21 @@ async function utilisateur(req: Request) {
 
   const base = Deno.env.get('SUPABASE_URL');
   if (!base) return null;
-  const publique = clePublique() || jeton;
+
+  /* La clé publique du projet, que `/auth/v1/user` exige en plus du
+     jeton. On prend d'abord celle que l'appelant nous tend : elle est
+     publique — elle est écrite en clair dans la page — et elle ne donne
+     accès à rien sans un jeton d'utilisateur valide, qui est le vrai
+     laissez-passer. La demander à l'environnement d'abord semblait plus
+     propre, mais `SUPABASE_ANON_KEY` y est annoncée puis absente : la
+     fonction refusait alors tout le monde, jeton valide compris.
+
+     L'ordre compte donc : ce que l'appelant fournit, puis ce que le
+     projet expose, et jamais le jeton en guise de clé — la base répond
+     « Invalid API key », ce qui ressemble à s'y méprendre à « tu n'es
+     personne ». */
+  const publique = (req.headers.get('apikey') || '').trim() || clePublique();
+  if (!publique) return null;
 
   try {
     const r = await fetch(`${base}/auth/v1/user`, {
