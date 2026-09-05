@@ -338,7 +338,7 @@ function json(donnees: unknown, statut = 200) {
       /* Le site est servi depuis un autre domaine que la fonction : sans
          ces en-têtes, le navigateur refuse la réponse avant de la lire. */
       'access-control-allow-origin': '*',
-      'access-control-allow-headers': 'authorization, content-type',
+      'access-control-allow-headers': 'authorization, content-type, apikey, x-cle-publique',
     },
   });
 }
