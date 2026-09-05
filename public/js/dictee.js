@@ -20,7 +20,10 @@
    plus tard au milieu des statistiques. */
 
 import { openModal, closeModal, toast, h, aujourdhui } from './util.js';
-import { store } from './store.js';
+import { store, PROFILS, MOMENTS, SURFACES } from './store.js';
+import { ECHELONS } from './classement.js';
+import { COUPS } from './terrain.js';
+import { SUPABASE_URL } from './config.js';
 import * as nuage from './nuage.js';
 import { matchForm, conseilForm, courseForm, cordageForm, joueurForm } from './forms.js';
 import { repertoire } from './views/joueurs.js';
@@ -225,22 +228,54 @@ export function rangerLocalement(texte) {
 // =====================================================================
 //  Le tri assisté
 // =====================================================================
+/* Ce que le carnet sait déjà, et qu'il faut donner pour être rattaché.
+
+   C'est là tout l'intérêt du tri assisté : sans ces listes, « l'open de
+   Puys » dicté trois fois de trois façons ferait trois tournois, et le
+   palmarès compterait trois titres au lieu d'un. Avec elles, Claude
+   choisit le libellé qui existe plutôt que d'en écrire un quatrième.
+
+   Les listes sont bornées : soixante adversaires, quarante tournois. Un
+   carnet de dix ans en compte trois cents, qu'on paierait à chaque
+   dictée pour reconnaître celui de dimanche. Les plus récents d'abord —
+   on dicte le match qu'on vient de jouer, pas celui de 2019. */
+function contexte() {
+  const tournois = [];
+  for (const m of [...store.matchs].sort((a, b) => (b.date || '').localeCompare(a.date || ''))) {
+    const t = (m.tournoi || '').trim();
+    if (t && !tournois.includes(t)) tournois.push(t);
+    if (tournois.length >= 40) break;
+  }
+  return {
+    aujourdhui: aujourdhui(),
+    echelon: store.profil.echelon,
+    adversaires: repertoire().slice(0, 60).map(j => j.nom),
+    tournois,
+    clubs: store.clubs.map(c => c.nom).slice(0, 40),
+    surfaces: SURFACES,
+    echelons: ECHELONS,
+    profils: PROFILS.map(p => p.cle),
+    moments: MOMENTS.map(m => m.cle),
+    coups: COUPS.map(c => c.cle),
+  };
+}
+
 async function rangerEnLigne(texte) {
   const jeton = await nuage.jetonCourant();
-  if (!jeton) throw new Error('Connexion requise pour le tri assisté.');
+  if (!jeton) throw new Error('Connecte-toi pour le tri assisté.');
 
-  const r = await fetch('/api/dicter', {
+  /* L'adresse de la fonction du projet, et non un chemin relatif : le
+     site est publié sur des pages statiques, où « /api/dicter » n'est
+     rien du tout. Il y a été appelé longtemps sans jamais répondre — le
+     tri retombait chaque fois sur les mots-clés, en silence. */
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/dicter`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jeton}` },
-    body: JSON.stringify({
-      texte,
-      echelon: store.profil.echelon,
-      adversaires: repertoire().slice(0, 60).map(j => j.nom),
-    }),
+    body: JSON.stringify({ texte, ...contexte() }),
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.erreur || `Erreur ${r.status}`);
-  return d.elements || [];
+  return (d.elements || []).map(e => ({ ...e, _assiste: true }));
 }
 
 // =====================================================================
@@ -251,9 +286,22 @@ const NOMS = {
   course: '🛒 À acheter', cordage: '🪢 Un cordage',
 };
 
-export function dicterModal() {
+/* ─── Ce qui reste à ranger ────────────────────────────────────────────
+ *
+ * Une dictée fait souvent trois choses : un match, un conseil, une
+ * course. On en ouvrait une, la fenêtre se fermait, et les deux autres
+ * disparaissaient avec elle — il fallait tout redicter pour la suivante.
+ *
+ * D'où cette reprise. Le formulaire s'ouvre par-dessus la liste, et
+ * quand il se referme — enregistré ou abandonné — la liste revient avec
+ * ce qui reste. On sait qu'il s'est refermé en regardant la fenêtre :
+ * elles partagent la même racine, et elle se vide.
+ */
+export function dicterModal(depart = null) {
   let reconnaissance = null;
-  let elements = [];
+  let elements = depart?.elements || [];
+  const texteInitial = depart?.texte || '';
+  const assisteInitial = !!depart?.assiste;
 
   openModal({
     title: 'Dicter une note',
@@ -275,6 +323,7 @@ export function dicterModal() {
       const zone = racine.querySelector('#dictee');
       const etat = racine.querySelector('#etat-micro');
       const props = racine.querySelector('#propositions');
+      if (texteInitial) zone.value = texteInitial;
       const bouton = racine.querySelector('[data-micro]');
 
       if (!micDisponible()) {
@@ -341,6 +390,8 @@ export function dicterModal() {
             correspondant, que tu valides ou non.</p>`;
       };
 
+      if (elements.length) dessiner(assisteInitial);
+
       racine.querySelector('[data-ranger]').onclick = async () => {
         const texte = zone.value.trim();
         if (!texte) { toast('Rien à ranger.'); return; }
@@ -363,12 +414,36 @@ export function dicterModal() {
       props.addEventListener('click', e => {
         const b = e.target.closest('[data-ouvrir]');
         if (!b) return;
-        const el = elements[+b.dataset.ouvrir];
+        const i = +b.dataset.ouvrir;
+        const el = elements[i];
+        /* Ce qui reste, sans celui qu'on ouvre : rangé ou non, on ne le
+           repropose pas — sinon la liste tourne en rond. */
+        const reste = elements.filter((_, j) => j !== i);
         closeModal();
         ouvrirFormulaire(el);
+        if (reste.length) reprendreApres(reste, zone.value, assisteInitial);
       });
     },
   });
+}
+
+/** Rouvre la liste dès que le formulaire posé par-dessus s'est refermé.
+ *
+ *  On guette la racine des fenêtres plutôt qu'un événement : les
+ *  formulaires ne préviennent pas quand ils se ferment, et leur en faire
+ *  prévenir treize obligerait à toucher treize fonctions pour un besoin
+ *  qui n'en concerne qu'une.
+ */
+function reprendreApres(reste, texte, assiste) {
+  const racine = document.getElementById('modal-root');
+  const guet = new MutationObserver(() => {
+    if (racine.querySelector('.modal')) return;   // un formulaire est encore là
+    guet.disconnect();
+    /* Le temps que la fermeture finisse : rouvrir dans la même
+       respiration ferait clignoter l'écran. */
+    setTimeout(() => dicterModal({ elements: reste, texte, assiste }), 220);
+  });
+  guet.observe(racine, { childList: true });
 }
 
 /** Ouvre le formulaire de la destination, pré-rempli. */
@@ -382,6 +457,7 @@ function ouvrirFormulaire(el) {
       return conseilForm({ date: aujourdhui(), titre: '', texte: '', categorie: 'tactique',
                            profils: [], moments: [], coups: [], source: '', favori: false,
                            ...(el.conseil || {}) });
+
     case 'course':
       return courseForm({ nom: '', icone: '🎾', categorie: 'materiel', recurrent: false,
                           note: '', ...(el.course || {}) });
@@ -390,10 +466,16 @@ function ouvrirFormulaire(el) {
                            cause: 'casse', marque: '', tension: '', note: '',
                            ...(el.cordage || {}) });
     case 'joueur': {
-      const nom = el.joueur?.nom || '';
+      const nom = (el.joueur?.nom || '').trim();
+      if (!nom) { toast('Aucun nom dans cette note.'); return; }
       const j = repertoire().find(x => x.nom.toLowerCase() === nom.toLowerCase());
-      if (!j) { toast(`Aucun adversaire nommé « ${nom} » dans le carnet.`); return; }
-      return joueurForm({ ...j, fiche: { ...(j.fiche || {}), ...(el.joueur || {}) } });
+      /* Un adversaire inconnu se crée au lieu d'être refusé. Le carnet
+         sait le faire depuis qu'on peut en ajouter un avant de l'avoir
+         joué — et c'est exactement ce qu'on vient de dicter : ce qu'on
+         sait de quelqu'un qu'on va rencontrer. */
+      return j
+        ? joueurForm({ ...j, fiche: { ...(j.fiche || {}), ...(el.joueur || {}) } })
+        : joueurForm({ nom, fiche: { profils: [], note: '', club: '', ...(el.joueur || {}) } });
     }
     default:
       toast('Destination inconnue.');
