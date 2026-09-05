@@ -277,6 +277,7 @@ async function rangerEnLigne(texte) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${jeton}`,
       apikey: SUPABASE_CLE,
+      'x-cle-publique': SUPABASE_CLE,
     },
     body: JSON.stringify({ texte, ...contexte() }),
   });

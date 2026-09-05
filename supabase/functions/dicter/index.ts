@@ -193,7 +193,12 @@ Deno.serve(async (req: Request) => {
   }
 
   const qui = await utilisateur(req);
-  if (!qui) return json({ erreur: 'Connecte-toi pour le tri assisté.' }, 401);
+  if (!qui.ok) {
+    /* On distingue les trois refus : sans jeton, sans clé, ou jeton
+       refusé par la base. « Connecte-toi » répondu à une clé manquante
+       envoie chercher pendant une heure du côté du mot de passe. */
+    return json({ erreur: qui.pourquoi }, 401);
+  }
 
   const cle = Deno.env.get('ANTHROPIC_API_KEY');
   if (!cle) return json({ erreur: 'La clé de l\'API n\'est pas posée sur le projet.' }, 500);
@@ -281,10 +286,10 @@ function clePublique(): string {
  */
 async function utilisateur(req: Request) {
   const jeton = (req.headers.get('authorization') || '').replace(/^Bearers+/i, '').trim();
-  if (!jeton) return null;
+  if (!jeton) return { ok: false, pourquoi: 'Connecte-toi pour le tri assisté.' };
 
   const base = Deno.env.get('SUPABASE_URL');
-  if (!base) return null;
+  if (!base) return { ok: false, pourquoi: 'Le projet ne dit pas son adresse.' };
 
   /* La clé publique du projet, que `/auth/v1/user` exige en plus du
      jeton. On prend d'abord celle que l'appelant nous tend : elle est
@@ -298,18 +303,25 @@ async function utilisateur(req: Request) {
      projet expose, et jamais le jeton en guise de clé — la base répond
      « Invalid API key », ce qui ressemble à s'y méprendre à « tu n'es
      personne ». */
-  const publique = (req.headers.get('apikey') || '').trim() || clePublique();
-  if (!publique) return null;
+  /* Sous un nom à nous : la passerelle des fonctions lit `apikey` pour
+     son propre compte et ne la transmet pas toujours. Un en-tête qu'elle
+     ne connaît pas traverse intact. */
+  const publique = (req.headers.get('x-cle-publique')
+    || req.headers.get('apikey') || '').trim() || clePublique();
+  if (!publique) return { ok: false, pourquoi: "Clé publique absente de l'appel." };
 
   try {
     const r = await fetch(`${base}/auth/v1/user`, {
       headers: { Authorization: `Bearer ${jeton}`, apikey: publique },
     });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d?.id ? d : null;
-  } catch {
-    return null;
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d?.id) {
+      return { ok: false,
+        pourquoi: `Session refusée par la base (${r.status}${d?.msg ? ' — ' + d.msg : ''}).` };
+    }
+    return { ok: true, id: d.id };
+  } catch (e) {
+    return { ok: false, pourquoi: `Vérification impossible : ${(e as Error).message}` };
   }
 }
 
