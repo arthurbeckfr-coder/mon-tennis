@@ -2665,6 +2665,94 @@ body.mode-court .terrain-diapo .terrain {
 }
 .bouton-rapide:hover { background: var(--carte-2); border-color: var(--accent); }
 /* ===================================================================
+   Les règles du jeu
+   =================================================================== */
+/* Les plans cotés. Ils gardent leurs proportions — un court déformé ne
+   dit plus rien de ses mesures — et prennent la largeur qu'on leur
+   donne. La couleur du sol est celle de l'accent, très diluée : c'est
+   un schéma, pas une photographie de terrain. */
+.regle-plan { display: block; width: 100%; max-width: 420px; margin: 4px auto 2px; }
+.regle-filet-face { max-width: 460px; }
+.regle-sol { fill: var(--accent); fill-opacity: .1; }
+.regle-sol-trait { stroke: var(--bord); stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+/* Les lignes du court : blanches sur le sol teinté, comme sur un vrai
+   terrain, mais cernées pour tenir sur le thème clair — du blanc sur du
+   vert très pâle ne se voit pas. */
+.regle-lignes line, .regle-lignes rect {
+  fill: none;
+  stroke: var(--texte);
+  stroke-opacity: .55;
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Le filet, plus appuyé que les lignes : c'est le sujet de la moitié
+   des questions qu'on se pose. */
+.regle-filet line {
+  stroke: var(--texte);
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
+}
+.regle-filet circle { fill: var(--texte); }
+.regle-bande {
+  fill: none;
+  stroke: var(--texte);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Les cotes : un trait fin de la couleur de l'accent, et un nombre qui
+   ne grossit pas avec le dessin. La taille est donnée en unités du
+   dessin — le plan fait dix-sept mètres de large, un chiffre de 0,8 m
+   de haut s'y lit sans écraser le reste. */
+.regle-cote line {
+  stroke: var(--accent);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+.regle-cote text {
+  fill: var(--accent);
+  font-size: .82px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+/* La vue de face est bien plus courte que le plan : à taille de texte
+   égale en unités du dessin, ses chiffres tombaient à sept pixels. On les
+   redonne à la même taille apparente que ceux du plan. */
+.regle-filet-face .regle-cote text { font-size: .55px; }
+.regle-cote text.a-gauche { text-anchor: start; }
+.regle-mot {
+  fill: var(--muet);
+  font-size: .72px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+/* Les fiches : le titre au doigt, le texte dessous. Même geste que les
+   conseils, un cran plus serré — on les parcourt, on ne les relit pas. */
+.regles-fiches { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 12px; }
+.regle-fiche {
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  background: var(--carte-2);
+  padding: 0 12px;
+}
+.regle-fiche > summary {
+  cursor: pointer;
+  padding: 11px 0;
+  font-weight: 600;
+  font-size: .92rem;
+  list-style: none;
+}
+.regle-fiche > summary::-webkit-details-marker { display: none; }
+.regle-fiche > summary::after { content: " +"; color: var(--muet); }
+.regle-fiche[open] > summary::after { content: " –"; }
+.regle-fiche p { margin: 0 0 10px; font-size: .88rem; }
+.regles-bloc .btn { margin-bottom: 4px; }
+
+/* ===================================================================
    Les photos d'un match
    =================================================================== */
 /* Les vignettes du formulaire : carrées, alignées, et coupées au centre.

@@ -31,6 +31,7 @@ import {
 } from '../store.js';
 import { blocTerrain, listeCoups, brancherCarrousel, nomCoup, COUPS } from '../terrain.js';
 import { conseilForm } from '../forms.js';
+import { blocRegles } from '../regles.js';
 
 let court = { profil: '', moment: '', coup: '', vue: 0, filtres: false, tous: false };
 
@@ -178,6 +179,13 @@ export function renderCourt() {
         </div>
       </details>
     </section>
+    ${/* Les règles se posent après le plan et avant les conseils. Elles
+          ne sont pas un conseil — un conseil s'écrit, une règle se lit —
+          mais elles se cherchent au même endroit et au même moment :
+          debout, entre deux jeux, quand un doute vient. Repliées, elles
+          ne coûtent qu'une ligne à l'écran. */''}
+    ${blocRegles()}
+
     <section class="court-liste">
       ${/* Écrire tient dans une fenêtre flottante : le « + » est ici, à
             côté de ce qu'on lit, et il emporte avec lui la situation en
