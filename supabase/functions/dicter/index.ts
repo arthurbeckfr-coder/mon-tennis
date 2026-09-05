@@ -5,8 +5,21 @@
  * La clé de l'API ne peut pas vivre dans une page publique : elle y serait
  * lue en trois secondes et facturée à quelqu'un d'autre. Elle vit donc
  * ici, dans un secret du projet Supabase, et la page n'appelle que cette
- * fonction — avec son propre jeton de session, que Supabase vérifie avant
- * de nous passer la main. Sans compte, pas de tri assisté.
+ * fonction — avec son propre jeton de session. Sans compte, pas de tri
+ * assisté.
+ *
+ * ─── Qui a le droit d'appeler ────────────────────────────────────────
+ *
+ * La fonction vérifie elle-même, plutôt que de laisser la plateforme le
+ * faire à sa place. Le garde-fou de Supabase attend un jeton signé par
+ * l'ancien secret ; les sessions d'aujourd'hui sont signées autrement, et
+ * un carnet qui marche aurait été refusé à la porte sans qu'on sache
+ * pourquoi.
+ *
+ * On demande donc à Supabase qui est ce jeton. S'il ne répond pas un
+ * utilisateur, on s'arrête là : cette fonction dépense de l'argent à
+ * chaque appel, et une porte ouverte serait une porte ouverte sur le
+ * portefeuille de quelqu'un.
  *
  * ─── Ce que Claude fait, et ce qu'il ne fait pas ─────────────────────
  *
@@ -182,6 +195,9 @@ Deno.serve(async (req: Request) => {
   const cle = Deno.env.get('ANTHROPIC_API_KEY');
   if (!cle) return json({ erreur: 'La clé de l\'API n\'est pas posée sur le projet.' }, 500);
 
+  const qui = await utilisateur(req);
+  if (!qui) return json({ erreur: 'Connecte-toi pour le tri assisté.' }, 401);
+
   let corps: Record<string, unknown>;
   try { corps = await req.json(); }
   catch { return json({ erreur: 'Corps illisible.' }, 400); }
@@ -226,6 +242,34 @@ Deno.serve(async (req: Request) => {
 
   return json({ elements });
 });
+
+/** L'utilisateur derrière le jeton, ou null.
+ *
+ *  On ne lit pas le jeton nous-mêmes : on le donne à Supabase, qui sait
+ *  s'il est valide, s'il a expiré et à qui il appartient. Vérifier une
+ *  signature à la main, c'est écrire un bout de sécurité de plus — et
+ *  celui-là, personne ne le relit jamais.
+ */
+async function utilisateur(req: Request) {
+  const jeton = (req.headers.get('authorization') || '').replace(/^Bearers+/i, '').trim();
+  if (!jeton) return null;
+
+  const base = Deno.env.get('SUPABASE_URL');
+  const publique = Deno.env.get('SUPABASE_ANON_KEY')
+    || Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || jeton;
+  if (!base) return null;
+
+  try {
+    const r = await fetch(`${base}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${jeton}`, apikey: publique },
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.id ? d : null;
+  } catch {
+    return null;
+  }
+}
 
 function json(donnees: unknown, statut = 200) {
   return new Response(JSON.stringify(donnees), {
