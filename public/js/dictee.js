@@ -405,9 +405,14 @@ export function dicterModal(depart = null) {
         } catch (err) {
           elements = rangerLocalement(texte);
           dessiner(false);
-          if (!/Connexion requise/.test(err.message)) {
-            etat.textContent = `Tri assisté indisponible (${err.message}) — tri local utilisé.`;
-          }
+          /* On dit toujours pourquoi. Le tri assisté a passé des mois à
+             échouer sans un mot — l'adresse qu'il appelait n'existait
+             pas —, et l'on croyait lire Claude là où l'on lisait trois
+             expressions régulières. Un repli silencieux est un mensonge
+             par omission. */
+          etat.textContent = /Connecte-toi/.test(err.message)
+            ? 'Tri local : connecte-toi pour que Claude range à ta place.'
+            : `Tri local — le tri assisté n'a pas répondu : ${err.message}`;
         }
       };
 
