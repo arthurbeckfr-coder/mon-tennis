@@ -176,13 +176,18 @@ Les notes d'un match, c'est le ressenti — jamais le score, qui a sa case.`;
 
 Deno.serve(async (req: Request) => {
   /* Le navigateur demande la permission avant d'envoyer : sans cette
-     réponse, l'appel n'a jamais lieu et l'on croit la fonction morte. */
+     réponse, l'appel n'a jamais lieu et l'on croit la fonction morte.
+
+     La liste des en-têtes autorisés doit nommer chacun de ceux qu'on
+     envoie,  compris : un en-tête sur mesure absent de
+     cette liste fait refuser la requête avant même qu'elle parte, et la
+     promesse échoue sans rien dire. */
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
       headers: {
         'access-control-allow-origin': '*',
-        'access-control-allow-headers': 'authorization, content-type, apikey',
+        'access-control-allow-headers': 'authorization, content-type, apikey, x-cle-publique',
         'access-control-allow-methods': 'POST, OPTIONS',
       },
     });
