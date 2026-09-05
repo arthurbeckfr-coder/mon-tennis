@@ -278,6 +278,7 @@ async function rangerEnLigne(texte) {
       Authorization: `Bearer ${jeton}`,
       apikey: SUPABASE_CLE,
       'x-cle-publique': SUPABASE_CLE,
+      'x-jeton': jeton,
     },
     body: JSON.stringify({ texte, ...contexte() }),
   });

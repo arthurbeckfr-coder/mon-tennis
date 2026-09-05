@@ -187,7 +187,7 @@ Deno.serve(async (req: Request) => {
       status: 204,
       headers: {
         'access-control-allow-origin': '*',
-        'access-control-allow-headers': 'authorization, content-type, apikey, x-cle-publique',
+        'access-control-allow-headers': 'authorization, content-type, apikey, x-cle-publique, x-jeton',
         'access-control-allow-methods': 'POST, OPTIONS',
       },
     });
@@ -290,7 +290,13 @@ function clePublique(): string {
  *  celui-là, personne ne le relit jamais.
  */
 async function utilisateur(req: Request) {
-  const jeton = (req.headers.get('authorization') || '').replace(/^Bearers+/i, '').trim();
+  /* Le jeton voyage lui aussi sous un nom à nous. La passerelle des
+     fonctions se sert de  pour son propre compte et y
+     laisse sa propre valeur : on lisait bien quelque chose, mais pas la
+     session — d'où un « jeton invalide » sur une session parfaitement
+     valide. Ce qu'une passerelle touche ne peut pas servir de preuve. */
+  const jeton = (req.headers.get('x-jeton')
+    || (req.headers.get('authorization') || '').replace(/^Bearers+/i, '')).trim();
   if (!jeton) return { ok: false, pourquoi: 'Connecte-toi pour le tri assisté.' };
 
   const base = Deno.env.get('SUPABASE_URL');
@@ -338,7 +344,7 @@ function json(donnees: unknown, statut = 200) {
       /* Le site est servi depuis un autre domaine que la fonction : sans
          ces en-têtes, le navigateur refuse la réponse avant de la lire. */
       'access-control-allow-origin': '*',
-      'access-control-allow-headers': 'authorization, content-type, apikey, x-cle-publique',
+      'access-control-allow-headers': 'authorization, content-type, apikey, x-cle-publique, x-jeton',
     },
   });
 }
